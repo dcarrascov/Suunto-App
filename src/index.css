@@ -1,0 +1,40 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-garmin-blue: #0079c1;
+  --color-garmin-dark: #003d6b;
+  --color-run: #ef4444;
+  --color-ride: #f97316;
+  --color-swim: #3b82f6;
+  --color-other: #8b5cf6;
+
+  --color-zone1: #22c55e;
+  --color-zone2: #84cc16;
+  --color-zone3: #eab308;
+  --color-zone4: #f97316;
+  --color-zone5: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #1e293b;
+  border-radius: 0.5rem;
+}
+
+/* Mapa base claro de OpenStreetMap, oscurecido para encajar con el tema (solo afecta a los mosaicos) */
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95);
+}

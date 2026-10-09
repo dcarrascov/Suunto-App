@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Credenciales (NUNCA subir)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Datos personales descargados de Suunto
+public/data/
+public/data/**
+dist/data/
+dist/data/**
+
+# Python: entorno virtual y bytecode
+.venv/
+__pycache__/
+
+# Depuración y ficheros FIT exportados (contienen tus coordenadas GPS)
+fetch/debug/
+fetch/fit/
+*.fit
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
