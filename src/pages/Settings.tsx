@@ -1,5 +1,6 @@
 import { useActivityStore } from '../stores/activityStore'
 import type { UserSettings } from '../types/suunto'
+import { LTHR_OFFSET, lthrFor } from '../utils/calculations'
 
 export default function Settings() {
   const settings = useActivityStore(s => s.settings)
@@ -44,6 +45,34 @@ export default function Settings() {
           onChange={v => set('lthrRunning', v)}
           hint="FC aproximada en tu umbral láctico corriendo. Suele ser el 87-93% de FCmax."
         />
+
+        {(['cycling', 'swimming'] as const).map(sport => {
+          const key = sport === 'cycling' ? 'lthrCycling' : 'lthrSwimming'
+          const auto = settings[key] == null
+          return (
+            <div key={sport}>
+              <Field
+                label={`FC en Umbral Láctico (${sport === 'cycling' ? 'Ciclismo' : 'Natación'})`}
+                unit="bpm"
+                value={lthrFor(sport, settings)}
+                min={110}
+                max={200}
+                onChange={v => set(key, v)}
+                hint={auto
+                  ? `Automático: ${LTHR_OFFSET[sport]} bpm menos que corriendo. Muévelo para fijar tu valor.`
+                  : 'Valor fijado a mano. Se usa para estimar el TSS cuando Suunto no lo da.'}
+              />
+              {!auto && (
+                <button
+                  onClick={() => set(key, undefined)}
+                  className="mt-1 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Volver a automático
+                </button>
+              )}
+            </div>
+          )
+        })}
 
         <div>
           <label className="block text-sm text-slate-300 mb-1">

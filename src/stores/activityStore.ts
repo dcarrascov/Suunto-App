@@ -87,6 +87,11 @@ export const useActivityStore = create<ActivityState>()(
     {
       name: SETTINGS_KEY,
       partialize: (state) => ({ settings: state.settings }),
+      // Mezcla con los valores por defecto: así los ajustes nuevos tienen valor aunque haya ajustes guardados antiguos
+      merge: (persisted, current) => ({
+        ...current,
+        settings: { ...DEFAULT_SETTINGS, ...(persisted as Partial<ActivityState> | undefined)?.settings },
+      }),
     }
   )
 )

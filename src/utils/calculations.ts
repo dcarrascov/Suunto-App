@@ -1,7 +1,18 @@
-import type { ActivitySummary, FitnessPoint, HRZone, UserSettings } from '../types/suunto'
+import type { ActivitySummary, FitnessPoint, HRZone, Sport, UserSettings } from '../types/suunto'
 import { parseLocalDate, toLocalISODate } from './date'
 
 // ─── TSS Estimation ─────────────────────────────────────────────────────────
+
+// Diferencia típica del umbral láctico respecto a carrera cuando no se ha configurado:
+// en bici suele ser ~5 bpm más bajo y nadando ~10 bpm (menos masa muscular, posición horizontal)
+export const LTHR_OFFSET: Record<'cycling' | 'swimming', number> = { cycling: 5, swimming: 10 }
+
+/** FC de umbral láctico para un deporte ("other" usa la de carrera). */
+export function lthrFor(sport: Sport, settings: UserSettings): number {
+  if (sport === 'cycling') return settings.lthrCycling ?? settings.lthrRunning - LTHR_OFFSET.cycling
+  if (sport === 'swimming') return settings.lthrSwimming ?? settings.lthrRunning - LTHR_OFFSET.swimming
+  return settings.lthrRunning
+}
 
 /**
  * Estimates TSS for activities that don't have it from Suunto.
@@ -19,7 +30,7 @@ export function estimateTSS(activity: ActivitySummary, settings: UserSettings): 
   // TRIMP exponential weighting
   const trimp = durationHours * 60 * hrReserve * 0.64 * Math.exp(1.92 * hrReserve)
   // Normalize: assume 100 TSS ≈ 1h at threshold (TRIMP ~100 at threshold)
-  const thresholdHRReserve = (settings.lthrRunning - 60) / (settings.maxHR - 60)
+  const thresholdHRReserve = (lthrFor(activity.sport, settings) - 60) / (settings.maxHR - 60)
   const thresholdTRIMP = 60 * thresholdHRReserve * 0.64 * Math.exp(1.92 * thresholdHRReserve)
 
   return Math.round((trimp / thresholdTRIMP) * 100)

@@ -35,7 +35,8 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - Récords reales: `bestEfforts` (mejor tramo por distancia, en el resumen) lo calcula `set_best_efforts()`
   con las muestras (exacto) o, si no hay, con los parciales guardados (`bestEffortsSource: "laps"`, aprox.).
   `sync.py` completa así los detalles antiguos sin red; `--force` los recalcula exactos.
+- TSS estimado con el umbral de cada deporte (`lthrFor`): bici y natación se deducen del de carrera
+  (−5/−10 bpm) salvo que se fijen en Ajustes. El `persist` mezcla con `DEFAULT_SETTINGS`.
 
 ## Pendiente
-1. `estimateTSS` usa `lthrRunning` para todos los deportes (afecta a ~20 actividades sin TSS).
-2. La página Rendimiento asume reparto de triatlón 35/50/15; no encaja con un corredor puro.
+1. La página Rendimiento asume reparto de triatlón 35/50/15; no encaja con un corredor puro.

@@ -109,6 +109,9 @@ export interface UserSettings {
   maxHR: number
   ftp: number          // Functional Threshold Power (watts)
   lthrRunning: number  // Lactate threshold HR for running
+  // Umbral de bici y natación: sin valor se deducen del de carrera (ver lthrFor en calculations.ts)
+  lthrCycling?: number
+  lthrSwimming?: number
   thresholdPace: number // seconds per km at threshold
   ftpDate?: string
 }
