@@ -224,20 +224,24 @@ export interface PR {
   date: string
   pace: number       // sec/km
   duration: number   // seconds
+  approx: boolean    // calculado con los parciales (no con las muestras)
 }
 
+// Deben coincidir con EFFORT_DISTANCES de fetch/normalizer.py (claves de bestEfforts en metros)
 const RUNNING_DISTANCES = [
   { km: 1, label: '1 km' },
   { km: 5, label: '5 km' },
   { km: 10, label: '10 km' },
-  { km: 21.097, label: 'Half Marathon' },
-  { km: 42.195, label: 'Marathon' },
+  { km: 21.097, label: 'Media maratón' },
+  { km: 42.195, label: 'Maratón' },
 ]
 
 const CYCLING_DISTANCES = [
+  { km: 10, label: '10 km' },
+  { km: 20, label: '20 km' },
   { km: 40, label: '40 km' },
   { km: 90, label: '90 km' },
-  { km: 180, label: '180 km (Full IM)' },
+  { km: 180, label: '180 km' },
 ]
 
 export function computePRs(activities: ActivitySummary[]): Record<string, PR[]> {
@@ -255,23 +259,20 @@ function findPRsForSport(
   distances: { km: number; label: string }[]
 ): PR[] {
   return distances.map(({ km, label }) => {
-    const candidates = activities.filter(a => a.distance >= km * 0.95)
-    if (candidates.length === 0) return null
-
-    // Best pace for approximately this distance
+    const key = String(Math.round(km * 1000))
+    // Mejor tramo de esa distancia dentro de cada actividad (no el ritmo medio de toda ella)
     let best: PR | null = null
-    for (const act of candidates) {
-      if (!act.avgPace) continue
-      const pace = act.avgPace
-      if (!best || pace < best.pace) {
-        best = {
-          distance: km,
-          label,
-          activityId: act.id,
-          date: act.startTime.slice(0, 10),
-          pace,
-          duration: Math.round(km * pace),
-        }
+    for (const act of activities) {
+      const secs = act.bestEfforts?.[key]
+      if (!secs || (best && secs >= best.duration)) continue
+      best = {
+        distance: km,
+        label,
+        activityId: act.id,
+        date: act.startTime.slice(0, 10),
+        pace: Math.round(secs / km),
+        duration: secs,
+        approx: act.bestEffortsSource === 'laps',
       }
     }
     return best

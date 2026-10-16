@@ -49,6 +49,29 @@ def check_summary(a, where):
         errors.append(f"{where}: 'id' debe ser entero")
     if num(a.get("avgHR")) and a["avgHR"] < 0:
         errors.append(f"{where}: avgHR negativo")
+    check_efforts(a, where)
+
+
+EFFORT_SOURCES = {"samples", "laps"}
+
+
+def check_efforts(a, where):
+    """bestEfforts es opcional (datos de versiones anteriores); si está: {"<metros>": segundos} o null."""
+    if "bestEfforts" not in a:
+        return
+    be, src = a["bestEfforts"], a.get("bestEffortsSource")
+    if be is None:
+        if src is not None:
+            errors.append(f"{where}: bestEffortsSource debe ser null si bestEfforts es null")
+        return
+    if not isinstance(be, dict):
+        errors.append(f"{where}: 'bestEfforts' debe ser un objeto o null")
+        return
+    for k, v in be.items():
+        if not k.isdigit() or not num(v) or v <= 0:
+            errors.append(f"{where}: bestEfforts['{k}'] debe ser metros (texto) -> segundos (> 0)")
+    if src not in EFFORT_SOURCES:
+        errors.append(f"{where}: bestEffortsSource debe ser uno de {sorted(EFFORT_SOURCES)} (es {src!r})")
 
 
 EXTRA_TEXT = {"tssMethod"}

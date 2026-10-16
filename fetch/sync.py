@@ -39,6 +39,7 @@ OUT_DIR = ROOT / "public" / "data"
 PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
 DEBUG_DIR = Path(__file__).resolve().parent / "debug"
 DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "extra", "partial")  # claves que no van en el resumen
+EFFORT_KEYS = ("bestEfforts", "bestEffortsSource")  # se calculan en el detalle y se copian al resumen
 
 
 def save_json(path: Path, data):
@@ -279,7 +280,7 @@ def main():
     save_json(OUT_DIR / "activities.json", [e["summary"] for e in entries])
     print(f"Guardados {len(entries)} resúmenes → public/data/activities.json")
 
-    from normalizer import build_extra, normalize_summary
+    from normalizer import build_extra, normalize_summary, set_best_efforts
     from suunto_client import SuuntoAuthError  # solo para capturar el error de sesión
     print(f"\nProcesando el detalle de {len(entries)} actividades...")
     updated = 0
@@ -291,7 +292,7 @@ def main():
         if path.exists() and not args.force:
             cached = json.loads(path.read_text(encoding="utf-8"))
             if not (cached.get("partial") and not args.no_gpx):
-                raw = e.get("raw")
+                raw, changed = e.get("raw"), False
                 if raw is not None and "extra" not in cached:
                     # detalle guardado con una versión anterior: se completa con los datos nuevos que
                     # ya vienen en la lista (no hace falta pedir nada más a Suunto)
@@ -299,6 +300,13 @@ def main():
                     cached["extra"] = build_extra(raw, cached, None)
                     for k in ("vo2max", "aerobicTE"):
                         cached[k] = fresh[k]
+                    changed = True
+                if "bestEfforts" not in cached:
+                    # detalle sin mejores tramos (versión anterior): se estiman con los parciales
+                    # guardados; con --force se recalculan exactos a partir de las muestras
+                    set_best_efforts(cached)
+                    changed = True
+                if changed:
                     save_json(path, cached)
                     updated += 1
                 print(f"  {tag} — ya guardada, la salto")
@@ -308,6 +316,8 @@ def main():
         print(f"  {tag} ({s.get('title', '')})...")
         try:
             new_summary, detail = e["load"]()
+            for k in EFFORT_KEYS:
+                new_summary[k] = detail.get(k)
             save_json(path, detail)
             e["summary"] = new_summary
         except SuuntoAuthError as err:

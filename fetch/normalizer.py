@@ -243,6 +243,9 @@ def make_summary(*, start_s, sport, name, distance_m, duration_s, ascent_m, avg_
         "vo2max": vo2max,
         "aerobicTE": round(aerobic_te, 1) if aerobic_te else None,
         "anaerobicTE": round(anaerobic_te, 1) if anaerobic_te else None,
+        # Mejor tiempo (s) por distancia ("1000", "5000"...); lo rellena set_best_efforts()
+        "bestEfforts": None,
+        "bestEffortsSource": None,  # "samples" (exacto) | "laps" (aprox. con los parciales)
     }
     if sport == "swimming":
         summary["swolf"] = None
@@ -404,6 +407,98 @@ def best_window_speed(dist_pts, window_s: float):
     return best if best and best > 0 else None
 
 
+# ── Mejores tramos (récords) ────────────────────────────────────────────────
+# Distancias (m) para las que se busca el tramo más rápido dentro de cada actividad.
+# Las claves de `bestEfforts` son estas distancias como texto ("1000", "5000"...).
+EFFORT_DISTANCES = {
+    "running": (1000, 5000, 10000, 21097, 42195),
+    "cycling": (10000, 20000, 40000, 90000, 180000),
+}
+# Velocidad máxima creíble (m/s): un tramo más rápido es un salto del GPS y se descarta
+EFFORT_MAX_SPEED = {"running": 6.5, "cycling": 25.0}  # 2:34 /km · 90 km/h
+
+
+def best_efforts_from_samples(dist_pts, sport: str) -> dict | None:
+    """
+    Menor tiempo (s) en recorrer cada distancia de EFFORT_DISTANCES, sobre muestras
+    [(t_s, dist_m)] acumuladas. El inicio del tramo se interpola, así que vale para
+    cualquier punto de la actividad (no solo al empezar cada km).
+    """
+    targets = EFFORT_DISTANCES.get(sport)
+    pts = sorted((t, d) for t, d in dist_pts if t is not None and d is not None)
+    if not targets or len(pts) < 2:
+        return None
+    ts, ds, top = [], [], 0.0
+    for t, d in pts:  # distancia acumulada no decreciente (ignora retrocesos del GPS)
+        top = max(top, d)
+        ts.append(t)
+        ds.append(top)
+    max_speed = EFFORT_MAX_SPEED[sport]
+    out = {}
+    for target in targets:
+        if ds[-1] - ds[0] < target:
+            break
+        best = None
+        for j in range(len(ds)):
+            start_d = ds[j] - target
+            if start_d < ds[0]:
+                continue
+            i = bisect.bisect_right(ds, start_d) - 1  # última muestra con ds[i] <= start_d
+            d0, d1 = ds[i], ds[i + 1]
+            t_start = ts[i] if d1 == d0 else ts[i] + (ts[i + 1] - ts[i]) * (start_d - d0) / (d1 - d0)
+            secs = ts[j] - t_start
+            if secs > 0 and target / secs <= max_speed and (best is None or secs < best):
+                best = secs
+        if best:
+            out[str(target)] = round(best)
+    return out or None
+
+
+def best_efforts_from_laps(laps: list, sport: str) -> dict | None:
+    """
+    Aproximación con los parciales guardados (sin muestras): el grupo de vueltas
+    consecutivas más rápido que cubre la distancia, pasándose como mucho un 5 %.
+    Con parciales de 1 km es exacto para tramos que empiezan en un km redondo.
+    """
+    targets = EFFORT_DISTANCES.get(sport)
+    laps = [(l.get("distance") or 0.0, l.get("duration") or 0.0) for l in laps or []]
+    if not targets or not laps:
+        return None
+    max_speed = EFFORT_MAX_SPEED[sport]
+    out = {}
+    for target in targets:
+        km = target / 1000
+        best = None
+        for i in range(len(laps)):
+            dist = secs = 0.0
+            for d, s in laps[i:]:
+                dist += d
+                secs += s
+                if dist >= km * 0.999:
+                    break
+            if dist < km * 0.999 or dist > km * 1.05 or secs <= 0:
+                continue
+            est = secs * km / dist  # se ajusta a la distancia exacta con el ritmo del grupo
+            if target / est <= max_speed and (best is None or est < best):
+                best = est
+        if best:
+            out[str(target)] = round(best)
+    return out or None
+
+
+def set_best_efforts(detail: dict, dist_pts=None) -> dict:
+    """Rellena bestEfforts/bestEffortsSource del detalle: con muestras si las hay, si no con los parciales."""
+    efforts, source = None, None
+    if dist_pts:
+        efforts = best_efforts_from_samples(dist_pts, detail["sport"])
+        source = "samples" if efforts else None
+    if not efforts:
+        efforts = best_efforts_from_laps(detail.get("laps"), detail["sport"])
+        source = "laps" if efforts else None
+    detail["bestEfforts"], detail["bestEffortsSource"] = efforts, source
+    return detail
+
+
 def sample_extra(dist_pts, hr, alts) -> dict:
     """Extras que se calculan a partir de las muestras (sirven para la nube y para FIT)."""
     out = {k: _pace(best_window_speed(dist_pts, w)) for k, w in PEAK_WINDOWS.items()}
@@ -487,7 +582,7 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
     detail["laps"], detail["gpxCoords"] = [], []
     detail["extra"] = build_extra(w, summary, None)
     if not data:
-        return detail
+        return set_best_efforts(detail)
 
     hr = [(_num(r.get("t")), _num(r.get("hr"))) for r in _rows(data, "heartrates")]
     hr = [(t, v) for t, v in hr if t is not None and v]
@@ -507,4 +602,4 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
         laps = auto_splits(dist_pts, hr, alts, split_m) or laps
     detail["laps"] = laps
     detail["extra"] = build_extra(w, summary, sample_extra(dist_pts, hr, alts))
-    return detail
+    return set_best_efforts(detail, dist_pts)

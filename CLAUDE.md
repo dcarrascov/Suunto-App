@@ -32,9 +32,10 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - VO2max del Dashboard = media semanal; tooltip en la carga semanal.
 - Fechas en hora local en toda la app (racha, Fitness, Zonas, filtros, "Hoy/Ayer").
 - Renombrado Garmin → Suunto (tipos, paquete, CSS, clave de ajustes).
+- Récords reales: `bestEfforts` (mejor tramo por distancia, en el resumen) lo calcula `set_best_efforts()`
+  con las muestras (exacto) o, si no hay, con los parciales guardados (`bestEffortsSource: "laps"`, aprox.).
+  `sync.py` completa así los detalles antiguos sin red; `--force` los recalcula exactos.
 
 ## Pendiente
-1. **Récords reales** (siguiente tarea): `computePRs` usa el ritmo medio de toda la actividad,
-   no el mejor tramo de 1/5/10 km… Calcularlo con parciales o muestras (requiere datos en el detalle o en el resumen).
-2. `estimateTSS` usa `lthrRunning` para todos los deportes (afecta a ~20 actividades sin TSS).
-3. La página Rendimiento asume reparto de triatlón 35/50/15; no encaja con un corredor puro.
+1. `estimateTSS` usa `lthrRunning` para todos los deportes (afecta a ~20 actividades sin TSS).
+2. La página Rendimiento asume reparto de triatlón 35/50/15; no encaja con un corredor puro.

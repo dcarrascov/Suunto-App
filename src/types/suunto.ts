@@ -40,6 +40,10 @@ export interface ActivitySummary {
   vo2max: number | null
   aerobicTE: number | null
   anaerobicTE: number | null
+  // Mejor tiempo (s) por distancia en metros ("1000", "5000"...): el tramo más rápido de la actividad.
+  // Opcional: los datos de versiones anteriores no lo traen.
+  bestEfforts?: Record<string, number> | null
+  bestEffortsSource?: 'samples' | 'laps' | null  // samples = exacto · laps = aprox. con los parciales
   // Swimming only
   swolf?: number | null
   avgStrokesPerLength?: number | null
