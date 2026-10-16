@@ -4,6 +4,9 @@ import { aggregateByWeek } from '../utils/calculations'
 
 export interface WeekLoadPoint {
   week: string
+  weekStart: string   // lunes (YYYY-MM-DD)
+  distance: number    // km totales de la semana
+  duration: number    // segundos totales de la semana
   tss: number
   rampPct: number
   riskLevel: 'ok' | 'warn' | 'high'
@@ -22,6 +25,9 @@ export function useWeeklyLoad(windowWeeks = 16): WeekLoadPoint[] {
       const riskLevel = rampPct > 15 ? 'high' : rampPct > 8 ? 'warn' : 'ok'
       return {
         week: w.weekStart.slice(5),
+        weekStart: w.weekStart,
+        distance: w.totalDistance,
+        duration: w.totalDuration,
         tss: Math.round(w.totalTSS),
         rampPct: +rampPct.toFixed(0),
         riskLevel,

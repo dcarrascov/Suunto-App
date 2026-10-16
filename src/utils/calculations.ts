@@ -145,17 +145,50 @@ export interface WeekSummary {
   byType: Record<string, { distance: number; duration: number; count: number }>
 }
 
+// Lunes de la semana de una fecha, como YYYY-MM-DD en hora LOCAL.
+// (toISOString() convierte a UTC y mandaba las actividades de madrugada a una semana "fantasma")
+export function localWeekStart(d: Date): string {
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`
+}
+
+export interface WeeklyVo2 {
+  value: number       // media de las mediciones de esa semana
+  weekStart: string   // lunes de esa semana (YYYY-MM-DD)
+  isCurrent: boolean  // false si se usa la última semana que tuvo mediciones
+  samples: number     // nº de mediciones promediadas
+}
+
+// Media del VO2max de la semana actual; si esta semana aún no hay mediciones,
+// la de la última semana que sí las tuvo.
+export function weeklyVo2max(
+  history: { date: string; value: number }[] | undefined,
+  today: Date = new Date(),
+): WeeklyVo2 | null {
+  const byWeek = new Map<string, number[]>()
+  for (const p of history ?? []) {
+    if (!(p.value > 0)) continue
+    const key = localWeekStart(new Date(`${p.date}T12:00:00`))
+    byWeek.set(key, [...(byWeek.get(key) ?? []), p.value])
+  }
+  if (byWeek.size === 0) return null
+  const currentKey = localWeekStart(today)
+  const key = byWeek.has(currentKey) ? currentKey : [...byWeek.keys()].sort().at(-1)!
+  const values = byWeek.get(key)!
+  return {
+    value: values.reduce((a, b) => a + b, 0) / values.length,
+    weekStart: key,
+    isCurrent: key === currentKey,
+    samples: values.length,
+  }
+}
+
 export function aggregateByWeek(activities: ActivitySummary[], settings: UserSettings): WeekSummary[] {
   const weeks: Record<string, WeekSummary> = {}
 
   for (const act of activities) {
-    const d = new Date(act.startTime)
-    // Get Monday of this week
-    const day = d.getDay()
-    const diff = (day === 0 ? -6 : 1 - day)
-    const monday = new Date(d)
-    monday.setDate(d.getDate() + diff)
-    const weekKey = monday.toISOString().slice(0, 10)
+    const weekKey = localWeekStart(new Date(act.startTime))
 
     if (!weeks[weekKey]) {
       weeks[weekKey] = {

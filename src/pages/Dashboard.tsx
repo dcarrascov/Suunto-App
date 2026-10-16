@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { GlobalStats } from '../types/garmin'
+import { weeklyVo2max } from '../utils/calculations'
 import { useActivityStore } from '../stores/activityStore'
 import { formatDuration, formatPace, sportIcon, sportColor } from '../utils/formatters'
 import { daysAgo } from '../utils/date'
@@ -25,6 +26,21 @@ function LoadingScreen() {
       <div className="text-slate-400 animate-pulse text-sm">Cargando...</div>
     </div>
   )
+}
+
+// "5 – 11 oct" o "29 sep – 5 oct" a partir del lunes de la semana
+function formatWeekRange(weekStart: string): string {
+  const start = new Date(`${weekStart}T00:00:00`)
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
+  const short = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  return start.getMonth() === end.getMonth() ? `${start.getDate()} – ${short(end)}` : `${short(start)} – ${short(end)}`
+}
+
+function formatWeekTime(seconds: number): string {
+  const totalMin = Math.round(seconds / 60)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return h > 0 ? `${h} h ${m} min` : `${m} min`
 }
 
 // Segundos de recuperación que quedan: el acumulado tras la última actividad menos el tiempo transcurrido
@@ -63,6 +79,7 @@ export default function Dashboard() {
 
   const { current: fitness, sparkPoints } = useFitnessHistory()
   const recovery = recoveryLeft(stats)
+  const vo2 = weeklyVo2max(stats?.vo2maxHistory)
   const { current: week, previous: lastWeek } = useWeekComparison()
   const { bySport: sportHours, totalHours, percentages } = useSportVolume(30)
   const streak = useTrainingStreak()
@@ -103,13 +120,16 @@ export default function Dashboard() {
           </div>
 
           {/* VO2max */}
-          {stats?.vo2maxHistory?.length ? (
-            <div className="text-right">
+          {vo2 ? (
+            <div className="text-right" title={`Media de ${vo2.samples} medición(es) de la semana del ${formatWeekRange(vo2.weekStart)}`}>
               <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">VO2max</div>
               <div className="text-3xl font-black text-purple-400" style={{ textShadow: '0 0 20px #a855f766' }}>
-                {stats.vo2maxHistory.at(-1)!.value.toFixed(1)}
+                {vo2.value.toFixed(1)}
               </div>
               <div className="text-xs text-slate-500">ml/kg/min</div>
+              <div className="text-xs text-slate-600 mt-0.5">
+                {vo2.isCurrent ? 'media de la semana' : `media · ${formatWeekRange(vo2.weekStart)}`}
+              </div>
             </div>
           ) : null}
         </div>
@@ -287,10 +307,25 @@ export default function Dashboard() {
           <div className="flex items-end gap-1 h-20">
             {weeklyLoad.map((w, i) => {
               const isCurrentWeek = i === weeklyLoad.length - 1
+              // las barras de los extremos alinean el tooltip hacia dentro para que no se salga de la tarjeta
+              const align = i < 4 ? 'left-0' : i >= weeklyLoad.length - 4 ? 'right-0' : 'left-1/2 -translate-x-1/2'
               return (
-                <div key={w.week} className="flex-1 h-full flex flex-col justify-end items-center" title={`${w.week}: ${w.tss} TSS`}>
+                <div key={w.weekStart} className="group relative flex-1 h-full flex flex-col justify-end items-center">
                   <div
-                    className="w-full rounded-t transition-all"
+                    role="tooltip"
+                    className={`pointer-events-none absolute bottom-full mb-2 hidden group-hover:block z-20 min-w-44 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 shadow-xl ${align}`}
+                  >
+                    <div className="text-xs font-semibold text-slate-200 whitespace-nowrap">
+                      {formatWeekRange(w.weekStart)}{isCurrentWeek ? ' · esta semana' : ''}
+                    </div>
+                    <div className="mt-1 space-y-0.5 text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                      <div className="flex justify-between gap-4"><span>Distancia</span><span className="font-medium text-slate-100">{w.distance.toFixed(1)} km</span></div>
+                      <div className="flex justify-between gap-4"><span>Tiempo</span><span className="font-medium text-slate-100">{formatWeekTime(w.duration)}</span></div>
+                      <div className="flex justify-between gap-4"><span>Carga</span><span className="font-medium text-slate-100">{w.tss} TSS</span></div>
+                    </div>
+                  </div>
+                  <div
+                    className="w-full rounded-t transition-all group-hover:brightness-125"
                     style={{
                       height: `${Math.max((w.tss / maxWeekTSS) * 100, 2)}%`,
                       background: isCurrentWeek ? 'linear-gradient(to top, #3b82f6, #60a5fa)' : '#334155',

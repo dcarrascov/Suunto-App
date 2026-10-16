@@ -1,340 +1,84 @@
-# Guía: adaptar Garmin Stats para que funcione con tu reloj Suunto
+# Actualización: tiempo de recuperación y estadísticas detalladas
 
-> **Resumen en 30 segundos**
->
-> - La app tiene dos mitades: un script de Python que **descarga** tus entrenamientos (es lo único atado a Garmin) y una web en React que **lee ficheros JSON** y casi no cambia.
-> - Suunto **no ofrece una API para uso personal**, así que hay dos caminos: **Ruta A** (automática: lee tu cuenta de Suunto; no es oficial) y **Ruta B** (ficheros FIT que exportas tú; sin riesgo). La guía incluye el código completo de las dos.
-> - De paso se corrigen **3 fallos que ya tenía la app** y que se notarían con cualquier reloj: un gráfico del Dashboard sin barras, el mapa de la actividad que no dibujaba la ruta y un TSS negativo en entrenos sin pulsómetro.
-> - Todo está probado con un servidor simulado y con ficheros FIT reales, pero **no contra los servidores reales de Suunto** (no tengo una cuenta). Qué está verificado y qué no se detalla en el [apartado 9](#9-cómo-se-verificó-esta-guía-y-qué-no).
+Añade a tu proyecto:
 
-> **¿Usas un asistente de IA (Claude Code, Cursor, Copilot…)?** Pásale esta guía entera y dile: *«Aplica esta guía a mi proyecto, paso a paso, y al final ejecuta las comprobaciones del apartado 5.6.»* Está escrita para poder aplicarse de forma literal: cada fichero está completo y cada edición indica exactamente qué buscar y por qué cambiarlo.
+- **Dashboard:** un tercer indicador **Recuperación** junto a Fatiga, con el tiempo de recuperación que te queda.
+- **Detalle de actividad:** una sección **Estadísticas** como la de la app de Suunto, con Ritmo, Altura, Velocidad, Frecuencia cardiaca, Fisiología y Técnica. Solo se muestra lo que tu reloj envía.
+- **Datos:** `vo2max` con decimales (62,2 en vez de 62), `stats.json` con la recuperación, y un `--dump` mucho más corto (de miles de líneas a unas 70).
 
-## Índice
+Parte de **tu estado actual** (el proyecto entregado + tus dos arreglos del mapa), así que no pierdes nada.
 
-1. [Qué vas a conseguir (y qué no)](#1-qué-vas-a-conseguir-y-qué-no)
-2. [Cómo está hecha la app (y por qué el cambio es pequeño)](#2-cómo-está-hecha-la-app-y-por-qué-el-cambio-es-pequeño)
-3. [Elige tu ruta](#3-elige-tu-ruta)
-4. [Plan de trabajo](#4-plan-de-trabajo)
-5. [Paso a paso](#5-paso-a-paso)
-   - [5.1 Antes de tocar nada](#51-antes-de-tocar-nada)
-   - [5.2 Capa de datos: carpeta `fetch/`](#52-capa-de-datos-carpeta-fetch)
-   - [5.3 Web: carpeta `src/` (e `index.html`)](#53-web-carpeta-src-e-indexhtml)
-   - [5.4 `.gitignore` y README](#54-gitignore-y-readme)
-   - [5.5 Primera sincronización](#55-primera-sincronización)
-   - [5.6 Comprobar que funciona](#56-comprobar-que-funciona)
-6. [Qué datos tendrás: Garmin frente a Suunto](#6-qué-datos-tendrás-garmin-frente-a-suunto)
-7. [Problemas frecuentes](#7-problemas-frecuentes)
-8. [Riesgos y privacidad](#8-riesgos-y-privacidad)
-9. [Cómo se verificó esta guía (y qué no)](#9-cómo-se-verificó-esta-guía-y-qué-no)
-10. [Mejoras opcionales](#10-mejoras-opcionales)
-- [Apéndice A. `README.md` adaptado](#apéndice-a-readmemd-adaptado)
-- [Apéndice B. Contrato de datos](#apéndice-b-contrato-de-datos)
-- [Apéndice C. IDs de actividad de Suunto usados](#apéndice-c-ids-de-actividad-de-suunto-usados)
+## Qué hacer, paso a paso
 
----
+### 1. Reemplazar 7 ficheros y crear 1
 
-## 1. Qué vas a conseguir (y qué no)
+En IntelliJ: abre el fichero → `Ctrl + A` (seleccionar todo) → pega el contenido de abajo → `Ctrl + S`.
 
-**Vas a tener** la misma aplicación, con tus datos de Suunto: Dashboard, Actividades (con mapa, zonas de FC y parciales), Fitness y Forma (CTL/ATL/TSB), Zonas, Rendimiento y Récords.
-
-**Qué cambia respecto a Garmin** (la tabla completa está en el [apartado 6](#6-qué-datos-tendrás-garmin-frente-a-suunto)):
-
-- En los datos de Suunto que usan los proyectos de referencia no vienen el Training Effect anaeróbico ni el SWOLF/brazadas: esos huecos quedan vacíos.
-- El VO2max tendrá pocas mediciones: Suunto solo lo calcula en carreras y caminatas.
-- El «Training Effect» que verás es el *Peak Training Effect* de Suunto (escala 1-5): parecido al de Garmin, pero calculado de otra forma.
-- El TSS será el que calcula Suunto. Si una actividad no lo trae, la app lo estima con la FC, como ya hacía.
-- No he encontrado un campo con el título del entrenamiento en los datos que usan los proyectos de referencia, así que se genera uno: «Carrera · 30/09».
-
-**Trabajo que implica:** crear o reemplazar 8 ficheros (el código está en esta guía), hacer 16 ediciones pequeñas en 8 ficheros existentes y configurar la ruta que elijas.
-
----
-
-## 2. Cómo está hecha la app (y por qué el cambio es pequeño)
-
-```
-   Garmin Connect ──▶ fetch/sync.py ──▶ fetch/normalizer.py
-   (garminconnect,                              │
-    email + contraseña)                         ▼
-                                    public/data/activities.json        ← lista de actividades
-                                    public/data/activity_<id>.json     ← detalle de cada una
-                                    public/data/stats.json             ← totales y VO2max
-                                                │
-                                                ▼
-                                    src/  (React + Vite): Dashboard, Fitness, Zonas…
-```
-
-Solo la parte de la izquierda conoce a Garmin. La web ya funciona con un «contrato» de datos (los tipos de `src/types/garmin.ts`, copiados en el [Apéndice B](#apéndice-b-contrato-de-datos)) que no depende del reloj. Por eso la estrategia es:
-
-1. **Sustituir la parte que descarga** por otra que lea Suunto.
-2. **Producir exactamente el mismo JSON** que antes.
-3. **Tocar la web solo en rótulos «Garmin» y en 3 fallos** que encontré al probarla.
-
-| Pieza | ¿Atada a Garmin? | Qué hacer |
+| # | Fichero | Qué hacer |
 | --- | --- | --- |
-| `fetch/requirements.txt` | Sí (`garminconnect`) | Reemplazar |
-| `.env.example` | Sí (`GARMIN_EMAIL`, `GARMIN_PASSWORD`) | Reemplazar |
-| `fetch/sync.py` | Sí | Reemplazar |
-| `fetch/normalizer.py` | Sí | Reemplazar |
-| `src/` (la web) | Solo unos pocos rótulos «Garmin» | Editar (y arreglar 3 fallos) |
-| `src/types/garmin.ts` | Solo el nombre del fichero | Nada (renombrarlo es opcional) |
+| 1 | `fetch/normalizer.py` | Reemplazar todo el contenido |
+| 2 | `fetch/sync.py` | Reemplazar todo el contenido |
+| 3 | `fetch/fit_source.py` | Reemplazar todo el contenido |
+| 4 | `fetch/validate_output.py` | Reemplazar todo el contenido |
+| 5 | `src/types/garmin.ts` | Reemplazar todo el contenido |
+| 6 | `src/components/ActivityStats.tsx` | **FICHERO NUEVO**: clic derecho en la carpeta `src/components` → New → File |
+| 7 | `src/pages/ActivityDetail.tsx` | Reemplazar todo el contenido |
+| 8 | `src/pages/Dashboard.tsx` | Reemplazar todo el contenido |
 
----
+> Si has modificado por tu cuenta alguno de esos ficheros (aparte de los arreglos del mapa), dímelo antes de reemplazarlo.
 
-## 3. Elige tu ruta
+### 2. Completar tus actividades ya descargadas
 
-### 3.1 Por qué no se usa la API oficial
+En la terminal, desde la carpeta del proyecto:
 
-Suunto tiene una API oficial (la «API Zone»), pero según su propio [FAQ](https://apizone.suunto.com/faq) se concede a empresas y organizaciones que desarrollan herramientas o servicios, y **no se ofrece para uso personal**. Como particular no puedes pedirla.
-
-### 3.2 Las dos rutas
-
-| | **Ruta A — Nube de Suunto** | **Ruta B — Ficheros FIT** |
-| --- | --- | --- |
-| Cómo trae los datos | Lee tu cuenta de Suunto (la de la app del móvil) | Lee los `.fit` que exportas desde la app |
-| Comodidad | Un comando, todo el historial | Hay que exportar los entrenamientos y copiarlos a una carpeta |
-| Qué obtienes | TSS, VO2max, PTE y zonas de FC **de Suunto**, parciales, ruta | Distancia, FC, ruta, parciales, potencia; TSS y zonas se calculan |
-| Riesgo | **No es oficial.** Puede dejar de funcionar sin aviso y podría ir contra los términos de Suunto | **Ninguno** (son tus propios ficheros) |
-| Necesitas | `suuntool` (solo para iniciar sesión) | Nada más |
-
-### 3.3 ¿Y Strava?
-
-Si ya sincronizas Suunto con Strava podrías leer Strava con su API oficial. No lo he incluido porque obliga a registrar una aplicación de desarrollador y a hacer un flujo OAuth, y porque esa API no está pensada para datos propios de Suunto como el VO2max o el Training Effect. La Ruta B cubre el caso «sin riesgo» sin esos pasos.
-
-### 3.4 Mi recomendación
-
-Prueba primero la **Ruta A** con `--limit 20`. Si el riesgo no te convence o no funciona con tu cuenta, usa la **Ruta B**. Elige una: las dos escriben en `public/data/` y la lista de actividades se rehace con la fuente que ejecutes, no se mezclan.
-
----
-
-## 4. Plan de trabajo
-
-- [ ] 1. Hacer una copia de seguridad del proyecto.
-- [ ] 2. Crear o reemplazar los 6 ficheros de `fetch/`, `.env.example` y `README.md` ([5.2](#52-capa-de-datos-carpeta-fetch)).
-- [ ] 3. Hacer las ediciones de la web ([5.3](#53-web-carpeta-src-e-indexhtml)) y del `.gitignore` ([5.4](#54-gitignore-y-readme)).
-- [ ] 4. Instalar las dependencias de Python.
-- [ ] 5. **Ruta A:** instalar `suuntool` e iniciar sesión · **Ruta B:** exportar tus `.fit` ([5.5](#55-primera-sincronización)).
-- [ ] 6. Sincronizar una prueba pequeña (`--limit 20`) y, si va bien, todo el historial.
-- [ ] 7. Validar los datos y abrir la app ([5.6](#56-comprobar-que-funciona)).
-- [ ] 8. Poner tu FC máxima en **Ajustes**.
-
----
-
-## 5. Paso a paso
-
-### 5.1 Antes de tocar nada
-
-Haz una copia de la carpeta del proyecto. Si usas git: `git checkout -b suunto`.
-
-### 5.2 Capa de datos: carpeta `fetch/`
-
-Estos ficheros se **crean o se sustituyen enteros** (copia el contenido tal cual). El código está en bloques desplegables; haz clic en cada uno.
-
-| Fichero | Acción | Para qué sirve |
-| --- | --- | --- |
-| `.env.example` | Reemplazar | Opciones. Ya **no hay email ni contraseña** de ningún servicio |
-| `fetch/requirements.txt` | Reemplazar | Dependencias de Python (sin `garminconnect`) |
-| `fetch/suunto_client.py` | **Nuevo** | Ruta A: lee tu cuenta de Suunto (solo lectura) |
-| `fetch/normalizer.py` | Reemplazar | Convierte datos de Suunto al formato de la app |
-| `fetch/fit_source.py` | **Nuevo** | Ruta B: lee ficheros FIT |
-| `fetch/sync.py` | Reemplazar | Script principal: descarga, caché y estadísticas |
-| `fetch/validate_output.py` | **Nuevo** | Comprueba que los datos tienen el formato correcto |
-| `README.md` | Reemplazar | Versión adaptada ([Apéndice A](#apéndice-a-readmemd-adaptado)) |
-
-Notas:
-
-- Aunque la librería se llame `garmin-fit-sdk`, **FIT es un formato abierto** que usan muchas marcas (Suunto lo exporta). Es el decodificador oficial del formato y funcionó con ficheros de Garmin, COROS y Wahoo en mis pruebas.
-- No hace falta crear un `.env`: todas las opciones son opcionales. Si quieres usarlas: `cp .env.example .env`.
-- Ya no necesitas `garminconnect`. Puedes quitarlo con `python3 -m pip uninstall garminconnect garth`.
-
-<details>
-<summary><b><code>.env.example</code></b> · 17 líneas · clic para desplegar</summary>
-
-```ini
-# Ya NO hace falta email ni contraseña: la sesión la crea `suuntool login`.
-# Todo lo de abajo es opcional (quita el # para activarlo).
-
-# Zona horaria para la hora local de tus actividades (por defecto, la de tu ordenador)
-# SUUNTO_TIMEZONE=Europe/Madrid
-
-# Solo si no usas suuntool: pega aquí tu clave de sesión (equivale a una contraseña, no la compartas)
-# SUUNTO_SESSION_KEY=
-
-# Solo si el servidor rechazara el User-Agent por defecto
-# SUUNTO_USER_AGENT=
-
-# Pausa (segundos) entre actividades al descargar; súbela si ves errores 429
-# SUUNTO_PAUSE=0.6
-
-# Importación de ficheros FIT (--source fit): FC máxima para calcular las zonas
-# MAX_HR=185
+```powershell
+py fetch\sync.py
 ```
 
-</details>
+Sin ninguna opción. Debe decir **«Se han completado N actividades ya guardadas con los datos nuevos (sin descargar nada más)»**. Completa tus 1434 actividades con los datos que ya vienen en la lista de Suunto, así que no vuelve a pedir los detalles uno a uno y tarda poco.
 
-<details>
-<summary><b><code>fetch/requirements.txt</code></b> · 4 líneas · clic para desplegar</summary>
+### 3. (Opcional) Mejores ritmos y FC mínima en tus actividades recientes
 
-```text
-requests>=2.31.0
-python-dotenv>=1.0.0
-garmin-fit-sdk>=21.0.0
-tzdata>=2024.1
+Dos datos, **FC mín.** y **Ritmo máx. de 30 s, 1, 3 y 5 min**, se calculan con las muestras de cada entrenamiento, que solo se descargan con el detalle. Las actividades ya guardadas no los tienen, y esas filas no se muestran. Para tenerlos en las recientes:
+
+```powershell
+py fetch\sync.py --force --since 2026-09-01
 ```
 
-</details>
+`--force` vuelve a descargar los detalles de ese periodo (tarda en proporción a cuántas haya). Puedes cambiar la fecha.
 
-<details>
-<summary><b><code>fetch/suunto_client.py</code></b> · 142 líneas · clic para desplegar</summary>
+### 4. Abrir la app
 
-```python
-"""
-Cliente de SOLO LECTURA para el backend que usa la app móvil de Suunto
-(Sports Tracker). No es una API pública: puede cambiar sin aviso y su uso puede
-ir contra los términos de Suunto. Úsalo solo con tu propia cuenta.
+Con `npm run dev` en marcha, refresca el navegador con `Ctrl + F5`.
 
-No gestiona contraseñas. La clave de sesión (`sessionkey`) la crea la herramienta
-`suuntool` al hacer `suuntool login` y se lee de su fichero de sesión, o de la
-variable de entorno SUUNTO_SESSION_KEY.
-"""
-from __future__ import annotations
-import gzip
-import json
-import os
-import time
-from pathlib import Path
+## Qué esperar (y qué no)
 
-import requests
+- **Recuperación del Dashboard.** Es una **estimación**: toma el tiempo de recuperación acumulado que Suunto anota tras tu última actividad y le resta el tiempo transcurrido. Compárala con la que te dice el reloj o la app. Si no coincide, dímelo: en mi volcado hay tres valores de recuperación distintos y necesito ver los de otra actividad para saber cuál es el correcto.
+- **Ritmo ajustado al calor, ritmo ajustado al viento, ritmo de esfuerzo real e índice de estrés térmico.** No los incluyo: no aparecen en el volcado de la actividad de 1 km que me pasaste y no voy a inventar de dónde salen. Para añadirlos necesito el volcado de tu carrera de 10,13 km (comando abajo).
+- **Ritmo máx. de 30 s a 5 min.** Se calculan con las muestras GPS, que van cada unos 6 segundos, así que son aproximados y pueden diferir unos segundos de los de la app.
+- **Altura y técnica.** El desnivel, los puntos más alto y bajo, las cadencias, la longitud de paso y de zancada y las velocidades verticales salen de campos que sí vienen en tus datos, o se calculan con fórmulas que cuadran con tus capturas (cadencia de pasos 182 y 210, punto más alto 45 m, ritmo máx. 3:13…). Los valores de tu app usan más decimales, así que puede haber diferencias de ±1.
+- **Qué se muestra según el deporte.** La sección Ritmo no sale en bici ni natación; las cadencias de pasos y la longitud de paso solo en actividades a pie.
 
-API_BASE = os.getenv("SUUNTO_API_BASE", "https://api.sports-tracker.com/apiserver/v1/")
-# Mismo User-Agent que usan los clientes de código abierto de referencia (app Suunto 6.8.13).
-# Si el servidor empezara a rechazarlo, cámbialo con SUUNTO_USER_AGENT.
-USER_AGENT = os.getenv("SUUNTO_USER_AGENT", "com.stt.android.suunto/6008013")
-TIMEOUT = 45
-PAGE_SIZE = 100  # máximo por página que acepta el servidor
+## Para completar lo que falta: volcado de la carrera de 10,13 km
 
+1. Averigua su clave (cambia la fecha si hace falta):
 
-class SuuntoError(Exception):
-    pass
-
-
-class SuuntoAuthError(SuuntoError):
-    pass
-
-
-def _session_files() -> list[Path]:
-    files = []
-    if os.getenv("SUUNTOOL_SESSION_FILE"):
-        files.append(Path(os.environ["SUUNTOOL_SESSION_FILE"]))
-    if os.getenv("XDG_CONFIG_HOME"):
-        files.append(Path(os.environ["XDG_CONFIG_HOME"]) / "suuntool" / "session.json")
-    files.append(Path.home() / ".config" / "suuntool" / "session.json")
-    return files
-
-
-def load_session_key() -> str:
-    key = os.getenv("SUUNTO_SESSION_KEY", "").strip()
-    if key:
-        return key
-    for path in _session_files():
-        if not path.is_file():
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as e:
-            raise SuuntoAuthError(f"No puedo leer {path}: {e}") from e
-        if data.get("sessionkey"):
-            return data["sessionkey"]
-    raise SuuntoAuthError(
-        "No hay sesión de Suunto. Ejecuta primero:  suuntool login --email TU_EMAIL"
-    )
-
-
-class SuuntoClient:
-    def __init__(self, session_key: str | None = None):
-        self._http = requests.Session()
-        self._http.headers.update({
-            "User-Agent": USER_AGENT,
-            "Accept-Language": "en",
-            "STTAuthorization": session_key or load_session_key(),
-        })
-
-    # -- bajo nivel ----------------------------------------------------------
-
-    def _get(self, path: str) -> bytes:
-        url = API_BASE.rstrip("/") + "/" + path.lstrip("/")
-        last: Exception | None = None
-        for attempt in range(3):
-            try:
-                r = self._http.get(url, timeout=TIMEOUT)
-            except requests.RequestException as e:
-                last = SuuntoError(f"sin conexión con Suunto ({type(e).__name__}); comprueba tu internet")
-                time.sleep(2 ** attempt)
-                continue
-            if r.status_code in (401, 403):
-                raise SuuntoAuthError(
-                    f"Sesión de Suunto no válida o caducada (HTTP {r.status_code}). "
-                    "Repite:  suuntool login --email TU_EMAIL"
-                )
-            if r.status_code == 429 or r.status_code >= 500:
-                last = SuuntoError(f"HTTP {r.status_code}")
-                time.sleep(2 ** attempt * 2)
-                continue
-            if not r.ok:
-                raise SuuntoError(f"HTTP {r.status_code} en {path}")
-            return r.content
-        raise SuuntoError(f"No se pudo leer {path}: {last}")
-
-    def _payload(self, path: str):
-        """Devuelve `payload` del sobre {error, metadata, payload} que usa el servidor."""
-        body = self._get(path)
-        if body[:2] == b"\x1f\x8b":  # a veces llega comprimido sin cabecera
-            body = gzip.decompress(body)
-        try:
-            env = json.loads(body)
-        except ValueError as e:
-            raise SuuntoError(f"Respuesta no válida en {path}: {e}") from e
-        if isinstance(env, dict) and env.get("error"):
-            raise SuuntoError(f"Error del servidor en {path}: {env['error']}")
-        return env.get("payload") if isinstance(env, dict) and "payload" in env else env
-
-    # -- endpoints -----------------------------------------------------------
-
-    def list_workouts(self, since_ms: int = 0, max_pages: int = 200) -> list[dict]:
-        """Todos los entrenamientos desde `since_ms` (0 = todos), sin duplicados."""
-        items: list[dict] = []
-        seen: set[str] = set()
-        offset = 0
-        for _ in range(max_pages):
-            page = self._payload(f"workouts?since={since_ms}&limit={PAGE_SIZE}&offset={offset}")
-            if not isinstance(page, list) or not page:
-                break
-            fresh = [w for w in page if isinstance(w, dict) and w.get("key") and w["key"] not in seen]
-            if not fresh:  # el servidor repite página: evita un bucle infinito
-                break
-            seen.update(w["key"] for w in fresh)
-            items.extend(fresh)
-            print(f"  {len(items)} entrenamientos leídos...")
-            if len(page) < PAGE_SIZE:
-                break
-            offset += PAGE_SIZE
-            time.sleep(0.3)
-        return items
-
-    def workout(self, key: str) -> dict:
-        """Detalle de un entrenamiento (incluye `extensions`)."""
-        p = self._payload(f"workouts/{key}")
-        return p if isinstance(p, dict) else {}
-
-    def workout_data(self, key: str) -> dict:
-        """Muestras del entrenamiento: heartrates, locations (GPS) y eventlaps."""
-        p = self._payload(f"workouts/{key}/data")
-        return p if isinstance(p, dict) else {}
+```powershell
+py -c "import json; [print(a['suuntoKey'], a['startTime'], a['distance'], 'km') for a in json.load(open('public/data/activities.json')) if a['startTime'].startswith('2026-10-04')]"
 ```
 
-</details>
+2. Haz el volcado con la clave de esa carrera:
+
+```powershell
+py fetch\sync.py --dump LA_CLAVE
+```
+
+3. Compárteme **solo** el fichero `fetch\debug\LA_CLAVE.redacted.json`. Ahora sale con unas 70 líneas en vez de miles y no lleva coordenadas ni tu usuario.
+
+## Los ficheros
 
 <details>
-<summary><b><code>fetch/normalizer.py</code></b> · 394 líneas · clic para desplegar</summary>
+<summary><b><code>fetch/normalizer.py</code></b> · 510 líneas · clic para desplegar</summary>
 
 ```python
 """
@@ -352,6 +96,7 @@ Unidades de ENTRADA del backend de Suunto (comprobadas por proyectos que lo usan
     cadence.avg ciclos/min (en carrera hay que multiplicar x2 para pasos/min)
 """
 from __future__ import annotations
+import bisect
 import math
 import os
 from datetime import datetime, timezone
@@ -618,7 +363,9 @@ def normalize_summary(w: dict) -> dict:
         power=_num(w.get("avgPower")) or _first_ext_value(w, "SummaryExtension", "avgPower"),
         np_w=_num(tss_blk.get("normalizedPower")),
         cadence=_spm(cad_avg, sport),
-        vo2max=_first_ext_value(w, "FitnessExtension", "vo2Max"),  # solo carrera/caminata
+        # estimatedVo2Max trae decimales (62,2); vo2Max es ese mismo valor redondeado (62)
+        vo2max=(_first_ext_value(w, "FitnessExtension", "estimatedVo2Max")
+                or _first_ext_value(w, "FitnessExtension", "vo2Max")),
         aerobic_te=_first_ext_value(w, "SummaryExtension", "pte"),  # Peak Training Effect 1..5
         anaerobic_te=None,  # no viene en los datos de Suunto que se conocen
         utc_offset_min=_num(w.get("timeOffsetInMinutes")),  # si el servidor lo envía
@@ -701,6 +448,117 @@ def _laps_from_events(events: list, total_t: float, total_m: float, scale: float
     return laps
 
 
+# ── Datos extra para la pantalla de detalle ─────────────────────────────────
+
+PEAK_WINDOWS = {"peakPace30s": 30, "peakPace1m": 60, "peakPace3m": 180, "peakPace5m": 300}
+
+
+def _pace(speed_ms):
+    """m/s -> segundos por km."""
+    return round(1000 / speed_ms) if speed_ms and speed_ms > 0 else None
+
+
+def _secs(v, total_time):
+    """Segundos; si el valor es absurdamente grande para la duración, se asume milisegundos."""
+    v = _num(v)
+    if v is None:
+        return None
+    return v / 1000 if total_time and v > total_time * 1.5 else v
+
+
+def best_window_speed(dist_pts, window_s: float):
+    """Mayor velocidad media (m/s) en cualquier tramo de `window_s` s, sobre muestras [(t_s, dist_m)] acumuladas."""
+    pts = sorted((t, d) for t, d in dist_pts if t is not None and d is not None)
+    if len(pts) < 2 or pts[-1][0] - pts[0][0] < window_s:
+        return None
+    ts = [p[0] for p in pts]
+
+    def dist_at(t):
+        i = bisect.bisect_right(ts, t)
+        if i <= 0:
+            return pts[0][1]
+        if i >= len(pts):
+            return pts[-1][1]
+        (t0, d0), (t1, d1) = pts[i - 1], pts[i]
+        return d0 if t1 == t0 else d0 + (d1 - d0) * (t - t0) / (t1 - t0)
+
+    starts = [t for t in ts if t + window_s <= ts[-1]] + [t - window_s for t in ts if t - window_s >= ts[0]]
+    best = max(((dist_at(s + window_s) - dist_at(s)) / window_s for s in starts), default=None)
+    return best if best and best > 0 else None
+
+
+def sample_extra(dist_pts, hr, alts) -> dict:
+    """Extras que se calculan a partir de las muestras (sirven para la nube y para FIT)."""
+    out = {k: _pace(best_window_speed(dist_pts, w)) for k, w in PEAK_WINDOWS.items()}
+    out["minHR"] = round(min(v for _, v in hr)) if hr else None
+    if alts:
+        out["minAltitude"] = round(min(h for _, h in alts), 1)
+        out["maxAltitude"] = round(max(h for _, h in alts), 1)
+    return out
+
+
+EXTRA_KEYS = (
+    "maxSpeed", "maxPace", "ngp", "peakPace30s", "peakPace1m", "peakPace3m", "peakPace5m",
+    "ascent", "descent", "ascentTime", "descentTime", "minAltitude", "maxAltitude",
+    "ascentSpeed", "descentSpeed", "minHR", "tssMethod", "epoc", "recoveryTime",
+    "steps", "stepCadence", "maxStepCadence", "cadence", "maxCadence", "stepLength", "strideLength",
+)
+
+
+def build_extra(w: dict, summary: dict, samples: dict | None = None) -> dict:
+    """
+    Datos adicionales de un entrenamiento de Suunto para la pantalla de detalle. Todas las claves
+    existen siempre; las que Suunto no envía valen None (la interfaz no las muestra).
+    `samples` es el resultado de sample_extra() cuando se han descargado las muestras.
+    """
+    sport = summary["sport"]
+    total_time = _num(w.get("totalTime"), 0.0) or 0.0
+    summ = next(_ext(w, "SummaryExtension"), {})
+    tss_blk = w.get("tss") if isinstance(w.get("tss"), dict) else {}
+    cad = w.get("cadence") if isinstance(w.get("cadence"), dict) else {}
+
+    max_speed = _num(w.get("maxSpeed"))  # m/s
+    avg_speed = _num(w.get("avgSpeed"))
+    if not avg_speed and total_time:
+        avg_speed = (_num(w.get("totalDistance"), 0.0) or 0.0) / total_time
+    ascent, descent = _num(w.get("totalAscent")), _num(w.get("totalDescent"))
+    asc_t, desc_t = _secs(summ.get("ascentTime"), total_time), _secs(summ.get("descentTime"), total_time)
+    steps = _num(w.get("stepCount"))
+    foot = sport == "running" or (sport == "other" and bool(steps))  # actividades a pie
+    cad_avg, cad_max = _num(cad.get("avg")), _num(cad.get("max"))  # ciclos/min
+    min_alt, max_alt = _num(w.get("minAltitude")), _num(w.get("maxAltitude"))  # decímetros
+    step_len = avg_speed / (cad_avg * 2 / 60) * 100 if foot and cad_avg and avg_speed else None  # cm
+
+    extra = {
+        "maxSpeed": round(max_speed * 3.6, 1) if max_speed else None,
+        "maxPace": _pace(max_speed),
+        "ngp": _pace(_num(tss_blk.get("averageGradeAdjustedPace"))),  # ritmo ajustado a la pendiente
+        "ascent": round(ascent) if ascent is not None else None,
+        "descent": round(descent) if descent is not None else None,
+        "ascentTime": round(asc_t) if asc_t else None,
+        "descentTime": round(desc_t) if desc_t else None,
+        "minAltitude": round(min_alt / 10, 1) if min_alt is not None else None,
+        "maxAltitude": round(max_alt / 10, 1) if max_alt is not None else None,
+        "ascentSpeed": round(ascent / (asc_t / 60), 1) if ascent and asc_t else None,  # m/min
+        "descentSpeed": round(descent / (desc_t / 60), 1) if descent and desc_t else None,
+        "tssMethod": tss_blk.get("calculationMethod") if tss_blk.get("trainingStressScore") else None,
+        "epoc": _num(summ.get("peakEpoc")),
+        "recoveryTime": _num(w.get("recoveryTime")) or _num(summ.get("recoveryTime")),  # segundos
+        "steps": round(steps) if steps else None,
+        "stepCadence": round(cad_avg * 2) if foot and cad_avg else None,  # pasos/min
+        "maxStepCadence": round(cad_max * 2) if foot and cad_max else None,
+        "cadence": round(cad_avg) if (foot or sport == "cycling") and cad_avg else None,  # rpm
+        "maxCadence": round(cad_max) if (foot or sport == "cycling") and cad_max else None,
+        "stepLength": round(step_len) if step_len else None,
+        "strideLength": round(step_len * 2) if step_len else None,
+        "peakPace30s": None, "peakPace1m": None, "peakPace3m": None, "peakPace5m": None, "minHR": None,
+    }
+    for k, v in (samples or {}).items():  # lo calculado de las muestras solo rellena huecos
+        if extra.get(k) is None:
+            extra[k] = v
+    return {k: extra.get(k) for k in EXTRA_KEYS}
+
+
 def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
     """
     ActivityDetail: resumen + zonas de FC + parciales + ruta GPS.
@@ -710,6 +568,7 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
     detail = dict(summary)
     detail["hrZones"] = hr_zones_suunto(w)
     detail["laps"], detail["gpxCoords"] = [], []
+    detail["extra"] = build_extra(w, summary, None)
     if not data:
         return detail
 
@@ -723,20 +582,359 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
 
     detail["gpxCoords"] = route_points([(_num(r.get("la")), _num(r.get("ln"))) for r in loc])
 
+    dist_pts = [(_num(r.get("t")), (_num(r.get("s")) or 0.0) * scale) for r in loc if r.get("s") is not None]
     events = _rows(data, "eventlaps")
     laps = _laps_from_events(events, summary["duration"], total_m, scale, hr, alts) if events else []
     if len(laps) < 2:  # sin vueltas del reloj: parciales automáticos por distancia
-        dist_pts = [(_num(r.get("t")), (_num(r.get("s")) or 0.0) * scale) for r in loc if r.get("s") is not None]
         split_m = 5000.0 if summary["sport"] == "cycling" else 1000.0
         laps = auto_splits(dist_pts, hr, alts, split_m) or laps
     detail["laps"] = laps
+    detail["extra"] = build_extra(w, summary, sample_extra(dist_pts, hr, alts))
     return detail
 ```
 
 </details>
-
 <details>
-<summary><b><code>fetch/fit_source.py</code></b> · 173 líneas · clic para desplegar</summary>
+<summary><b><code>fetch/sync.py</code></b> · 332 líneas · clic para desplegar</summary>
+
+```python
+#!/usr/bin/env python3
+"""
+Suunto -> JSON local.
+
+Uso (desde la carpeta raíz del proyecto):
+    python3 fetch/sync.py                       # todo el historial (nube de Suunto)
+    python3 fetch/sync.py --limit 20            # solo las 20 más recientes (para probar)
+    python3 fetch/sync.py --since 2024-01-01    # solo desde una fecha
+    python3 fetch/sync.py --no-gpx              # más rápido: sin ruta GPS ni parciales
+    python3 fetch/sync.py --force               # vuelve a descargar los detalles ya guardados
+    python3 fetch/sync.py --source fit          # lee los .fit de la carpeta fetch/fit/
+    python3 fetch/sync.py --dump latest         # guarda las respuestas crudas para depurar
+
+Fuente "nube": la sesión la crea `suuntool login` (ver la guía); aquí no hay contraseñas.
+Salida: public/data/activities.json + activity_{id}.json + stats.json
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
+for _stream in (sys.stdout, sys.stderr):  # evita errores con consolas de codificación limitada (Windows)
+    try:
+        _stream.reconfigure(errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+OUT_DIR = ROOT / "public" / "data"
+PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
+DEBUG_DIR = Path(__file__).resolve().parent / "debug"
+DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "extra", "partial")  # claves que no van en el resumen
+
+
+def save_json(path: Path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def since_ms(since: str | None) -> int:
+    if not since:
+        return 0
+    try:
+        return int(datetime.strptime(since, "%Y-%m-%d").timestamp() * 1000)
+    except ValueError:
+        sys.exit("ERROR: --since debe tener el formato YYYY-MM-DD (por ejemplo 2024-01-01)")
+
+
+# ── Fuente: nube de Suunto ──────────────────────────────────────────────────
+
+def make_client():
+    from suunto_client import SuuntoAuthError, SuuntoClient
+    try:
+        return SuuntoClient()
+    except SuuntoAuthError as e:
+        sys.exit(f"ERROR: {e}")
+
+
+def collect_cloud(args):
+    from normalizer import _num, normalize_detail, normalize_summary
+    from suunto_client import SuuntoAuthError, SuuntoError
+
+    client = make_client()
+    print("Leyendo la lista de entrenamientos de Suunto...")
+    try:
+        raw_list = client.list_workouts(since_ms(args.since))
+    except SuuntoAuthError as e:
+        sys.exit(f"ERROR: {e}")
+    except SuuntoError as e:
+        sys.exit(f"ERROR: {e}")
+    print(f"Total entrenamientos: {len(raw_list)}")
+
+    entries, user_max_hr = [], None
+    for raw in sorted(raw_list, key=lambda w: w.get("startTime") or 0, reverse=True):
+        try:
+            summary = normalize_summary(raw)
+        except Exception as e:
+            print(f"  WARNING: no pude procesar el entrenamiento {raw.get('key')}: {e}")
+            continue
+        if user_max_hr is None:
+            hr = raw.get("hrdata") if isinstance(raw.get("hrdata"), dict) else {}
+            user_max_hr = hr.get("userMaxHR")
+
+        def load(raw=raw, summary=summary):
+            w, data = raw, None
+            if not args.no_gpx:
+                if raw.get("extensions") is None:  # la lista no trae VO2max/TE: pedir el detalle
+                    try:
+                        w = {**raw, **client.workout(raw["key"])}
+                    except SuuntoAuthError:
+                        raise
+                    except SuuntoError as e:
+                        print(f"  WARNING: detalle {raw['key']}: {e}")
+                try:
+                    data = client.workout_data(raw["key"])
+                except SuuntoAuthError:
+                    raise
+                except SuuntoError as e:
+                    print(f"  WARNING: muestras {raw['key']}: {e}")
+            new_summary = normalize_summary(w)
+            new_summary["id"] = summary["id"]  # conserva el id (puede haberse desplazado)
+            detail = normalize_detail(new_summary, w, data)
+            if args.no_gpx:
+                detail["partial"] = True  # se completará en la próxima sync sin --no-gpx
+            return new_summary, detail
+
+        entries.append({"summary": summary, "load": load, "network": True, "raw": raw})
+    meta = {"userMaxHR": round(float(user_max_hr)) if user_max_hr else None}
+
+    # Tiempo de recuperación acumulado tras el último entrenamiento y cuándo terminó (la web calcula lo que queda)
+    latest = max(raw_list, key=lambda w: w.get("startTime") or 0, default=None)
+    if latest:
+        secs = _num(latest.get("cumulativeRecoveryTime")) or _num(latest.get("recoveryTime"))
+        ended = _num(latest.get("stopTime")) or (
+            (_num(latest.get("startTime"), 0.0) or 0.0) + (_num(latest.get("totalTime"), 0.0) or 0.0) * 1000)
+        if secs and ended:
+            meta["recovery"] = {"seconds": round(secs), "endedAt": int(ended)}
+    return entries, meta
+
+
+# ── Fuente: ficheros FIT ────────────────────────────────────────────────────
+
+def collect_fit(args):
+    from fit_source import parse_fit
+
+    fit_dir = Path(args.fit_dir) if args.fit_dir else Path(__file__).resolve().parent / "fit"
+    files = sorted(p for p in fit_dir.rglob("*") if p.suffix.lower() == ".fit")
+    if not files:
+        sys.exit(f"ERROR: no hay ficheros .fit en {fit_dir} (copia ahí los que exportes de la app)")
+    max_hr = int(os.getenv("MAX_HR", "185"))
+    print(f"Leyendo {len(files)} ficheros FIT de {fit_dir} (FC máxima para zonas: {max_hr})...")
+
+    entries, seen = [], set()
+    for path in files:
+        try:
+            summary, detail = parse_fit(path, max_hr)
+        except Exception as e:
+            print(f"  AVISO: {path.name} omitido: {e}")
+            continue
+        if summary["id"] in seen:
+            print(f"  AVISO: {path.name} es un duplicado (misma hora de inicio); lo omito")
+            continue
+        seen.add(summary["id"])
+        entries.append({"summary": summary, "load": lambda s=summary, d=detail: (s, d), "network": False})
+    return entries, {}
+
+
+# ── Depuración ──────────────────────────────────────────────────────────────
+
+SENSITIVE = {"la", "ln", "lat", "lon", "latitude", "longitude", "x", "y", "polyline", "username", "email"}
+
+
+def redact(obj):
+    """Copia sin datos personales: coordenadas, ruta codificada y nombre de usuario."""
+    if isinstance(obj, dict):
+        return {k: "REDACTED" if k in SENSITIVE else redact(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [redact(v) for v in obj]
+    return obj
+
+
+def compress_streams(obj):
+    """En el detalle de Suunto las series (FC, altitud, GPS…) son enormes: deja solo el total y 3 muestras."""
+    if isinstance(obj, dict):
+        return {k: ({"_total": len(v), "_first3": v[:3]} if k in ("points", "locationPoints") and isinstance(v, list)
+                    else compress_streams(v)) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [compress_streams(v) for v in obj]
+    return obj
+
+
+def redacted_sample(data: dict) -> dict:
+    """Del detalle de muestras (/data) conserva solo la estructura: total y 3 primeras filas por serie."""
+    return {
+        k: ({"_total": len(v), "_first3": redact(v[:3])} if isinstance(v, list) else redact(v))
+        for k, v in data.items()
+    }
+
+
+def dump(which: str):
+    from suunto_client import SuuntoError
+    client = make_client()
+    try:
+        if which == "latest":
+            items = client.list_workouts()
+            if not items:
+                sys.exit("No hay entrenamientos en tu cuenta.")
+            item = max(items, key=lambda w: w.get("startTime") or 0)
+        else:
+            item = {"key": which}
+        key = item["key"]
+        files = {"list": item, "detail": client.workout(key), "data": client.workout_data(key)}
+    except SuuntoError as e:
+        sys.exit(f"ERROR: {e}")
+    DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    for name, payload in files.items():
+        path = DEBUG_DIR / f"{key}.{name}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        if isinstance(payload, dict):
+            shape = {k: (len(v) if isinstance(v, (list, dict)) else type(v).__name__) for k, v in payload.items()}
+            print(f"{path.relative_to(ROOT)}\n    {shape}")
+    safe = DEBUG_DIR / f"{key}.redacted.json"
+    safe.write_text(json.dumps({
+        "list": redact(files["list"]), "detail": compress_streams(redact(files["detail"])),
+        "data": redacted_sample(files["data"]),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\nPara pedir ayuda comparte SOLO {safe.relative_to(ROOT)} (sin coordenadas ni usuario).")
+    print("Los demás ficheros de esa carpeta contienen tu ruta GPS: no los compartas.")
+
+
+# ── Estadísticas globales ───────────────────────────────────────────────────
+
+def compute_stats(summaries: list, meta: dict) -> dict:
+    by_sport: dict = {}
+    for s in summaries:
+        by_sport.setdefault(s.get("sport", "other"), []).append(s)
+    vo2max_history = sorted(
+        ({"date": s["startTime"][:10], "value": s["vo2max"]} for s in summaries if s.get("vo2max")),
+        key=lambda x: x["date"],
+    )
+    stats = {
+        "totalActivities": len(summaries),
+        "byType": {sport: len(acts) for sport, acts in by_sport.items()},
+        "vo2maxHistory": vo2max_history,
+        "syncedAt": datetime.now().isoformat(),
+    }
+    if meta.get("userMaxHR"):
+        stats["userMaxHR"] = meta["userMaxHR"]
+    if meta.get("recovery"):
+        stats["recovery"] = meta["recovery"]
+    return stats
+
+
+# ── Principal ───────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="Sincroniza tus entrenamientos de Suunto a JSON local")
+    parser.add_argument("--source", choices=["cloud", "fit"], default="cloud",
+                        help="cloud = nube de Suunto (por defecto) · fit = ficheros .fit exportados")
+    parser.add_argument("--fit-dir", default=None, help="carpeta con los .fit (por defecto fetch/fit)")
+    parser.add_argument("--limit", type=int, default=None, help="máximo de actividades (para probar)")
+    parser.add_argument("--since", type=str, default=None, help="solo desde esta fecha (YYYY-MM-DD)")
+    parser.add_argument("--no-gpx", action="store_true", help="sin ruta GPS ni parciales (más rápido; solo nube)")
+    parser.add_argument("--force", action="store_true", help="vuelve a descargar los detalles ya guardados")
+    parser.add_argument("--dump", metavar="KEY|latest", default=None,
+                        help="guarda en fetch/debug las respuestas crudas de un entrenamiento y sale")
+    args = parser.parse_args()
+
+    since_ms(args.since)  # valida el formato antes de tocar la red
+    if args.dump:
+        return dump(args.dump)
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    entries, meta = collect_fit(args) if args.source == "fit" else collect_cloud(args)
+
+    # ids únicos y estables (derivados de la hora de inicio)
+    used = set()
+    for e in sorted(entries, key=lambda e: (e["summary"]["startTime"], e["summary"].get("suuntoKey") or "")):
+        while e["summary"]["id"] in used:
+            e["summary"]["id"] += 1
+        used.add(e["summary"]["id"])
+
+    if args.since:
+        entries = [e for e in entries if e["summary"]["startTime"] >= args.since]
+    entries.sort(key=lambda e: e["summary"]["startTime"], reverse=True)
+    if args.limit:
+        entries = entries[: args.limit]
+
+    save_json(OUT_DIR / "activities.json", [e["summary"] for e in entries])
+    print(f"Guardados {len(entries)} resúmenes → public/data/activities.json")
+
+    from normalizer import build_extra, normalize_summary
+    from suunto_client import SuuntoAuthError  # solo para capturar el error de sesión
+    print(f"\nProcesando el detalle de {len(entries)} actividades...")
+    updated = 0
+    for i, e in enumerate(entries):
+        s = e["summary"]
+        path = OUT_DIR / f"activity_{s['id']}.json"
+        tag = f"[{i + 1}/{len(entries)}] {s['id']}"
+
+        if path.exists() and not args.force:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            if not (cached.get("partial") and not args.no_gpx):
+                raw = e.get("raw")
+                if raw is not None and "extra" not in cached:
+                    # detalle guardado con una versión anterior: se completa con los datos nuevos que
+                    # ya vienen en la lista (no hace falta pedir nada más a Suunto)
+                    fresh = normalize_summary(raw)
+                    cached["extra"] = build_extra(raw, cached, None)
+                    for k in ("vo2max", "aerobicTE"):
+                        cached[k] = fresh[k]
+                    save_json(path, cached)
+                    updated += 1
+                print(f"  {tag} — ya guardada, la salto")
+                e["summary"] = {k: v for k, v in cached.items() if k not in DETAIL_ONLY}
+                continue
+
+        print(f"  {tag} ({s.get('title', '')})...")
+        try:
+            new_summary, detail = e["load"]()
+            save_json(path, detail)
+            e["summary"] = new_summary
+        except SuuntoAuthError as err:
+            sys.exit(f"ERROR: {err}")
+        except Exception as err:
+            print(f"  WARNING: no pude procesar {s['id']}: {err}")
+        if e["network"] and not args.no_gpx:
+            time.sleep(PAUSE)  # el servidor admite pocas peticiones por segundo
+
+    if updated:
+        print(f"\nSe han completado {updated} actividades ya guardadas con los datos nuevos (sin descargar nada más).")
+    summaries = [e["summary"] for e in entries]
+    save_json(OUT_DIR / "activities.json", summaries)
+    save_json(OUT_DIR / "stats.json", compute_stats(summaries, meta))
+    print("\n¡Listo! Datos guardados en public/data/")
+    if meta.get("userMaxHR"):
+        print(f"Tu FC máxima según Suunto es {meta['userMaxHR']} bpm → ponla en Ajustes dentro de la app.")
+    print("Ejecuta 'npm run dev' para abrir la app.")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+</details>
+<details>
+<summary><b><code>fetch/fit_source.py</code></b> · 186 líneas · clic para desplegar</summary>
 
 ```python
 """
@@ -751,7 +949,8 @@ from pathlib import Path
 from garmin_fit_sdk import Decoder, Stream
 
 from normalizer import (
-    _lap, _num, _spm, auto_splits, hr_zones_from_samples, make_summary, route_points,
+    EXTRA_KEYS, _lap, _num, _pace, _spm, auto_splits, hr_zones_from_samples, make_summary,
+    route_points, sample_extra,
 )
 
 SEMICIRCLES = 180.0 / 2 ** 31  # los FIT guardan las coordenadas en semicírculos
@@ -911,317 +1110,24 @@ def parse_fit(path: Path, max_hr: int = 185) -> tuple[dict, dict]:
     detail["hrZones"] = hr_zones_from_samples(hr, max_hr)
     detail["laps"] = laps
     detail["gpxCoords"] = route_points(latlons)
+
+    # Datos extra (los que un FIT permite calcular)
+    max_speed = _positive(first.get("enhanced_max_speed"), first.get("max_speed"))
+    extra = {k: None for k in EXTRA_KEYS}
+    extra.update(sample_extra(dist_pts, hr, alts))
+    extra.update({
+        "maxSpeed": round(max_speed * 3.6, 1) if max_speed else None,
+        "maxPace": _pace(max_speed),
+        "ascent": round(total("total_ascent")) if total("total_ascent") is not None else None,
+        "descent": round(total("total_descent")) if total("total_descent") is not None else None,
+    })
+    detail["extra"] = extra
     return summary, detail
 ```
 
 </details>
-
 <details>
-<summary><b><code>fetch/sync.py</code></b> · 296 líneas · clic para desplegar</summary>
-
-```python
-#!/usr/bin/env python3
-"""
-Suunto -> JSON local.
-
-Uso (desde la carpeta raíz del proyecto):
-    python3 fetch/sync.py                       # todo el historial (nube de Suunto)
-    python3 fetch/sync.py --limit 20            # solo las 20 más recientes (para probar)
-    python3 fetch/sync.py --since 2024-01-01    # solo desde una fecha
-    python3 fetch/sync.py --no-gpx              # más rápido: sin ruta GPS ni parciales
-    python3 fetch/sync.py --force               # vuelve a descargar los detalles ya guardados
-    python3 fetch/sync.py --source fit          # lee los .fit de la carpeta fetch/fit/
-    python3 fetch/sync.py --dump latest         # guarda las respuestas crudas para depurar
-
-Fuente "nube": la sesión la crea `suuntool login` (ver la guía); aquí no hay contraseñas.
-Salida: public/data/activities.json + activity_{id}.json + stats.json
-"""
-from __future__ import annotations
-
-import argparse
-import json
-import os
-import sys
-import time
-from datetime import datetime
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
-
-for _stream in (sys.stdout, sys.stderr):  # evita errores con consolas de codificación limitada (Windows)
-    try:
-        _stream.reconfigure(errors="replace")
-    except (AttributeError, ValueError):
-        pass
-
-OUT_DIR = ROOT / "public" / "data"
-PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
-DEBUG_DIR = Path(__file__).resolve().parent / "debug"
-DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "partial")  # claves que no van en el resumen
-
-
-def save_json(path: Path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
-
-
-def since_ms(since: str | None) -> int:
-    if not since:
-        return 0
-    try:
-        return int(datetime.strptime(since, "%Y-%m-%d").timestamp() * 1000)
-    except ValueError:
-        sys.exit("ERROR: --since debe tener el formato YYYY-MM-DD (por ejemplo 2024-01-01)")
-
-
-# ── Fuente: nube de Suunto ──────────────────────────────────────────────────
-
-def make_client():
-    from suunto_client import SuuntoAuthError, SuuntoClient
-    try:
-        return SuuntoClient()
-    except SuuntoAuthError as e:
-        sys.exit(f"ERROR: {e}")
-
-
-def collect_cloud(args):
-    from normalizer import normalize_detail, normalize_summary
-    from suunto_client import SuuntoAuthError, SuuntoError
-
-    client = make_client()
-    print("Leyendo la lista de entrenamientos de Suunto...")
-    try:
-        raw_list = client.list_workouts(since_ms(args.since))
-    except SuuntoAuthError as e:
-        sys.exit(f"ERROR: {e}")
-    except SuuntoError as e:
-        sys.exit(f"ERROR: {e}")
-    print(f"Total entrenamientos: {len(raw_list)}")
-
-    entries, user_max_hr = [], None
-    for raw in sorted(raw_list, key=lambda w: w.get("startTime") or 0, reverse=True):
-        try:
-            summary = normalize_summary(raw)
-        except Exception as e:
-            print(f"  WARNING: no pude procesar el entrenamiento {raw.get('key')}: {e}")
-            continue
-        if user_max_hr is None:
-            hr = raw.get("hrdata") if isinstance(raw.get("hrdata"), dict) else {}
-            user_max_hr = hr.get("userMaxHR")
-
-        def load(raw=raw, summary=summary):
-            w, data = raw, None
-            if not args.no_gpx:
-                if raw.get("extensions") is None:  # la lista no trae VO2max/TE: pedir el detalle
-                    try:
-                        w = {**raw, **client.workout(raw["key"])}
-                    except SuuntoAuthError:
-                        raise
-                    except SuuntoError as e:
-                        print(f"  WARNING: detalle {raw['key']}: {e}")
-                try:
-                    data = client.workout_data(raw["key"])
-                except SuuntoAuthError:
-                    raise
-                except SuuntoError as e:
-                    print(f"  WARNING: muestras {raw['key']}: {e}")
-            new_summary = normalize_summary(w)
-            new_summary["id"] = summary["id"]  # conserva el id (puede haberse desplazado)
-            detail = normalize_detail(new_summary, w, data)
-            if args.no_gpx:
-                detail["partial"] = True  # se completará en la próxima sync sin --no-gpx
-            return new_summary, detail
-
-        entries.append({"summary": summary, "load": load, "network": True})
-    meta = {"userMaxHR": round(float(user_max_hr)) if user_max_hr else None}
-    return entries, meta
-
-
-# ── Fuente: ficheros FIT ────────────────────────────────────────────────────
-
-def collect_fit(args):
-    from fit_source import parse_fit
-
-    fit_dir = Path(args.fit_dir) if args.fit_dir else Path(__file__).resolve().parent / "fit"
-    files = sorted(p for p in fit_dir.rglob("*") if p.suffix.lower() == ".fit")
-    if not files:
-        sys.exit(f"ERROR: no hay ficheros .fit en {fit_dir} (copia ahí los que exportes de la app)")
-    max_hr = int(os.getenv("MAX_HR", "185"))
-    print(f"Leyendo {len(files)} ficheros FIT de {fit_dir} (FC máxima para zonas: {max_hr})...")
-
-    entries, seen = [], set()
-    for path in files:
-        try:
-            summary, detail = parse_fit(path, max_hr)
-        except Exception as e:
-            print(f"  AVISO: {path.name} omitido: {e}")
-            continue
-        if summary["id"] in seen:
-            print(f"  AVISO: {path.name} es un duplicado (misma hora de inicio); lo omito")
-            continue
-        seen.add(summary["id"])
-        entries.append({"summary": summary, "load": lambda s=summary, d=detail: (s, d), "network": False})
-    return entries, {}
-
-
-# ── Depuración ──────────────────────────────────────────────────────────────
-
-SENSITIVE = {"la", "ln", "lat", "lon", "latitude", "longitude", "x", "y", "polyline", "username", "email"}
-
-
-def redact(obj):
-    """Copia sin datos personales: coordenadas, ruta codificada y nombre de usuario."""
-    if isinstance(obj, dict):
-        return {k: "REDACTED" if k in SENSITIVE else redact(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [redact(v) for v in obj]
-    return obj
-
-
-def redacted_sample(data: dict) -> dict:
-    """Del detalle de muestras (/data) conserva solo la estructura: total y 3 primeras filas por serie."""
-    return {
-        k: ({"_total": len(v), "_first3": redact(v[:3])} if isinstance(v, list) else redact(v))
-        for k, v in data.items()
-    }
-
-
-def dump(which: str):
-    from suunto_client import SuuntoError
-    client = make_client()
-    try:
-        if which == "latest":
-            items = client.list_workouts()
-            if not items:
-                sys.exit("No hay entrenamientos en tu cuenta.")
-            item = max(items, key=lambda w: w.get("startTime") or 0)
-        else:
-            item = {"key": which}
-        key = item["key"]
-        files = {"list": item, "detail": client.workout(key), "data": client.workout_data(key)}
-    except SuuntoError as e:
-        sys.exit(f"ERROR: {e}")
-    DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    for name, payload in files.items():
-        path = DEBUG_DIR / f"{key}.{name}.json"
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        if isinstance(payload, dict):
-            shape = {k: (len(v) if isinstance(v, (list, dict)) else type(v).__name__) for k, v in payload.items()}
-            print(f"{path.relative_to(ROOT)}\n    {shape}")
-    safe = DEBUG_DIR / f"{key}.redacted.json"
-    safe.write_text(json.dumps({
-        "list": redact(files["list"]), "detail": redact(files["detail"]), "data": redacted_sample(files["data"]),
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\nPara pedir ayuda comparte SOLO {safe.relative_to(ROOT)} (sin coordenadas ni usuario).")
-    print("Los demás ficheros de esa carpeta contienen tu ruta GPS: no los compartas.")
-
-
-# ── Estadísticas globales ───────────────────────────────────────────────────
-
-def compute_stats(summaries: list, meta: dict) -> dict:
-    by_sport: dict = {}
-    for s in summaries:
-        by_sport.setdefault(s.get("sport", "other"), []).append(s)
-    vo2max_history = sorted(
-        ({"date": s["startTime"][:10], "value": s["vo2max"]} for s in summaries if s.get("vo2max")),
-        key=lambda x: x["date"],
-    )
-    stats = {
-        "totalActivities": len(summaries),
-        "byType": {sport: len(acts) for sport, acts in by_sport.items()},
-        "vo2maxHistory": vo2max_history,
-        "syncedAt": datetime.now().isoformat(),
-    }
-    if meta.get("userMaxHR"):
-        stats["userMaxHR"] = meta["userMaxHR"]
-    return stats
-
-
-# ── Principal ───────────────────────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser(description="Sincroniza tus entrenamientos de Suunto a JSON local")
-    parser.add_argument("--source", choices=["cloud", "fit"], default="cloud",
-                        help="cloud = nube de Suunto (por defecto) · fit = ficheros .fit exportados")
-    parser.add_argument("--fit-dir", default=None, help="carpeta con los .fit (por defecto fetch/fit)")
-    parser.add_argument("--limit", type=int, default=None, help="máximo de actividades (para probar)")
-    parser.add_argument("--since", type=str, default=None, help="solo desde esta fecha (YYYY-MM-DD)")
-    parser.add_argument("--no-gpx", action="store_true", help="sin ruta GPS ni parciales (más rápido; solo nube)")
-    parser.add_argument("--force", action="store_true", help="vuelve a descargar los detalles ya guardados")
-    parser.add_argument("--dump", metavar="KEY|latest", default=None,
-                        help="guarda en fetch/debug las respuestas crudas de un entrenamiento y sale")
-    args = parser.parse_args()
-
-    since_ms(args.since)  # valida el formato antes de tocar la red
-    if args.dump:
-        return dump(args.dump)
-
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    entries, meta = collect_fit(args) if args.source == "fit" else collect_cloud(args)
-
-    # ids únicos y estables (derivados de la hora de inicio)
-    used = set()
-    for e in sorted(entries, key=lambda e: (e["summary"]["startTime"], e["summary"].get("suuntoKey") or "")):
-        while e["summary"]["id"] in used:
-            e["summary"]["id"] += 1
-        used.add(e["summary"]["id"])
-
-    if args.since:
-        entries = [e for e in entries if e["summary"]["startTime"] >= args.since]
-    entries.sort(key=lambda e: e["summary"]["startTime"], reverse=True)
-    if args.limit:
-        entries = entries[: args.limit]
-
-    save_json(OUT_DIR / "activities.json", [e["summary"] for e in entries])
-    print(f"Guardados {len(entries)} resúmenes → public/data/activities.json")
-
-    from suunto_client import SuuntoAuthError  # solo para capturar el error de sesión
-    print(f"\nProcesando el detalle de {len(entries)} actividades...")
-    for i, e in enumerate(entries):
-        s = e["summary"]
-        path = OUT_DIR / f"activity_{s['id']}.json"
-        tag = f"[{i + 1}/{len(entries)}] {s['id']}"
-
-        if path.exists() and not args.force:
-            cached = json.loads(path.read_text(encoding="utf-8"))
-            if not (cached.get("partial") and not args.no_gpx):
-                print(f"  {tag} — ya guardada, la salto")
-                e["summary"] = {k: v for k, v in cached.items() if k not in DETAIL_ONLY}
-                continue
-
-        print(f"  {tag} ({s.get('title', '')})...")
-        try:
-            new_summary, detail = e["load"]()
-            save_json(path, detail)
-            e["summary"] = new_summary
-        except SuuntoAuthError as err:
-            sys.exit(f"ERROR: {err}")
-        except Exception as err:
-            print(f"  WARNING: no pude procesar {s['id']}: {err}")
-        if e["network"] and not args.no_gpx:
-            time.sleep(PAUSE)  # el servidor admite pocas peticiones por segundo
-
-    summaries = [e["summary"] for e in entries]
-    save_json(OUT_DIR / "activities.json", summaries)
-    save_json(OUT_DIR / "stats.json", compute_stats(summaries, meta))
-    print("\n¡Listo! Datos guardados en public/data/")
-    if meta.get("userMaxHR"):
-        print(f"Tu FC máxima según Suunto es {meta['userMaxHR']} bpm → ponla en Ajustes dentro de la app.")
-    print("Ejecuta 'npm run dev' para abrir la app.")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-</details>
-
-<details>
-<summary><b><code>fetch/validate_output.py</code></b> · 138 líneas · clic para desplegar</summary>
+<summary><b><code>fetch/validate_output.py</code></b> · 159 líneas · clic para desplegar</summary>
 
 ```python
 #!/usr/bin/env python3
@@ -1277,8 +1183,26 @@ def check_summary(a, where):
         errors.append(f"{where}: avgHR negativo")
 
 
+EXTRA_TEXT = {"tssMethod"}
+
+
+def check_extra(x, where):
+    if x is None:
+        return  # detalles guardados con una versión anterior: es opcional
+    if not isinstance(x, dict):
+        errors.append(f"{where}: 'extra' debe ser un objeto")
+        return
+    for k, v in x.items():
+        if k in EXTRA_TEXT:
+            if v is not None and not isinstance(v, str):
+                errors.append(f"{where}: extra.{k} debe ser texto o null")
+        elif v is not None and not num(v):
+            errors.append(f"{where}: extra.{k} debe ser número o null (es {v!r})")
+
+
 def check_detail(d, where):
     check_summary(d, where)
+    check_extra(d.get("extra"), where)
     if not isinstance(d.get("laps"), list):
         errors.append(f"{where}: 'laps' debe ser una lista")
     else:
@@ -1344,6 +1268,9 @@ def main():
             errors.append("stats.json: totalActivities (entero) y byType (objeto) son obligatorios")
         if not isinstance(s.get("syncedAt"), str):
             errors.append("stats.json: syncedAt debe ser texto")
+        rec = s.get("recovery")
+        if rec is not None and not (isinstance(rec, dict) and num(rec.get("seconds")) and num(rec.get("endedAt"))):
+            errors.append("stats.json: recovery necesita seconds y endedAt (números)")
         for i, v in enumerate(s.get("vo2maxHistory") or []):
             if not isinstance(v.get("date"), str) or not num(v.get("value")):
                 errors.append(f"stats.json: vo2maxHistory[{i}] necesita date (texto) y value (número)")
@@ -1365,988 +1292,8 @@ if __name__ == "__main__":
 ```
 
 </details>
-
-### 5.3 Web: carpeta `src/` (e `index.html`)
-
-Cada edición dice **qué bloque buscar** y **por qué lo cambias por otro**. Los bloques incluyen un par de líneas de contexto para que los localices sin ambigüedad; solo cambian las líneas distintas.
-
-Los 3 fallos que ya tenía la app (marcados con 🐞) los comprobé sobre el código original: los dos primeros en un navegador real y el tercero ejecutando su función:
-
-1. 🐞 **Gráfico «Carga semanal» del Dashboard vacío.** Cada barra usaba un porcentaje de altura dentro de un contenedor sin altura, así que medía 0.
-2. 🐞 **El mapa no dibujaba la ruta.** La app nunca cargaba la hoja de estilos de Leaflet: las capas del mapa quedaban sin posicionar y la ruta aparecía fuera de la vista.
-3. 🐞 **TSS negativo.** Una actividad sin frecuencia cardiaca (`avgHR = 0`) daba un TSS estimado negativo (−4 en un entreno de 49 min), que *restaba* carga al Fitness y la Fatiga.
-
-#### `index.html`
-
-**Cambio 1 de 1**: Título de la pestaña del navegador.
-
-Busca este bloque:
-
-```html
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Garmin Training Analyst</title>
-  </head>
-  <body>
-```
-
-y cámbialo por:
-
-```html
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Suunto Training Analyst</title>
-  </head>
-  <body>
-```
-
-#### `src/components/Sidebar.tsx`
-
-**Cambio 1 de 2**: Nombre de la app en la barra lateral.
-
-Busca este bloque:
-
-```tsx
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-slate-700/50">
-        <div className="text-blue-400 font-bold text-lg tracking-tight">Garmin Stats</div>
-        <div className="text-slate-500 text-xs mt-0.5">
-          {activities.length > 0 ? `${activities.length} actividades` : 'Sin datos aún'}
-```
-
-y cámbialo por:
-
-```tsx
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-slate-700/50">
-        <div className="text-blue-400 font-bold text-lg tracking-tight">Suunto Stats</div>
-        <div className="text-slate-500 text-xs mt-0.5">
-          {activities.length > 0 ? `${activities.length} actividades` : 'Sin datos aún'}
-```
-
-**Cambio 2 de 2**: Comando de actualización que se muestra abajo (el original apuntaba a `cd fetch && python sync.py`).
-
-Busca este bloque:
-
-```tsx
-          <div className="mt-3 text-xs text-slate-600 leading-relaxed">
-            Para actualizar:<br />
-            <code className="text-slate-500">cd fetch && python sync.py</code>
-          </div>
-        </div>
-```
-
-y cámbialo por:
-
-```tsx
-          <div className="mt-3 text-xs text-slate-600 leading-relaxed">
-            Para actualizar:<br />
-            <code className="text-slate-500">python3 fetch/sync.py</code>
-          </div>
-        </div>
-```
-
-#### `src/pages/Dashboard.tsx`
-
-**Cambio 1 de 2**: Pantalla «sin datos»: ahora explica los pasos de Suunto.
-
-Busca este bloque:
-
-```tsx
-    <div className="flex-1 p-8 max-w-2xl">
-      <div className="bg-amber-950/40 border border-amber-800/50 rounded-xl p-6">
-        <h2 className="text-amber-300 font-medium text-lg mb-2">Sin datos de Garmin</h2>
-        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 space-y-1 mt-3">
-          <div>cp .env.example .env</div>
-          <div>cd fetch && pip install -r requirements.txt</div>
-          <div>python3 sync.py --limit 20</div>
-        </div>
-      </div>
-```
-
-y cámbialo por:
-
-```tsx
-    <div className="flex-1 p-8 max-w-2xl">
-      <div className="bg-amber-950/40 border border-amber-800/50 rounded-xl p-6">
-        <h2 className="text-amber-300 font-medium text-lg mb-2">Sin datos de Suunto</h2>
-        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 space-y-1 mt-3">
-          <div>suuntool login --email TU_EMAIL</div>
-          <div>pip install -r fetch/requirements.txt</div>
-          <div>python3 fetch/sync.py --limit 20</div>
-        </div>
-      </div>
-```
-
-**Cambio 2 de 2**: 🐞 **Fallo 1.** La columna de cada barra pasa a tener altura (`h-full`) y las barras se apoyan abajo (`justify-end`); sin eso su `height: X%` medía 0.
-
-Busca este bloque:
-
-```tsx
-              const isCurrentWeek = i === weeklyLoad.length - 1
-              return (
-                <div key={w.week} className="flex-1 flex flex-col items-center" title={`${w.week}: ${w.tss} TSS`}>
-                  <div
-                    className="w-full rounded-t transition-all"
-```
-
-y cámbialo por:
-
-```tsx
-              const isCurrentWeek = i === weeklyLoad.length - 1
-              return (
-                <div key={w.week} className="flex-1 h-full flex flex-col justify-end items-center" title={`${w.week}: ${w.tss} TSS`}>
-                  <div
-                    className="w-full rounded-t transition-all"
-```
-
-#### `src/pages/PerformanceAnalysis.tsx`
-
-**Cambio 1 de 1**: Texto de ayuda del VO2max cuando todavía no hay datos.
-
-Busca este bloque:
-
-```tsx
-        <Section
-          title="Tendencia VO2max"
-          sub={currentVo2 ? `Actual: ${currentVo2.toFixed(1)} ml/kg/min — ${vo2Label}` : 'Estimado por Garmin'}
-        >
-          {vo2Points.length > 1 ? (
-```
-
-y cámbialo por:
-
-```tsx
-        <Section
-          title="Tendencia VO2max"
-          sub={currentVo2 ? `Actual: ${currentVo2.toFixed(1)} ml/kg/min — ${vo2Label}` : 'Suunto solo lo calcula en carreras y caminatas'}
-        >
-          {vo2Points.length > 1 ? (
-```
-
-#### `src/pages/ActivityDetail.tsx`
-
-**Cambio 1 de 3**: Título de la tabla: los parciales ya no son siempre de 1 km (son las vueltas de tu reloj).
-
-Busca este bloque:
-
-```tsx
-        <section className="mb-6">
-          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
-            Splits ({detail.laps.length} km)
-          </h2>
-          <div className="overflow-x-auto">
-```
-
-y cámbialo por:
-
-```tsx
-        <section className="mb-6">
-          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
-            Parciales ({detail.laps.length})
-          </h2>
-          <div className="overflow-x-auto">
-```
-
-**Cambio 2 de 3**: Cabecera de la tabla: columna `#` y nueva columna `Dist.`.
-
-Busca este bloque:
-
-```tsx
-              <thead>
-                <tr className="text-left text-xs text-slate-500 border-b border-slate-700">
-                  <th className="pb-2 pr-4">Km</th>
-                  <th className="pb-2 pr-4">Tiempo</th>
-                  {act.sport === 'running' && <th className="pb-2 pr-4">Ritmo</th>}
-```
-
-y cámbialo por:
-
-```tsx
-              <thead>
-                <tr className="text-left text-xs text-slate-500 border-b border-slate-700">
-                  <th className="pb-2 pr-4">#</th>
-                  <th className="pb-2 pr-4">Dist.</th>
-                  <th className="pb-2 pr-4">Tiempo</th>
-                  {act.sport === 'running' && <th className="pb-2 pr-4">Ritmo</th>}
-```
-
-**Cambio 3 de 3**: Celda con la distancia de cada parcial.
-
-Busca este bloque:
-
-```tsx
-                  <tr key={lap.index} className="border-b border-slate-800 hover:bg-slate-800/40">
-                    <td className="py-2 pr-4 text-slate-400">{lap.index}</td>
-                    <td className="py-2 pr-4 font-mono text-slate-200">{formatDuration(lap.duration)}</td>
-                    {act.sport === 'running' && (
-```
-
-y cámbialo por:
-
-```tsx
-                  <tr key={lap.index} className="border-b border-slate-800 hover:bg-slate-800/40">
-                    <td className="py-2 pr-4 text-slate-400">{lap.index}</td>
-                    <td className="py-2 pr-4 text-slate-200">{lap.distance.toFixed(2)} km</td>
-                    <td className="py-2 pr-4 font-mono text-slate-200">{formatDuration(lap.duration)}</td>
-                    {act.sport === 'running' && (
-```
-
-#### `src/utils/calculations.ts`
-
-**Cambio 1 de 3** *(opcional)*: Solo cambia un comentario.
-
-Busca este bloque:
-
-```ts
-
-/**
- * Estimates TSS for activities that don't have it from Garmin.
- * Uses TRIMP-derived method based on HR zones.
- */
-```
-
-y cámbialo por:
-
-```ts
-
-/**
- * Estimates TSS for activities that don't have it from Suunto.
- * Uses TRIMP-derived method based on HR zones.
- */
-```
-
-**Cambio 2 de 3**: 🐞 **Fallo 3.** Sin FC se asume una carga suave (~30 TSS por hora) y, con FC, la reserva se limita a 0-1 para que nunca salga negativa.
-
-Busca este bloque:
-
-```ts
-
-  const durationHours = activity.movingTime / 3600
-  const hrReserve = (activity.avgHR - 60) / (settings.maxHR - 60)
-
-  // TRIMP exponential weighting
-```
-
-y cámbialo por:
-
-```ts
-
-  const durationHours = activity.movingTime / 3600
-  // Sin frecuencia cardiaca (avgHR = 0) no se puede usar TRIMP: se asume una carga suave de ~30 TSS/hora.
-  // Antes salía un TSS NEGATIVO que restaba carga al Fitness/Fatiga.
-  if (!activity.avgHR) return Math.round(durationHours * 30)
-  const hrReserve = Math.min(Math.max((activity.avgHR - 60) / (settings.maxHR - 60), 0), 1)
-
-  // TRIMP exponential weighting
-```
-
-**Cambio 3 de 3** *(opcional)*: Solo cambia un comentario.
-
-Busca este bloque:
-
-```ts
-
-/**
- * Returns seconds spent in each zone for an activity that lacks zone data from Garmin.
- */
-export function estimateZonesFromHR(
-```
-
-y cámbialo por:
-
-```ts
-
-/**
- * Returns seconds spent in each zone for an activity that lacks zone data from Suunto.
- */
-export function estimateZonesFromHR(
-```
-
-#### `src/index.css`
-
-**Cambio 1 de 1**: 🐞 **Fallo 2.** Carga los estilos de Leaflet **antes** de los ajustes del proyecto (así se respeta el fondo oscuro del mapa).
-
-Busca este bloque:
-
-```css
-@import "tailwindcss";
-
-@theme {
-```
-
-y cámbialo por:
-
-```css
-@import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
-
-@theme {
-```
-
-### 5.4 `.gitignore` y README
-
-- **`README.md`:** reemplázalo por el del [Apéndice A](#apéndice-a-readmemd-adaptado).
-- **`.gitignore`:** protege las carpetas que pueden contener tu ruta GPS (`fetch/debug/`, `fetch/fit/`, `*.fit`) e ignora el entorno virtual de Python y su bytecode.
-
-#### `.gitignore`
-
-**Cambio 1 de 3** *(opcional)*: Solo cambia un comentario.
-
-Busca este bloque:
-
-```text
-*.local
-
-# Credenciales de Garmin (NUNCA subir)
-.env
-.env.local
-```
-
-y cámbialo por:
-
-```text
-*.local
-
-# Credenciales (NUNCA subir)
-.env
-.env.local
-```
-
-**Cambio 2 de 3** *(opcional)*: Solo cambia un comentario.
-
-Busca este bloque:
-
-```text
-!.env.example
-
-# Datos personales descargados de Garmin Connect
-public/data/
-public/data/**
-```
-
-y cámbialo por:
-
-```text
-!.env.example
-
-# Datos personales descargados de Suunto
-public/data/
-public/data/**
-```
-
-**Cambio 3 de 3**: Ignora el entorno virtual de Python y las carpetas que pueden contener tu ruta GPS (sustituye al bloque `.garth/`).
-
-Busca este bloque:
-
-```text
-dist/data/**
-
-# Tokens de sesión de Garmin (por si se copian al proyecto)
-.garth/
-
-# Editor directories and files
-```
-
-y cámbialo por:
-
-```text
-dist/data/**
-
-# Python: entorno virtual y bytecode
-.venv/
-__pycache__/
-
-# Depuración y ficheros FIT exportados (contienen tus coordenadas GPS)
-fetch/debug/
-fetch/fit/
-*.fit
-
-# Editor directories and files
-```
-
-### 5.5 Primera sincronización
-
-> En Windows usa `py` o `python` donde ponga `python3`.
-
-Instala las dependencias de Python (desde la carpeta raíz del proyecto):
-
-```bash
-python3 -m pip install -r fetch/requirements.txt
-```
-
-> **Si `pip` dice «externally-managed-environment»** (pasa en Ubuntu/WSL y otras distribuciones recientes), crea un entorno virtual en la carpeta del proyecto y úsalo en todos los comandos de Python:
->
-> ```bash
-> sudo apt install python3-venv          # solo en Debian/Ubuntu, si falta
-> python3 -m venv .venv
-> source .venv/bin/activate              # Windows (PowerShell): .venv\Scripts\Activate.ps1
-> python3 -m pip install -r fetch/requirements.txt
-> ```
->
-> Cada vez que abras una terminal nueva, ejecuta `source .venv/bin/activate` antes de `python3 fetch/sync.py`.
-
-#### Ruta A — Nube de Suunto
-
-**1. Instala `suuntool`.** Es una herramienta de línea de comandos de código abierto (MIT), no oficial, que hace el login contra el servicio de la app de Suunto. Este proyecto **no guarda tu contraseña**: solo lee la clave de sesión que crea `suuntool`.
-
-| Sistema | Cómo |
-| --- | --- |
-| macOS | `brew install --cask tajchert/tap/suuntool` (o descarga el binario `darwin_arm64` / `darwin_amd64` de la [página de versiones](https://github.com/tajchert/suuntool/releases)) |
-| Linux | Descarga el binario de la [página de versiones](https://github.com/tajchert/suuntool/releases) (ver abajo) o `go install github.com/tajchert/suuntool@latest` |
-| Windows | **No hay binarios para Windows.** Lo más sencillo es usar WSL (Ubuntu) y ejecutar allí `suuntool` y también `python3 fetch/sync.py`. Alternativa: `go install` con Go instalado (no lo he podido probar) |
-
-Linux (verificado con la v0.10.0; usa `arm64` en lugar de `amd64` en Raspberry Pi y similares):
-
-```bash
-curl -L -o suuntool.tar.gz https://github.com/tajchert/suuntool/releases/download/v0.10.0/suuntool_0.10.0_linux_amd64.tar.gz
-tar -xzf suuntool.tar.gz suuntool
-sudo mv suuntool /usr/local/bin/
-suuntool version        # → suuntool 0.10.0
-```
-
-**2. Inicia sesión** (solo la primera vez, o cuando caduque):
-
-```bash
-suuntool login --email TU_EMAIL
-suuntool doctor
-```
-
-Te pide tu contraseña de Suunto sin mostrarla en pantalla. Usa la cuenta de la **app Suunto** (las credenciales del antiguo Movescount no sirven, según el FAQ oficial). La clave de sesión queda en `~/.config/suuntool/session.json`. `suuntool doctor` comprueba la conexión y la sesión.
-
-- `suuntool` solo admite email y contraseña. Si entras en la app con Facebook u otro acceso social, crea antes una contraseña de Suunto (en la app: Ajustes → Cuenta → Cambiar contraseña; te llega un enlace por email). **No está comprobado** que eso baste en cuentas creadas con acceso social; si no funciona, usa la Ruta B.
-- **WSL:** si `suuntool` está en WSL pero ejecutas Python en Windows, o al revés, no verán el mismo `~/.config`. Ejecuta todo en el mismo sitio, o copia el valor de `sessionkey` de `session.json` a tu `.env` como `SUUNTO_SESSION_KEY=...`.
-
-**3. Sincroniza una prueba pequeña y luego todo:**
-
-```bash
-python3 fetch/sync.py --limit 20     # las 20 más recientes
-python3 fetch/sync.py                # todo el historial
-```
-
-Si Suunto envía tu FC máxima, al terminar te la dice (por ejemplo «Tu FC máxima según Suunto es 186 bpm»): apúntala para **Ajustes**.
-
-La primera vez puede tardar varios minutos si tienes muchas actividades (hay una pausa entre peticiones).
-
-Opciones útiles: `--since 2024-01-01` (desde una fecha), `--no-gpx` (mucho más rápido, sin ruta ni parciales), `--force` (volver a descargar lo guardado). Lo ya descargado no se vuelve a pedir.
-
-#### Ruta B — Ficheros FIT
-
-**1. Exporta tus entrenamientos** (pasos del [soporte oficial de Suunto](https://www.suunto.com/Support/faq-articles/suunto-app/how-do-i-download-a-.fit-file-from-suunto-app-for-ios)): en la app, **Calendario** → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT** → envíatelo a tu ordenador. Se hace de uno en uno.
-
-**2. Copia los `.fit` a `fetch/fit/`** (crea la carpeta si no existe).
-
-**3. Sincroniza:**
-
-```bash
-python3 fetch/sync.py --source fit
-```
-
-Opcional: en `.env`, `MAX_HR=190` (tu FC máxima) para que las zonas de FC se calculen con ella. Los ficheros que no son actividades se saltan con un aviso.
-
-**¿Muchos entrenamientos?** Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; mira su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). No he podido comprobar en la práctica qué entregan exactamente ni cuánto tardan; este proyecto lee ficheros `.fit`.
-
-#### Abrir la app
-
-```bash
-npm install        # solo la primera vez
-npm run dev        # abre http://localhost:5173
-```
-
-### 5.6 Comprobar que funciona
-
-```bash
-python3 fetch/validate_output.py       # debe terminar con «0 errores»
-```
-
-En el navegador deberías ver:
-
-- [ ] La barra lateral dice **Suunto Stats** y el número de actividades.
-- [ ] El Dashboard muestra Fitness, Fatiga y Forma, y el gráfico «Carga semanal» **con barras**.
-- [ ] Al abrir una carrera o una salida en bici: **mapa con la ruta**, zonas de FC Z1-Z5 y la tabla de **Parciales**.
-- [ ] Un entreno sin pulsómetro (por ejemplo, gimnasio) se abre sin errores y su TSS **no es negativo**.
-- [ ] En **Ajustes** has puesto tu FC máxima.
-
-Si algo sale vacío o raro, mira el [apartado 7](#7-problemas-frecuentes).
-
----
-
-## 6. Qué datos tendrás: Garmin frente a Suunto
-
-| Campo de la app | Versión Garmin | Con Suunto |
-| --- | --- | --- |
-| Distancia, duración, desnivel, FC media y máxima, calorías | Sí | Sí |
-| Título | El de Garmin Connect | Generado: `Carrera · 30/09` |
-| Hora de inicio | Hora local de Garmin | Hora local calculada: con la diferencia horaria del propio entrenamiento si viene (`timeOffsetInMinutes` en la nube, `local_timestamp` en FIT); si no, con la zona horaria de tu ordenador o `SUUNTO_TIMEZONE` |
-| TSS | El de Garmin; si faltaba, estimado | El de Suunto (`tss.trainingStressScore`); si falta, estimado con la FC; sin FC, ~30 TSS por hora |
-| VO2max | En casi todas las carreras | Solo carreras y caminatas (`FitnessExtension.vo2Max`): pocas mediciones |
-| Training Effect aeróbico | El de Garmin | El *Peak Training Effect* de Suunto (`SummaryExtension.pte`) |
-| Training Effect anaeróbico | Sí | No viene en los datos: vacío |
-| Potencia media y normalizada | Si hay sensor | Si hay sensor y el dato llega (en la nube no está verificado; en FIT sí) |
-| Cadencia | pasos/min o rpm | Carrera: pasos/min (Suunto da ciclos/min, se multiplica ×2); bici: rpm |
-| SWOLF y brazadas | Sí | No vienen en los datos que he podido ver: vacío |
-| Zonas de FC | Calculadas por Garmin | Tiempo real en cada zona según tu reloj (`timeInZone0..5`; la «zona 0» se suma a Z1). En FIT se calculan con tu FC máxima |
-| Parciales | Vueltas del reloj | Vueltas del reloj; si no hay, automáticos: cada 1 km (5 km en bici) |
-| Ruta GPS | GPX | Muestras GPS de Suunto, reducidas a 500 puntos |
-| Deportes (running, cycling, swimming, other) | Por tipo de Garmin | Por ID de actividad de Suunto ([Apéndice C](#apéndice-c-ids-de-actividad-de-suunto-usados)) |
-
----
-
-## 7. Problemas frecuentes
-
-| Síntoma | Qué hacer |
-| --- | --- |
-| `ERROR: No hay sesión de Suunto` | Aún no has iniciado sesión: `suuntool login --email TU_EMAIL` |
-| `Sesión de Suunto no válida o caducada` | Repite `suuntool login`. Si persiste, `suuntool doctor` y actualiza `suuntool` (puede que Suunto haya cambiado algo) |
-| `ModuleNotFoundError: ... requests / dotenv / garmin_fit_sdk` | Falta instalar: `python3 -m pip install -r fetch/requirements.txt` (y, si usas entorno virtual, activarlo antes) |
-| `error: externally-managed-environment` al instalar | Usa un entorno virtual (receta al principio de 5.5) |
-| `ERROR: No se pudo leer ...: sin conexión con Suunto` | Revisa tu internet. Si usas WSL, comprueba que tiene red |
-| Error HTTP 429 | Demasiadas peticiones: sube la pausa con `SUUNTO_PAUSE=1.5` en `.env` |
-| Faltan actividades, o la **ruta / los parciales salen vacíos** | Mira «Cómo pedir ayuda» debajo |
-| Las horas salen desplazadas | Pon `SUUNTO_TIMEZONE=Europe/Madrid` (tu zona) en `.env` |
-| «Pocas mediciones aún» en VO2max | Es normal: Suunto solo lo calcula en carreras y caminatas |
-| Los entrenos sin pulsómetro (gimnasio…) tienen un TSS bajo | Es la estimación de ~30 TSS por hora para entrenos sin FC. Ajusta el `30` en `src/utils/calculations.ts` si quieres |
-| `AVISO: ... omitido: no contiene una actividad` (Ruta B) | Ese `.fit` no era un entrenamiento (ajustes, báscula…). Es normal |
-| Parciales automáticos con un primer tramo muy lento (Ruta B) | En un FIT con una pausa larga, el tiempo parado cuenta en el parcial donde ocurrió |
-| La web dice «Sin datos de Suunto» | Aún no has sincronizado (o `public/data/activities.json` no existe) |
-| Cambié de Ruta A a B y han desaparecido actividades | Es lo esperado: la lista se rehace con la fuente que ejecutas. Vuelve a ejecutar la otra ruta para recuperarla |
-
-### Cómo pedir ayuda sin regalar tus datos
-
-Si algo no encaja con tu cuenta (faltan campos, no hay ruta…), ejecuta:
-
-```bash
-python3 fetch/sync.py --dump latest
-```
-
-Guarda en `fetch/debug/` lo que devuelve Suunto para tu último entrenamiento. **Comparte solo el fichero `*.redacted.json`**: conserva la estructura (nombres de campos y tipos) pero sustituye coordenadas, ruta codificada y nombre de usuario. Los demás ficheros de esa carpeta contienen tu ruta GPS completa.
-
-Con ese fichero se puede ver qué campo ha cambiado Suunto y ajustar `fetch/normalizer.py`.
-
----
-
-## 8. Riesgos y privacidad
-
-**La Ruta A no es oficial**
-
-- Suunto no publica ese servicio: puede cambiar o desaparecer sin avisar y la Ruta A dejaría de funcionar.
-- Su uso podría ir contra los términos de Suunto. Los autores de `suuntool` advierten de que un uso abusivo podría llevar a que se bloquee la cuenta. Este código solo **lee tus propios datos**, hace una pausa entre peticiones (`SUUNTO_PAUSE`, 0,6 s por defecto) y no vuelve a pedir lo ya descargado.
-- La versión Garmin ya dependía de una librería no oficial (`garminconnect`), así que el nivel de riesgo es comparable. Si prefieres no asumirlo, usa la Ruta B.
-
-**Credenciales**
-
-- Tu contraseña solo se la das a `suuntool`; este proyecto no la guarda (antes estaba en `.env`).
-- `~/.config/suuntool/session.json` equivale a una contraseña: no lo subas a ningún sitio. `suuntool logout` lo invalida.
-- `suuntool` es software de terceros que recibe tu contraseña. Declara no tener telemetría y es de código abierto; lee su README o revisa el código antes de usarlo.
-
-**Tus datos**
-
-- `public/data/` contiene tus rutas GPS. Vite sirve `public/` tal cual: **no publiques esa carpeta** (GitHub Pages, Netlify…). Ya está en `.gitignore`.
-- `fetch/debug/` y `fetch/fit/` también contienen rutas GPS y quedan ignoradas por git con el cambio de 5.4.
-
----
-
-## 9. Cómo se verificó esta guía (y qué no)
-
-Probado en octubre de 2026 con: Python 3.12, Node 22, Vite 8, `garmin-fit-sdk` 21.217.0 y `suuntool` 0.10.0.
-
-| Qué | Cómo | Resultado |
-| --- | --- | --- |
-| Estructura y unidades de los datos de Suunto | Leyendo el código de [`suuntool`](https://github.com/tajchert/suuntool) y de [`ha-suunto`](https://github.com/MichalZaniewicz/ha-suunto) (integración de Home Assistant; su autor documenta haberlo contrastado con una cuenta real), el FAQ oficial de la API de Suunto y su [PDF oficial de IDs de actividad](https://aspartnercontent.blob.core.windows.net/apizone/docs/Activities.pdf) | Campos, unidades y mapa de deportes confirmados por fuentes independientes. La URL base coincide con la que muestra `suuntool doctor` |
-| Normalizador | 44 pruebas unitarias, incluidos datos «sucios» (HR en Hz, campos nulos, NaN, coordenadas inválidas, vueltas desordenadas…) | Todas correctas |
-| Ruta A completa | Servidor simulado con 131 entrenamientos en 2 páginas: caché, `--limit`, `--since`, `--no-gpx`, `--force`, errores de sesión y de red, ids únicos y estables, volcado redactado | Todo correcto; la 2.ª sincronización no repite ninguna petición de detalle |
-| Ruta B | 44 ficheros FIT reales (Garmin, COROS, Wahoo, multideporte, corruptos y ficheros que no son actividades) | 24 actividades válidas, 20 saltadas con aviso, 0 errores de formato |
-| Guía aplicada desde cero | Copia limpia del proyecto original + solo lo que dice esta guía | Idéntica a la versión probada; compila, pasa el linter y sincroniza por las dos rutas con un entorno Python vacío |
-| Web | `tsc` estricto + `vite build`, linter (0 avisos) y un navegador real (Chromium) recorriendo las 10 pantallas con datos simulados | Sin errores de JavaScript; solo fallaron las teselas del mapa base, que mi red bloquea |
-
-**Lo que NO he podido verificar**
-
-- **Los servidores reales de Suunto.** No tengo cuenta de Suunto y mi entorno no puede conectar con su servicio. Lo que sé de él viene de código y documentación de terceros; por eso existen `--dump` y los avisos del apartado 7.
-- Que el servidor real envíe `timeOffsetInMinutes`, `avgPower` o `tss.normalizedPower`. El código los usa si están y, si no, hace otra cosa razonable.
-- Ficheros FIT **de Suunto**: no tengo ninguno; probé con otras marcas.
-- Windows y macOS (probado en Linux), `suuntool` en Windows y cuentas creadas con acceso social.
-
----
-
-## 10. Mejoras opcionales
-
-1. **Zonas de FC exactas en la página «Zonas».** Hoy esa página estima las zonas con la FC media (lo dice su pie: «Zonas estimadas…»), aunque cada `activity_<id>.json` ya trae el tiempo real por zona (`hrZones`). Se podría guardar ese reparto en el resumen y usarlo en `src/hooks/useZoneDistribution.ts`.
-2. **FC máxima automática.** `stats.json` ya incluye `userMaxHR` (la de tu reloj); la página de Ajustes podría proponerla.
-3. **Ritmo por 100 m en natación.** La interfaz muestra «/km» también en natación.
-4. **Renombrados cosméticos** (no aportan nada funcional): `src/types/garmin.ts` → `activity.ts` (hazlo con «Renombrar» de VS Code para que actualice los imports), el nombre en `package.json` y las variables `--color-garmin-*` de `src/index.css`. **No cambies** la clave `garmin-settings` de `src/stores/activityStore.ts`: perderías los ajustes guardados en tu navegador.
-
----
-
-## Apéndice A. `README.md` adaptado
-
 <details>
-<summary><b><code>README.md</code></b> · 341 líneas · clic para desplegar</summary>
-
-````markdown
-# Suunto Stats
-
-Panel personal para ver tus estadísticas de entrenamiento de Suunto: actividades, mapas, zonas de FC, fitness (CTL/ATL/TSB), récords y más.
-
-Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes tú) a archivos locales en tu ordenador. La app los lee desde ahí; no hay servidor en la nube ni base de datos.
-
----
-
-## Dos formas de traer tus datos
-
-| | **Ruta A — Automática** | **Ruta B — Ficheros FIT** |
-| --- | --- | --- |
-| Cómo funciona | Lee tu cuenta de Suunto (la misma de la app del móvil) | Exportas tus entrenamientos como `.fit` desde la app y los copias a una carpeta |
-| Comodidad | Un solo comando, descarga todo el historial | Hay que exportar los entrenamientos de uno en uno |
-| Riesgo | **No es oficial**: Suunto no ofrece API para uso personal. Puede dejar de funcionar sin aviso y podría ir contra sus términos de uso | Ninguno: son tus propios ficheros |
-| Necesitas | La herramienta `suuntool` (solo para iniciar sesión) | Nada más |
-
-Elige una. Si cambias de una a otra, la lista de actividades se rehace con la fuente nueva (no se mezclan). El resto de la app es idéntico.
-
----
-
-## Qué necesitas antes de empezar
-
-| Programa | Para qué sirve | Cómo comprobarlo |
-| --- | --- | --- |
-| **Node.js** (v18 o superior) | Ejecutar la app web | `node --version` |
-| **Python** (v3.10 o superior) | Descargar datos de Suunto | `python3 --version` |
-| **suuntool** (solo Ruta A) | Iniciar sesión en Suunto una vez | `suuntool version` |
-
-> **¿No tienes Node.js o Python?**
->
-> - Node.js: [https://nodejs.org](https://nodejs.org) → descarga la versión LTS.
-> - Python: [https://python.org/downloads](https://python.org/downloads) → en Mac/Linux suele venir instalado.
-
-> **Instalar suuntool (Ruta A)** — [github.com/tajchert/suuntool](https://github.com/tajchert/suuntool)
->
-> - Mac / Linux con Homebrew: `brew install --cask tajchert/tap/suuntool`
-> - Con Go instalado: `go install github.com/tajchert/suuntool@latest`
-> - Windows: no tiene binarios oficiales. Lo más sencillo es usar WSL (Ubuntu) y ejecutar allí tanto `suuntool` como `python3 fetch/sync.py`.
-
----
-
-## Guía paso a paso
-
-### 1. Descargar el proyecto
-
-Abre la carpeta del proyecto en la terminal:
-
-```bash
-cd ruta/donde/está/suunto-stats
-```
-
----
-
-### 2. Instalar dependencias de Python
-
-Desde la carpeta raíz del proyecto:
-
-```bash
-python3 -m pip install -r fetch/requirements.txt
-```
-
-> **Si `pip` dice «externally-managed-environment»** (pasa en Ubuntu/WSL y otras distribuciones recientes), crea un entorno virtual en la carpeta del proyecto y úsalo en todos los comandos de Python:
->
-> ```bash
-> sudo apt install python3-venv          # solo en Debian/Ubuntu, si falta
-> python3 -m venv .venv
-> source .venv/bin/activate              # Windows (PowerShell): .venv\Scripts\Activate.ps1
-> python3 -m pip install -r fetch/requirements.txt
-> ```
->
-> Cada vez que abras una terminal nueva, ejecuta `source .venv/bin/activate` antes de `python3 fetch/sync.py`.
-
----
-
-### 3A. Ruta A — Iniciar sesión en Suunto (solo la primera vez)
-
-```bash
-suuntool login --email tu@email.com
-```
-
-Te pedirá tu contraseña de Suunto (la de la app del móvil). **No se guarda ninguna contraseña en este proyecto**: `suuntool` guarda solo una clave de sesión en `~/.config/suuntool/session.json`.
-
-Comprueba que todo va bien:
-
-```bash
-suuntool doctor
-```
-
-> `suuntool` solo admite email + contraseña. Si entras en la app de Suunto con Facebook u otro acceso social, crea primero una contraseña de Suunto (en la app: Ajustes → Cuenta → Cambiar contraseña; te llega un enlace por email). No está comprobado que eso baste en cuentas creadas con acceso social; si no funciona, usa la Ruta B.
-
-Después descarga tus actividades, desde la carpeta raíz del proyecto:
-
-```bash
-python3 fetch/sync.py --limit 20
-```
-
-**Qué hace este comando:**
-
-- Lee la lista de tus entrenamientos de Suunto
-- Descarga el detalle de cada uno (zonas de FC, parciales, ruta GPS)
-- Guarda todo en `public/data/` (archivos JSON)
-
-La primera vez puede tardar **varios minutos** si tienes muchas actividades. Verás el progreso en la terminal.
-
-**Opciones útiles:**
-
-```bash
-# Todo el historial
-python3 fetch/sync.py
-
-# Solo actividades desde una fecha
-python3 fetch/sync.py --since 2024-01-01
-
-# Más rápido, sin ruta GPS ni parciales
-python3 fetch/sync.py --no-gpx
-
-# Volver a descargar lo ya guardado
-python3 fetch/sync.py --force
-```
-
-> **Importante:** vuelve a ejecutar `python3 fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Suunto.
-
----
-
-### 3B. Ruta B — Usar ficheros FIT
-
-1. En la app de Suunto (móvil): Calendario → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT**. Envíatelo a tu ordenador.
-2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe).
-3. Desde la carpeta raíz del proyecto:
-
-```bash
-python3 fetch/sync.py --source fit
-```
-
-Opcional: en `.env` puedes poner `MAX_HR=190` (tu FC máxima) para que las zonas de FC se calculen con ella.
-
-> **¿Muchos entrenamientos?** Exportarlos de uno en uno es lento. Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; ver su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). Este proyecto lee ficheros `.fit`.
-
----
-
-### 4. Comprobar que los datos son correctos (opcional)
-
-```bash
-python3 fetch/validate_output.py
-```
-
-Debe terminar con `0 errores`.
-
----
-
-### 5. Instalar dependencias de la app web
-
-En la carpeta raíz del proyecto:
-
-```bash
-npm install
-```
-
-Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
-
----
-
-### 6. Abrir la app
-
-```bash
-npm run dev
-```
-
-Verás algo como:
-
-```
-  ➜  Local:   http://localhost:5173/
-```
-
-Abre ese enlace en el navegador (Chrome, Firefox, Safari…).
-
-Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
-
----
-
-## Resumen rápido (cuando ya lo hayas hecho una vez)
-
-```bash
-# 1. Sincronizar datos nuevos de Suunto
-python3 fetch/sync.py
-
-# 2. Arrancar la app
-npm run dev
-```
-
-Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
-
----
-
-## Ajustes dentro de la app
-
-En el menú lateral, entra en **Ajustes** para configurar:
-
-- FC máxima (al terminar la sincronización se te indica la que tienes en tu reloj Suunto)
-- FTP (ciclismo)
-- FC y ritmo en umbral (running)
-
-Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS y fitness.
-
----
-
-## Qué datos de Suunto verás
-
-| Dato | Detalle |
-| --- | --- |
-| Distancia, duración, desnivel, FC, calorías | Siempre |
-| TSS | El que calcula Suunto; si falta, la app lo estima con la FC |
-| VO2max | Suunto solo lo calcula en carreras y caminatas, así que habrá pocas mediciones |
-| Training Effect | Se muestra el aeróbico (PTE de Suunto, escala 1-5). El anaeróbico no viene en los datos de Suunto |
-| Zonas de FC | Las de tu reloj (tiempo real en cada zona) |
-| Parciales | Las vueltas de tu reloj; si no hay, se calculan automáticos (cada 1 km, o 5 km en bici) |
-| SWOLF / brazadas | No vienen en los datos |
-
----
-
-## Problemas frecuentes
-
-### "ERROR: No hay sesión de Suunto"
-
-Aún no has iniciado sesión. Ejecuta `suuntool login --email tu@email.com` y repite la sincronización.
-
-### "Sesión de Suunto no válida o caducada"
-
-La clave de sesión ya no vale. Repite `suuntool login --email tu@email.com`.
-
-### Pide el login y la contraseña es correcta
-
-Prueba `suuntool doctor`. Si el login falla pero la contraseña es correcta, es posible que Suunto haya cambiado algo en su app y haga falta actualizar `suuntool` (`brew upgrade --cask suuntool` o `go install github.com/tajchert/suuntool@latest`).
-
-### Faltan actividades, o la ruta / los parciales salen vacíos
-
-Ejecuta `python3 fetch/sync.py --dump latest`. Guarda en `fetch/debug/` lo que devuelve Suunto para tu último entrenamiento; con eso se puede ver qué campo ha cambiado. Para pedir ayuda comparte **solo** el fichero `*.redacted.json` (sin coordenadas ni usuario): los demás ficheros de esa carpeta contienen tu ruta GPS.
-
-### Las horas salen desplazadas
-
-Pon tu zona horaria en `.env`: `SUUNTO_TIMEZONE=Europe/Madrid`.
-
-### "No hay ficheros .fit"
-
-Copia tus `.fit` en `fetch/fit/` (Ruta B) o ejecuta la sincronización sin `--source fit` (Ruta A).
-
-### "No se encontró /data/activities.json" en la app
-
-Aún no has sincronizado datos. Ejecuta primero:
-
-```bash
-python3 fetch/sync.py
-```
-
-### La terminal dice que `node` o `npm` no existen
-
-Instala Node.js desde [nodejs.org](https://nodejs.org) y vuelve a abrir la terminal.
-
-### La sincronización va muy lenta
-
-Es normal: hay una pausa entre peticiones para no saturar el servidor de Suunto. Para una prueba rápida usa `--limit 20` o `--no-gpx`. Si ves errores 429, sube la pausa con `SUUNTO_PAUSE=1.5` en `.env`.
-
-### Puerto 5173 ya en uso
-
-Cierra otras ventanas de terminal donde tengas `npm run dev` corriendo, o Vite te propondrá otro puerto (por ejemplo 5174).
-
----
-
-## Comandos extra (opcional)
-
-| Comando | Descripción |
-| --- | --- |
-| `npm run build` | Genera una versión optimizada en la carpeta `dist/` |
-| `npm run preview` | Previsualiza la versión de producción (después de `build`) |
-| `npm run lint` | Revisa el código con el linter |
-| `python3 fetch/validate_output.py` | Comprueba que los datos descargados tienen el formato correcto |
-
----
-
-## Estructura del proyecto (referencia)
-
-```
-suunto-stats/
-├── .env                      ← Opciones personales (opcional, no compartir)
-├── fetch/
-│   ├── sync.py               ← Script que descarga los datos
-│   ├── suunto_client.py      ← Ruta A: lectura de tu cuenta de Suunto
-│   ├── fit_source.py         ← Ruta B: lectura de ficheros FIT
-│   ├── normalizer.py         ← Convierte los datos al formato de la app
-│   ├── validate_output.py    ← Comprueba el formato de los datos
-│   ├── requirements.txt      ← Dependencias de Python
-│   └── fit/                  ← (Ruta B) tus ficheros .fit
-├── public/data/              ← Datos descargados (JSON)
-└── src/                      ← Código de la app web (React)
-```
-
----
-
-## Privacidad y qué NO subir a GitHub
-
-Estos archivos contienen datos personales o credenciales. El `.gitignore` ya los excluye, pero conviene conocerlos:
-
-| Archivo / carpeta | Qué contiene | Riesgo |
-| --- | --- | --- |
-| `.env` | Opciones personales (y la clave de sesión si la pusiste ahí) | Acceso a tu cuenta |
-| `~/.config/suuntool/session.json` (en tu home) | Clave de sesión de Suunto | Acceso a tu cuenta sin contraseña |
-| `public/data/` | Actividades, estadísticas y rutas GPS | Ubicación exacta, salud, hábitos |
-| `dist/data/` | Copia de los datos al hacer `npm run build` | Igual que arriba |
-| `fetch/debug/` y `fetch/fit/` | Respuestas crudas y ficheros FIT | Rutas GPS completas |
-
-**Datos sensibles dentro de los JSON:**
-
-- Coordenadas GPS de cada entrenamiento (pueden revelar dónde vives o entrenas)
-- FC, VO2max, calorías, ritmos y patrones horarios
-
-**Seguro para publicar:**
-
-- `.env.example` (solo tiene placeholders)
-- Todo el código en `src/` y `fetch/` (salvo las carpetas `fetch/debug/` y `fetch/fit/`)
-
-**Antes de hacer `git push`**, comprueba que no se cuelen datos:
-
-```bash
-git status
-```
-
-No deberían aparecer `.env` ni archivos dentro de `public/data/`. Si alguna vez los añadiste por error:
-
-```bash
-git rm -r --cached public/data/
-git rm --cached .env
-```
-
-Luego haz commit de la eliminación. Si ya los subiste a GitHub, **cierra la sesión de Suunto** (`suuntool logout`), cambia tu contraseña de Suunto y considera borrar el historial del repositorio.
-
----
-
-## Aviso
-
-Este proyecto no está afiliado a Suunto. La Ruta A usa un servicio que Suunto no ha publicado como API: puede cambiar o dejar de funcionar en cualquier momento, y su uso podría no cumplir los términos de Suunto. Úsala solo con tu propia cuenta y con moderación. Si prefieres evitar ese riesgo, usa la Ruta B.
-````
-
-</details>
-
----
-
-## Apéndice B. Contrato de datos
-
-La web lee tres tipos de fichero, todos en `public/data/`:
-
-| Fichero | Contenido |
-| --- | --- |
-| `activities.json` | Lista de `ActivitySummary` |
-| `activity_<id>.json` | Un `ActivityDetail` (resumen + `laps`, `hrZones`, `gpxCoords`) |
-| `stats.json` | `GlobalStats` |
-
-Reglas que cumplen los datos generados (y que comprueba `validate_output.py`):
-
-- `id` es un **entero**. Suunto identifica los entrenamientos con una clave de texto, así que se usa la hora de inicio en segundos (con +1 si dos coincidieran).
-- `startTime` es hora **local** en ISO, sin zona: `2026-09-30T07:45:00`.
-- `avgHR`, `maxHR` y `calories` son números (0 si no hay dato); el resto de campos opcionales valen `null`, **nunca se omite la clave**.
-
-Tipos de `src/types/garmin.ts` (solo la parte de datos):
+<summary><b><code>src/types/garmin.ts</code></b> · 117 líneas · clic para desplegar</summary>
 
 ```ts
 export type Sport = 'running' | 'cycling' | 'swimming' | 'other'
@@ -2396,7 +1343,38 @@ export interface ActivitySummary {
   avgStrokesPerLength?: number | null
 }
 
+// Datos extra de la pantalla de detalle. Todos opcionales: si el reloj no los envía valen null.
+export interface ActivityExtra {
+  maxSpeed: number | null        // km/h
+  maxPace: number | null         // s/km
+  ngp: number | null             // s/km (ritmo ajustado a la pendiente)
+  peakPace30s: number | null     // s/km (mejor ritmo en 30 s, 1, 3 y 5 min)
+  peakPace1m: number | null
+  peakPace3m: number | null
+  peakPace5m: number | null
+  ascent: number | null          // m
+  descent: number | null         // m
+  ascentTime: number | null      // s
+  descentTime: number | null     // s
+  minAltitude: number | null     // m
+  maxAltitude: number | null     // m
+  ascentSpeed: number | null     // m/min
+  descentSpeed: number | null    // m/min
+  minHR: number | null           // bpm
+  tssMethod: string | null       // 'HR' | 'PACE' | 'MET'...
+  epoc: number | null
+  recoveryTime: number | null    // s
+  steps: number | null
+  stepCadence: number | null     // pasos/min
+  maxStepCadence: number | null
+  cadence: number | null         // rpm
+  maxCadence: number | null
+  stepLength: number | null      // cm
+  strideLength: number | null    // cm
+}
+
 export interface ActivityDetail extends ActivitySummary {
+  extra?: ActivityExtra | null
   laps: Lap[]
   hrZones: HRZone[]
   gpxCoords: [number, number][]  // [lat, lon] pairs
@@ -2404,25 +1382,756 @@ export interface ActivityDetail extends ActivitySummary {
   trainingEffect?: number | null
 }
 
+export interface FitnessPoint {
+  date: string   // YYYY-MM-DD
+  ctl: number    // Chronic Training Load (Fitness)
+  atl: number    // Acute Training Load (Fatigue)
+  tsb: number    // Training Stress Balance (Form)
+  tss: number    // TSS accumulated that day
+}
+
 export interface GlobalStats {
   totalActivities: number
   byType: Record<string, number>
   vo2maxHistory: { date: string; value: number }[]
   syncedAt: string
+  // Tiempo de recuperación acumulado tras el último entrenamiento (s) y cuándo terminó (ms epoch)
+  recovery?: { seconds: number; endedAt: number } | null
+}
+
+export interface UserSettings {
+  maxHR: number
+  ftp: number          // Functional Threshold Power (watts)
+  lthrRunning: number  // Lactate threshold HR for running
+  thresholdPace: number // seconds per km at threshold
+  ftpDate?: string
+}
+
+export const DEFAULT_SETTINGS: UserSettings = {
+  maxHR: 185,
+  ftp: 250,
+  lthrRunning: 165,
+  thresholdPace: 270, // ~4:30/km
 }
 ```
 
----
+</details>
+<details>
+<summary><b><code>src/components/ActivityStats.tsx</code></b> · 135 líneas · clic para desplegar</summary>
 
-## Apéndice C. IDs de actividad de Suunto usados
+```tsx
+import type { ActivityDetail } from '../types/garmin'
+import { formatDuration, formatPace } from '../utils/formatters'
 
-Cada entrenamiento de Suunto trae un `activityId` numérico. Así se reparten en las 4 categorías de la app (fuente: el [PDF oficial de Suunto](https://aspartnercontent.blob.core.windows.net/apizone/docs/Activities.pdf)):
+interface Row {
+  label: string
+  value: string | null
+  hint?: string
+}
 
-| Categoría | IDs | Deportes |
-| --- | --- | --- |
-| `running` | 1, 22, 53, 103, 115 | Running, trail, cinta, pista, carrera vertical |
-| `cycling` | 2, 10, 52, 99, 114 | Ciclismo, MTB, ciclismo indoor, gravel, ciclocross |
-| `swimming` | 21, 85 | Natación en piscina, aguas abiertas |
-| `other` | El resto | Por ejemplo: 0 caminata, 11 senderismo, 23 gimnasio, 105 y 106 e-bike |
+interface Section {
+  title: string
+  rows: Row[]
+}
 
-Para cambiar el reparto (por ejemplo, contar la bici eléctrica como ciclismo o la orientación como carrera) edita `RUNNING_IDS`, `CYCLING_IDS` y `SWIMMING_IDS` al principio de `fetch/normalizer.py`.
+const pace = (s: number | null | undefined) => (s ? formatPace(s) : null)
+
+const num = (v: number | null | undefined, unit = '', digits = 0): string | null =>
+  v == null ? null : `${digits ? v.toFixed(digits) : Math.round(v)}${unit ? ` ${unit}` : ''}`
+
+const hours = (s: number | null | undefined): string | null => {
+  if (!s) return null
+  if (s < 3600) return `${Math.round(s / 60)} min`
+  return `${(s / 3600).toFixed(s >= 36000 ? 0 : 1)} h`
+}
+
+const TSS_METHOD: Record<string, string> = { HR: 'hr', PACE: 'ritmo', POWER: 'potencia', MET: 'MET' }
+
+export default function ActivityStats({ detail }: { detail: ActivityDetail }) {
+  const x = detail.extra
+  if (!x) return null
+
+  const onFoot = detail.sport === 'running' || detail.sport === 'other'
+
+  const sections: Section[] = [
+    {
+      title: 'Ritmo',
+      rows: onFoot
+        ? [
+            { label: 'Ritmo med.', value: pace(detail.avgPace) },
+            { label: 'NGP', value: pace(x.ngp), hint: 'Ritmo ajustado a la pendiente' },
+            { label: 'Ritmo máx.', value: pace(x.maxPace) },
+            { label: 'Ritmo máx.: 30 s', value: pace(x.peakPace30s), hint: 'Calculado con las muestras GPS (aproximado)' },
+            { label: 'Ritmo máx.: 1 min', value: pace(x.peakPace1m), hint: 'Calculado con las muestras GPS (aproximado)' },
+            { label: 'Ritmo máx.: 3 min', value: pace(x.peakPace3m), hint: 'Calculado con las muestras GPS (aproximado)' },
+            { label: 'Ritmo máx.: 5 min', value: pace(x.peakPace5m), hint: 'Calculado con las muestras GPS (aproximado)' },
+          ]
+        : [],
+    },
+    {
+      title: 'Altura',
+      rows: [
+        { label: 'Ascenso', value: num(x.ascent ?? detail.elevationGain, 'm') },
+        { label: 'Descenso', value: num(x.descent, 'm') },
+        { label: 'Duración de ascenso', value: x.ascentTime ? formatDuration(x.ascentTime) : null },
+        { label: 'Duración de descenso', value: x.descentTime ? formatDuration(x.descentTime) : null },
+        { label: 'Punto más alto', value: num(x.maxAltitude, 'm') },
+        { label: 'Punto más bajo', value: num(x.minAltitude, 'm') },
+        { label: 'Velocidad de ascenso', value: num(x.ascentSpeed, 'm/min', 1) },
+        { label: 'Velocidad de descenso', value: num(x.descentSpeed, 'm/min', 1) },
+      ],
+    },
+    {
+      title: 'Velocidad',
+      rows: [
+        { label: 'Velocidad med.', value: num(detail.avgSpeed, 'km/h', 1) },
+        { label: 'Velocidad máx.', value: num(x.maxSpeed, 'km/h', 1) },
+      ],
+    },
+    {
+      title: 'Frecuencia cardiaca',
+      rows: [
+        { label: 'FC media', value: detail.avgHR > 0 ? `${detail.avgHR} ppm` : null },
+        { label: 'FC máx.', value: detail.maxHR > 0 ? `${detail.maxHR} ppm` : null },
+        { label: 'FC mín.', value: num(x.minHR, 'ppm') },
+      ],
+    },
+    {
+      title: 'Fisiología',
+      rows: [
+        { label: 'Calorías', value: detail.calories > 0 ? `${detail.calories} kcal` : null },
+        {
+          label: x.tssMethod ? `TSS (${TSS_METHOD[x.tssMethod] ?? x.tssMethod.toLowerCase()})` : 'TSS',
+          value: detail.tss != null ? String(Math.round(detail.tss)) : null,
+        },
+        { label: 'VO₂ máx. estimado', value: num(detail.vo2max, '', 1) },
+        { label: 'EPOC', value: num(x.epoc) },
+        { label: 'PTE', value: num(detail.aerobicTE, '', 1), hint: 'Peak Training Effect' },
+        { label: 'Tiempo de recuperación', value: hours(x.recoveryTime) },
+      ],
+    },
+    {
+      title: 'Técnica',
+      rows: [
+        { label: 'Pasos', value: num(x.steps) },
+        { label: 'Cadencia de pasos med.', value: num(x.stepCadence, 'ppm') },
+        { label: 'Cadencia de pasos máx.', value: num(x.maxStepCadence, 'ppm') },
+        { label: 'Cadencia med.', value: num(x.cadence, 'rpm') },
+        { label: 'Cadencia máx.', value: num(x.maxCadence, 'rpm') },
+        { label: 'Longitud de pasos med.', value: num(x.stepLength, 'cm') },
+        { label: 'Longitud de zancada med.', value: num(x.strideLength, 'cm') },
+      ],
+    },
+  ]
+
+  // Solo se muestra lo que el reloj ha enviado
+  const visible = sections
+    .map(s => ({ ...s, rows: s.rows.filter(r => r.value != null) }))
+    .filter(s => s.rows.length > 0)
+  if (visible.length === 0) return null
+
+  return (
+    <section className="mb-6">
+      <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Estadísticas</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {visible.map(section => (
+          <div key={section.title}>
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">{section.title}</h3>
+            <div className="grid grid-cols-2 gap-px bg-slate-700/40 border border-slate-700/50 rounded-xl overflow-hidden">
+              {section.rows.map((row, i) => (
+                <div
+                  key={row.label}
+                  title={row.hint}
+                  className={`bg-slate-900 px-4 py-3 ${section.rows.length % 2 === 1 && i === section.rows.length - 1 ? 'col-span-2' : ''}`}
+                >
+                  <div className="text-xs text-slate-500">{row.label}</div>
+                  <div className="text-base font-semibold text-slate-100 tabular-nums mt-0.5">{row.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+```
+
+</details>
+<details>
+<summary><b><code>src/pages/ActivityDetail.tsx</code></b> · 168 líneas · clic para desplegar</summary>
+
+```tsx
+import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import type { ActivityDetail } from '../types/garmin'
+import { useActivityStore } from '../stores/activityStore'
+import { formatPace, formatDuration, formatDistance, formatDate, sportLabel } from '../utils/formatters'
+import { HR_ZONE_DEFS } from '../utils/calculations'
+import ActivityMap from '../components/ActivityMap'
+import MetricCard from '../components/MetricCard'
+import ActivityStats from '../components/ActivityStats'
+
+export default function ActivityDetailPage() {
+  const { id } = useParams<{ id: string }>()
+  const loadDetail = useActivityStore(s => s.loadDetail)
+  const activities = useActivityStore(s => s.activities)
+  const [detail, setDetail] = useState<ActivityDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    loadDetail(Number(id)).then(d => {
+      setDetail(d)
+      setLoading(false)
+    })
+  }, [id, loadDetail])
+
+  const summary = activities.find(a => a.id === Number(id))
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+        Cargando actividad...
+      </div>
+    )
+  }
+
+  const act = detail ?? summary
+  if (!act) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+        Actividad no encontrada.{' '}
+        <Link to="/activities" className="text-blue-400 ml-1">Volver</Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex-1 p-6 overflow-y-auto">
+      {/* Header */}
+      <div className="mb-5">
+        <Link to="/activities" className="text-xs text-slate-500 hover:text-slate-300 mb-2 inline-block">← Actividades</Link>
+        <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
+        <div className="text-sm text-slate-500 mt-0.5">
+          {formatDate(act.startTime)} · {sportLabel(act.sport)}
+        </div>
+      </div>
+
+      {/* Map */}
+      {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
+        <div className="mb-6">
+          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} />
+        </div>
+      )}
+
+      {/* Key metrics */}
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <MetricCard label="Distancia" value={formatDistance(act.distance, act.sport)} />
+        <MetricCard label="Duración" value={formatDuration(act.duration)} />
+        {act.sport === 'running' && act.avgPace
+          ? <MetricCard label="Ritmo medio" value={formatPace(act.avgPace)} />
+          : act.sport === 'cycling' && act.avgSpeed
+          ? <MetricCard label="Velocidad" value={`${act.avgSpeed}`} unit="km/h" />
+          : <MetricCard label="Calorías" value={act.calories} unit="kcal" />
+        }
+        <MetricCard label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
+      </div>
+
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        <MetricCard label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
+        <MetricCard label="Elevación +" value={act.elevationGain} unit="m" />
+        {act.tss != null && <MetricCard label="TSS" value={Math.round(act.tss)} />}
+        {act.sport === 'cycling' && act.avgPower
+          ? <MetricCard label="Potencia media" value={act.avgPower} unit="W" />
+          : act.sport === 'cycling' && act.normalizedPower
+          ? <MetricCard label="Potencia NP" value={act.normalizedPower} unit="W" />
+          : act.sport === 'running' && act.avgCadence
+          ? <MetricCard label="Cadencia" value={act.avgCadence} unit="spm" />
+          : null
+        }
+      </div>
+
+      {/* HR Zones */}
+      {detail?.hrZones && detail.hrZones.length > 0 && (
+        <section className="mb-6">
+          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Zonas de frecuencia cardíaca</h2>
+          <div className="space-y-2">
+            {detail.hrZones.map((zone) => {
+              const total = detail.hrZones.reduce((s, z) => s + z.seconds, 0)
+              const pct = total > 0 ? (zone.seconds / total) * 100 : 0
+              const def = HR_ZONE_DEFS[zone.zone - 1]
+              return (
+                <div key={zone.zone} className="flex items-center gap-3">
+                  <div className="w-24 text-xs text-slate-400">{zone.name}</div>
+                  <div className="flex-1 bg-slate-800 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all"
+                      style={{ width: `${pct}%`, background: def?.color ?? '#6b7280' }}
+                    />
+                  </div>
+                  <div className="w-16 text-xs text-slate-400 text-right">{formatDuration(zone.seconds)}</div>
+                  <div className="w-10 text-xs text-slate-500 text-right">{pct.toFixed(0)}%</div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Laps */}
+      {detail?.laps && detail.laps.length > 1 && (
+        <section className="mb-6">
+          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+            Parciales ({detail.laps.length})
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-700">
+                  <th className="pb-2 pr-4">#</th>
+                  <th className="pb-2 pr-4">Dist.</th>
+                  <th className="pb-2 pr-4">Tiempo</th>
+                  {act.sport === 'running' && <th className="pb-2 pr-4">Ritmo</th>}
+                  {act.sport === 'cycling' && <th className="pb-2 pr-4">Velocidad</th>}
+                  {act.avgPower != null && <th className="pb-2 pr-4">Potencia</th>}
+                  <th className="pb-2 pr-4">FC</th>
+                  <th className="pb-2">Elev.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.laps.map(lap => (
+                  <tr key={lap.index} className="border-b border-slate-800 hover:bg-slate-800/40">
+                    <td className="py-2 pr-4 text-slate-400">{lap.index}</td>
+                    <td className="py-2 pr-4 text-slate-200">{lap.distance.toFixed(2)} km</td>
+                    <td className="py-2 pr-4 font-mono text-slate-200">{formatDuration(lap.duration)}</td>
+                    {act.sport === 'running' && (
+                      <td className="py-2 pr-4 font-mono text-slate-200">{formatPace(lap.avgPace)}</td>
+                    )}
+                    {act.sport === 'cycling' && (
+                      <td className="py-2 pr-4 text-slate-200">{lap.avgSpeed ? `${lap.avgSpeed} km/h` : '–'}</td>
+                    )}
+                    {act.avgPower != null && (
+                      <td className="py-2 pr-4 text-slate-200">{lap.avgPower ? `${lap.avgPower}W` : '–'}</td>
+                    )}
+                    <td className="py-2 pr-4 text-slate-400">{lap.avgHR ?? '–'}</td>
+                    <td className="py-2 text-slate-400">{lap.elevationGain}m</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Estadísticas detalladas (ritmo, altura, fisiología, técnica…) */}
+      {detail && <ActivityStats detail={detail} />}
+    </div>
+  )
+}
+```
+
+</details>
+<details>
+<summary><b><code>src/pages/Dashboard.tsx</code></b> · 395 líneas · clic para desplegar</summary>
+
+```tsx
+import { Link } from 'react-router-dom'
+import type { GlobalStats } from '../types/garmin'
+import { useActivityStore } from '../stores/activityStore'
+import { formatDuration, formatPace, sportIcon, sportColor } from '../utils/formatters'
+import { daysAgo } from '../utils/date'
+import { useFitnessHistory } from '../hooks/useFitnessHistory'
+import { useWeekComparison } from '../hooks/useWeekComparison'
+import { useSportVolume } from '../hooks/useSportVolume'
+import { useTrainingStreak } from '../hooks/useTrainingStreak'
+import { useZoneDistribution } from '../hooks/useZoneDistribution'
+import { useWeeklyLoad } from '../hooks/useWeeklyLoad'
+import RadialProgress from '../components/RadialProgress'
+import FormBadge from '../components/FormBadge'
+import DeltaBadge from '../components/DeltaBadge'
+import {
+  AreaChart, Area, XAxis, Tooltip, ResponsiveContainer,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+} from 'recharts'
+
+// ─── Loading / Empty states ───────────────────────────────────────────────────
+
+function LoadingScreen() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-slate-400 animate-pulse text-sm">Cargando...</div>
+    </div>
+  )
+}
+
+// Segundos de recuperación que quedan: el acumulado tras la última actividad menos el tiempo transcurrido
+function recoveryLeft(stats: GlobalStats | null): number | null {
+  const r = stats?.recovery
+  if (!r) return null
+  return Math.max(0, r.seconds - (Date.now() - r.endedAt) / 1000)
+}
+
+function formatRecovery(seconds: number): string {
+  return seconds < 3600 ? `${Math.round(seconds / 60)}m` : `${Math.round(seconds / 3600)}h`
+}
+
+function EmptyScreen() {
+  return (
+    <div className="flex-1 p-8 max-w-2xl">
+      <div className="bg-amber-950/40 border border-amber-800/50 rounded-xl p-6">
+        <h2 className="text-amber-300 font-medium text-lg mb-2">Sin datos de Suunto</h2>
+        <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm text-slate-300 space-y-1 mt-3">
+          <div>suuntool login --email TU_EMAIL</div>
+          <div>pip install -r fetch/requirements.txt</div>
+          <div>python3 fetch/sync.py --limit 20</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export default function Dashboard() {
+  const activities = useActivityStore(s => s.activities)
+  const stats = useActivityStore(s => s.stats)
+  const loading = useActivityStore(s => s.loading)
+  const error = useActivityStore(s => s.error)
+
+  const { current: fitness, sparkPoints } = useFitnessHistory()
+  const recovery = recoveryLeft(stats)
+  const { current: week, previous: lastWeek } = useWeekComparison()
+  const { bySport: sportHours, totalHours, percentages } = useSportVolume(30)
+  const streak = useTrainingStreak()
+  const { slices: zoneSlices, isAerobicFocused } = useZoneDistribution(30)
+  const weeklyLoad = useWeeklyLoad(16)
+
+  if (loading) return <LoadingScreen />
+  if (error || activities.length === 0) return <EmptyScreen />
+
+  const tsb = fitness?.tsb ?? 0
+  const ctl = fitness?.ctl ?? 0
+  const atl = fitness?.atl ?? 0
+  const tsbColor = tsb > 10 ? '#22c55e' : tsb > -5 ? '#3b82f6' : tsb > -15 ? '#eab308' : tsb > -25 ? '#f97316' : '#ef4444'
+  const maxWeekTSS = Math.max(...weeklyLoad.map(w => w.tss), 1)
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-[#080f1e]">
+
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden px-6 pt-7 pb-6"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)' }}>
+        <div className="absolute top-0 left-1/4 w-96 h-48 rounded-full opacity-10 blur-3xl pointer-events-none"
+          style={{ background: tsbColor }} />
+
+        {/* Form title row */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Estado de forma</div>
+            <div className="flex items-center gap-3">
+              <span className="text-4xl font-black" style={{ color: tsbColor, textShadow: `0 0 30px ${tsbColor}66` }}>
+                {tsb > 0 ? '+' : ''}{Math.round(tsb)}
+              </span>
+              <div>
+                <FormBadge tsb={tsb} />
+                <div className="text-xs text-slate-500 mt-1.5">Forma = Fitness − Fatiga</div>
+              </div>
+            </div>
+          </div>
+
+          {/* VO2max */}
+          {stats?.vo2maxHistory?.length ? (
+            <div className="text-right">
+              <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">VO2max</div>
+              <div className="text-3xl font-black text-purple-400" style={{ textShadow: '0 0 20px #a855f766' }}>
+                {stats.vo2maxHistory.at(-1)!.value.toFixed(1)}
+              </div>
+              <div className="text-xs text-slate-500">ml/kg/min</div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* CTL / ATL radials + streak */}
+        <div className="flex items-center gap-8 mb-6">
+          <div className="flex items-center gap-3">
+            <RadialProgress value={ctl} max={100} color="#3b82f6" size={72} stroke={6}>
+              <span className="text-base font-bold text-blue-300">{Math.round(ctl)}</span>
+            </RadialProgress>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Fitness</div>
+              <div className="text-xs text-slate-400">CTL · 42 días</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <RadialProgress value={atl} max={100} color="#f97316" size={72} stroke={6}>
+              <span className="text-base font-bold text-orange-300">{Math.round(atl)}</span>
+            </RadialProgress>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wider">Fatiga</div>
+              <div className="text-xs text-slate-400">ATL · 7 días</div>
+            </div>
+          </div>
+
+          {recovery != null && (
+            <div className="flex items-center gap-3">
+              <RadialProgress value={recovery} max={72 * 3600} color="#14b8a6" size={72} stroke={6}>
+                <span className="text-base font-bold text-teal-300">{recovery > 0 ? formatRecovery(recovery) : '✓'}</span>
+              </RadialProgress>
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-wider">Recuperación</div>
+                <div className="text-xs text-slate-400">{recovery > 0 ? 'restante (estimado)' : 'recuperado'}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 ml-auto">
+            {streak > 1 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border"
+                style={{ borderColor: '#f59e0b40', background: '#f59e0b10' }}>
+                <span className="text-lg">🔥</span>
+                <div>
+                  <div className="text-sm font-bold text-amber-400">{streak} días</div>
+                  <div className="text-xs text-slate-500">racha activa</div>
+                </div>
+              </div>
+            )}
+            <div className="text-right">
+              <div className="text-xs text-slate-500">{stats?.totalActivities ?? activities.length} actividades</div>
+              {stats?.syncedAt && (
+                <div className="text-xs text-slate-600">
+                  Sync: {new Date(stats.syncedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Fitness sparkline */}
+        <div className="h-20">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkPoints} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="gCTL" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gATL" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" hide />
+              <Tooltip
+                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                formatter={(v: unknown, n: unknown) => [String(v), String(n)]}
+              />
+              <Area type="monotone" dataKey="ctl" name="Fitness" stroke="#3b82f6" strokeWidth={2} fill="url(#gCTL)" dot={false} />
+              <Area type="monotone" dataKey="atl" name="Fatiga" stroke="#f97316" strokeWidth={1.5} fill="url(#gATL)" dot={false} strokeDasharray="3 2" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex gap-4 mt-1">
+          <LegendDot color="#3b82f6" label="Fitness (CTL)" />
+          <LegendDot color="#f97316" label="Fatiga (ATL)" />
+        </div>
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      <div className="px-6 py-5 space-y-5">
+
+        {/* Week comparison */}
+        <section>
+          <SectionHeader left="Esta semana" right="vs semana anterior" />
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: 'Sesiones',    value: week.count,            prev: lastWeek.count,            fmt: (v: number) => String(v),              unit: '' },
+              { label: 'Distancia',   value: week.distance,         prev: lastWeek.distance,         fmt: (v: number) => v.toFixed(1),           unit: 'km' },
+              { label: 'Tiempo',      value: week.duration / 3600,  prev: lastWeek.duration / 3600,  fmt: (v: number) => v.toFixed(1),           unit: 'h' },
+              { label: 'Carga (TSS)', value: week.tss,              prev: lastWeek.tss,              fmt: (v: number) => Math.round(v).toString(), unit: '' },
+            ].map(({ label, value, prev, fmt, unit }) => (
+              <div key={label} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/60 transition-colors">
+                <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">{label}</div>
+                <div className="text-2xl font-bold text-slate-100 mb-1">
+                  {fmt(value)}<span className="text-sm text-slate-500 ml-1">{unit}</span>
+                </div>
+                <DeltaBadge value={value - prev} unit={unit ? ` ${unit}` : ''} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Sport rings + Zone radar */}
+        <div className="grid grid-cols-2 gap-4">
+
+          <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
+            <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Volumen · últimos 30 días</div>
+            <div className="flex items-center justify-around">
+              {([
+                { sport: 'running' as const,  label: 'Running',  color: '#ef4444', max: 20 },
+                { sport: 'cycling' as const,  label: 'Ciclismo', color: '#f97316', max: 30 },
+                { sport: 'swimming' as const, label: 'Natación', color: '#3b82f6', max: 8  },
+              ]).map(({ sport, label, color, max }) => (
+                <div key={sport} className="flex flex-col items-center gap-2">
+                  <RadialProgress value={sportHours[sport].hours} max={max} color={color} size={80} stroke={7}>
+                    <div className="text-center">
+                      <div className="text-sm font-bold" style={{ color }}>{sportHours[sport].hours.toFixed(1)}</div>
+                      <div className="text-xs text-slate-600">h</div>
+                    </div>
+                  </RadialProgress>
+                  <div className="text-center">
+                    <div className="text-xs font-medium text-slate-300">{sportIcon(sport)} {label}</div>
+                    <div className="text-xs text-slate-600">de {max}h ref.</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-700/50 text-xs text-slate-500 text-center">
+              Total: <span className="text-slate-300 font-medium">{totalHours.toFixed(1)}h</span>
+              {totalHours > 0 && (
+                <> · R {Math.round(percentages.running)}% · C {Math.round(percentages.cycling)}% · N {Math.round(percentages.swimming)}%</>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
+            <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Zonas FC · 30 días</div>
+            <div className="text-xs mb-2" style={{ color: isAerobicFocused ? '#22c55e' : '#eab308' }}>
+              {isAerobicFocused ? '✅ Buena base aeróbica (Z1+Z2 >60%)' : '⚠️ Añade más entrenamiento en Z1–Z2'}
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <RadarChart data={zoneSlices} margin={{ top: 0, right: 20, bottom: 0, left: 20 }}>
+                <PolarGrid stroke="#334155" />
+                <PolarAngleAxis dataKey="zone" tick={{ fill: '#64748b', fontSize: 10 }} />
+                <Radar dataKey="pct" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={1.5} />
+                <Tooltip
+                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  formatter={(v: unknown) => [`${v}%`, 'Tiempo']}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+              {zoneSlices.map(z => (
+                <span key={z.zone} className="text-xs" style={{ color: z.color }}>{z.zone} {z.pct}%</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Weekly TSS bar chart */}
+        <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
+          <SectionHeader left="Carga semanal (TSS) · 16 semanas" rightLink={{ to: '/fitness', label: 'Ver completo →' }} />
+          <div className="flex items-end gap-1 h-20">
+            {weeklyLoad.map((w, i) => {
+              const isCurrentWeek = i === weeklyLoad.length - 1
+              return (
+                <div key={w.week} className="flex-1 h-full flex flex-col justify-end items-center" title={`${w.week}: ${w.tss} TSS`}>
+                  <div
+                    className="w-full rounded-t transition-all"
+                    style={{
+                      height: `${Math.max((w.tss / maxWeekTSS) * 100, 2)}%`,
+                      background: isCurrentWeek ? 'linear-gradient(to top, #3b82f6, #60a5fa)' : '#334155',
+                      boxShadow: isCurrentWeek ? '0 0 8px #3b82f660' : 'none',
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-slate-600">{weeklyLoad[0]?.week}</span>
+            <span className="text-xs text-blue-400 font-medium">
+              esta semana {week.tss > 0 ? `${Math.round(week.tss)} TSS` : ''}
+            </span>
+          </div>
+        </div>
+
+        {/* Recent activities */}
+        <section>
+          <SectionHeader left="Últimas actividades" rightLink={{ to: '/activities', label: 'Ver todas →' }} />
+          <div className="space-y-2">
+            {activities.slice(0, 6).map(a => (
+              <Link
+                key={a.id}
+                to={`/activity/${a.id}`}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl border border-slate-700/40 bg-slate-800/30 hover:bg-slate-800/70 hover:border-slate-600/50 transition-all group"
+              >
+                <div className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: sportColor(a.sport), boxShadow: `0 0 6px ${sportColor(a.sport)}88` }} />
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-slate-200 truncate group-hover:text-white">{a.title}</div>
+                  <div className="text-xs text-slate-500">
+                    {daysAgo(a.startTime) === 0 ? 'Hoy' : daysAgo(a.startTime) === 1 ? 'Ayer' : `Hace ${daysAgo(a.startTime)}d`}
+                    {' · '}{sportIcon(a.sport)}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-5 shrink-0 text-right">
+                  {a.distance > 0 && (
+                    <div>
+                      <div className="text-sm font-bold text-slate-200">
+                        {a.distance.toFixed(1)}<span className="text-xs text-slate-500 ml-0.5">km</span>
+                      </div>
+                      {a.avgPace && <div className="text-xs text-slate-500">{formatPace(a.avgPace)}</div>}
+                      {a.avgSpeed && !a.avgPace && <div className="text-xs text-slate-500">{a.avgSpeed.toFixed(1)} km/h</div>}
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-sm font-bold text-slate-200">{formatDuration(a.duration)}</div>
+                    {a.avgHR > 0 && <div className="text-xs text-slate-500">{a.avgHR} bpm</div>}
+                  </div>
+                  {a.tss != null && (
+                    <div className="w-10 text-right">
+                      <div className="text-sm font-bold" style={{ color: sportColor(a.sport) }}>{Math.round(a.tss)}</div>
+                      <div className="text-xs text-slate-600">TSS</div>
+                    </div>
+                  )}
+                  <div className="text-slate-600 group-hover:text-slate-400 text-xs">→</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <div className="h-2" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Shared layout helpers ────────────────────────────────────────────────────
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-slate-500">
+      <span className="w-3 h-0.5 rounded inline-block" style={{ background: color }} />
+      {label}
+    </span>
+  )
+}
+
+function SectionHeader({
+  left,
+  right,
+  rightLink,
+}: {
+  left: string
+  right?: string
+  rightLink?: { to: string; label: string }
+}) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="text-xs text-slate-500 uppercase tracking-widest">{left}</div>
+      {right && <div className="text-xs text-slate-600">{right}</div>}
+      {rightLink && (
+        <Link to={rightLink.to} className="text-xs text-blue-400 hover:text-blue-300">{rightLink.label}</Link>
+      )}
+    </div>
+  )
+}
+```
+
+</details>
