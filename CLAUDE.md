@@ -37,6 +37,8 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   `sync.py` completa así los detalles antiguos sin red; `--force` los recalcula exactos.
 - TSS estimado con el umbral de cada deporte (`lthrFor`): bici y natación se deducen del de carrera
   (−5/−10 bpm) salvo que se fijen en Ajustes. El `persist` mezcla con `DEFAULT_SETTINGS`.
+- Rendimiento orientado a corredor: «Volumen de carrera» (km/semana, tirada larga, rampa frente a
+  la media de 4 semanas) en lugar del balance de triatlón; bici/natación quedan como «Otros».
 
 ## Pendiente
-1. La página Rendimiento asume reparto de triatlón 35/50/15; no encaja con un corredor puro.
+(nada por ahora)

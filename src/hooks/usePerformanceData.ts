@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
-import { isoDateOffset, monthKey } from '../utils/date'
-import type { ActivitySummary, Sport } from '../types/suunto'
+import { isoDateOffset, monthKey, parseLocalDate, toLocalISODate } from '../utils/date'
+import { localWeekStart } from '../utils/calculations'
+import type { ActivitySummary } from '../types/suunto'
 
 // ─── Aerobic Efficiency ───────────────────────────────────────────────────────
 
@@ -50,43 +51,63 @@ export function useAerobicEfficiency(): { data: AerobicEFPoint[]; trendPct: numb
   }, [activities])
 }
 
-// ─── Triathlon Balance ────────────────────────────────────────────────────────
+// ─── Running Volume ───────────────────────────────────────────────────────────
 
-const IDEAL_PCT: Record<Sport, number> = { running: 35, cycling: 50, swimming: 15, other: 0 }
-
-export interface SportBalanceRow {
-  sport: string
-  emoji: string
-  actual: number
-  ideal: number
-  hours: number
-  gap: number
+export interface RunWeekPoint {
+  week: string        // MM-DD del lunes
+  weekStart: string   // lunes (YYYY-MM-DD)
+  km: number
+  longRun: number     // km de la carrera más larga de la semana
+  runs: number
+  baseKm: number | null  // media de km de las 4 semanas anteriores
+  rampPct: number | null // km de la semana frente a esa media
+  riskLevel: 'ok' | 'warn' | 'high'
 }
 
-export function useTriathlonBalance(windowDays = 21): SportBalanceRow[] {
+/** Km de carrera por semana (lunes a domingo, hora local), incluidas las semanas sin carreras. */
+export function useRunningVolume(windowWeeks = 12): RunWeekPoint[] {
   const activities = useActivityStore(s => s.activities)
 
   return useMemo(() => {
-    const cutoff = isoDateOffset(windowDays)
-    const recent = activities.filter(a => a.startTime.slice(0, 10) >= cutoff)
-    const hours: Record<string, number> = { running: 0, cycling: 0, swimming: 0 }
-
-    for (const a of recent) {
-      if (Object.hasOwn(hours, a.sport)) hours[a.sport] += a.duration / 3600
+    const total = windowWeeks + 4  // 4 semanas más para la media de referencia de la primera
+    const monday = parseLocalDate(localWeekStart(new Date()))
+    monday.setDate(monday.getDate() - 7 * (total - 1))
+    const keys: string[] = []
+    for (let i = 0; i < total; i++) {
+      keys.push(toLocalISODate(monday))
+      monday.setDate(monday.getDate() + 7)
     }
 
-    const total = Object.values(hours).reduce((s, h) => s + h, 0) || 1
+    const weeks = new Map(keys.map(k => [k, { km: 0, longRun: 0, runs: 0 }]))
+    for (const a of activities) {
+      if (a.sport !== 'running') continue
+      const w = weeks.get(localWeekStart(new Date(a.startTime)))
+      if (!w) continue
+      w.km += a.distance
+      w.longRun = Math.max(w.longRun, a.distance)
+      w.runs += 1
+    }
 
-    return [
-      { sport: 'Running', emoji: '🏃', key: 'running' },
-      { sport: 'Ciclismo', emoji: '🚴', key: 'cycling' },
-      { sport: 'Natación', emoji: '🏊', key: 'swimming' },
-    ].map(({ sport, emoji, key }) => {
-      const actual = Math.round(hours[key] / total * 100)
-      const ideal = IDEAL_PCT[key as Sport]
-      return { sport, emoji, actual, ideal, hours: +hours[key].toFixed(1), gap: actual - ideal }
+    const rows = keys.map(k => weeks.get(k)!)
+    return keys.slice(4).map((k, j) => {
+      const i = j + 4
+      const w = rows[i]
+      const prev = rows.slice(i - 4, i).map(r => r.km)
+      const baseKm = prev.some(km => km > 0) ? prev.reduce((s, km) => s + km, 0) / 4 : null
+      const rampPct = baseKm ? Math.round((w.km - baseKm) / baseKm * 100) : null
+      const riskLevel = rampPct == null ? 'ok' : rampPct > 30 ? 'high' : rampPct > 15 ? 'warn' : 'ok'
+      return {
+        week: k.slice(5),
+        weekStart: k,
+        km: +w.km.toFixed(1),
+        longRun: +w.longRun.toFixed(1),
+        runs: w.runs,
+        baseKm: baseKm != null ? +baseKm.toFixed(1) : null,
+        rampPct,
+        riskLevel,
+      }
     })
-  }, [activities, windowDays])
+  }, [activities, windowWeeks])
 }
 
 // ─── Cadence vs Speed ─────────────────────────────────────────────────────────
@@ -143,40 +164,33 @@ export function useVo2maxTrend(): { points: Vo2maxPoint[]; current: number | nul
 
 export interface HeatmapData {
   dates: string[]
-  bySport: Record<Sport, number[]>
+  running: number[]   // horas de carrera por día
+  cross: number[]     // horas del resto de deportes (bici, natación, otros)
   activeDaysCount: number
 }
-
-const HEATMAP_SPORTS: Sport[] = ['running', 'cycling', 'swimming']
 
 export function useConsistencyHeatmap(windowDays = 28): HeatmapData {
   const activities = useActivityStore(s => s.activities)
 
   return useMemo(() => {
-    const days: Record<string, Record<Sport, number>> = {}
+    const days: Record<string, { running: number; cross: number }> = {}
     for (let i = windowDays - 1; i >= 0; i--) {
-      const key = isoDateOffset(i)
-      days[key] = { running: 0, cycling: 0, swimming: 0, other: 0 }
+      days[isoDateOffset(i)] = { running: 0, cross: 0 }
     }
 
     for (const a of activities) {
-      const key = a.startTime.slice(0, 10)
-      if (Object.hasOwn(days, key) && Object.hasOwn(days[key], a.sport)) {
-        days[key][a.sport as Sport] += a.duration / 3600
-      }
+      const day = days[a.startTime.slice(0, 10)]
+      if (!day) continue
+      day[a.sport === 'running' ? 'running' : 'cross'] += a.duration / 3600
     }
 
     const dateKeys = Object.keys(days).sort()
-
-    const bySport = Object.fromEntries(
-      HEATMAP_SPORTS.map(s => [s, dateKeys.map(d => days[d][s])])
-    ) as Record<Sport, number[]>
-
-    const activeDaysCount = dateKeys.filter(d =>
-      HEATMAP_SPORTS.some(s => days[d][s] > 0)
-    ).length
-
-    return { dates: dateKeys.map(d => d.slice(5)), bySport, activeDaysCount }
+    return {
+      dates: dateKeys.map(d => d.slice(5)),
+      running: dateKeys.map(d => days[d].running),
+      cross: dateKeys.map(d => days[d].cross),
+      activeDaysCount: dateKeys.filter(d => days[d].running > 0 || days[d].cross > 0).length,
+    }
   }, [activities, windowDays])
 }
 
