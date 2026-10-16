@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { calculateFitnessHistory } from '../utils/calculations'
 import { formatShortDate } from '../utils/formatters'
+import { isoDateOffset } from '../utils/date'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Legend
@@ -26,9 +27,7 @@ export default function FitnessChartPage() {
 
   const data = useMemo(() => {
     if (range === Infinity) return fitnessHistory
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - range)
-    const cutStr = cutoff.toISOString().slice(0, 10)
+    const cutStr = isoDateOffset(range)
     return fitnessHistory.filter(p => p.date >= cutStr)
   }, [fitnessHistory, range])
 

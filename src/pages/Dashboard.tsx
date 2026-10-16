@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { GlobalStats } from '../types/garmin'
+import type { GlobalStats } from '../types/suunto'
 import { weeklyVo2max } from '../utils/calculations'
 import { useActivityStore } from '../stores/activityStore'
 import { formatDuration, formatPace, sportIcon, sportColor } from '../utils/formatters'
@@ -360,7 +360,7 @@ export default function Dashboard() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-slate-200 truncate group-hover:text-white">{a.title}</div>
                   <div className="text-xs text-slate-500">
-                    {daysAgo(a.startTime) === 0 ? 'Hoy' : daysAgo(a.startTime) === 1 ? 'Ayer' : `Hace ${daysAgo(a.startTime)}d`}
+                    {(d => d === 0 ? 'Hoy' : d === 1 ? 'Ayer' : `Hace ${d}d`)(daysAgo(a.startTime))}
                     {' · '}{sportIcon(a.sport)}
                   </div>
                 </div>

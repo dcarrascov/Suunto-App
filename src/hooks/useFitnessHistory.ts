@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { calculateFitnessHistory } from '../utils/calculations'
-import type { FitnessPoint } from '../types/garmin'
+import type { FitnessPoint } from '../types/suunto'
 
 export interface FitnessHistoryData {
   history: FitnessPoint[]

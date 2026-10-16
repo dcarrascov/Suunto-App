@@ -1,4 +1,4 @@
-import type { ActivityDetail } from '../types/garmin'
+import type { ActivityDetail } from '../types/suunto'
 import { formatDuration, formatPace } from '../utils/formatters'
 
 interface Row {

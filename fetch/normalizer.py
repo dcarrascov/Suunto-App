@@ -1,9 +1,9 @@
 """
 Convierte datos de Suunto (backend de la app Suunto, o ficheros FIT) en el JSON
 que espera el frontend React. Los tipos TypeScript equivalentes están en
-src/types/garmin.ts.
+src/types/suunto.ts.
 
-Unidades de SALIDA (las mismas que usaba la versión Garmin):
+Unidades de SALIDA (las que espera la app):
     distance km · duration / movingTime s · avgPace s/km · avgSpeed km/h
     avgHR / maxHR bpm · elevationGain m · startTime ISO local (YYYY-MM-DDTHH:MM:SS)
 
@@ -21,7 +21,7 @@ from statistics import mean
 from zoneinfo import ZoneInfo
 
 # ── Deportes ────────────────────────────────────────────────────────────────
-# IDs de actividad de Suunto -> categoría de la app (tipo Sport de garmin.ts).
+# IDs de actividad de Suunto -> categoría de la app (tipo Sport de suunto.ts).
 # Cualquier otro ID cae en "other". Edita estos conjuntos para cambiar el reparto.
 RUNNING_IDS = {1, 22, 53, 103, 115}    # Running, Trail, Cinta, Pista, Vertical
 CYCLING_IDS = {2, 10, 52, 99, 114}     # Bici, MTB, Bici indoor, Gravel, Ciclocross
@@ -216,7 +216,7 @@ def make_summary(*, start_s, sport, name, distance_m, duration_s, ascent_m, avg_
                  vo2max=None, aerobic_te=None, anaerobic_te=None, utc_offset_min=None,
                  **extra) -> dict:
     """
-    ÚNICO sitio que define la forma de ActivitySummary (garmin.ts). Lo usan tanto
+    ÚNICO sitio que define la forma de ActivitySummary (suunto.ts). Lo usan tanto
     la fuente "nube de Suunto" como la fuente "ficheros FIT".
     """
     start_iso = local_iso(start_s, utc_offset_min)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Comprueba que public/data/ cumple el contrato que espera el frontend
-(src/types/garmin.ts). Úsalo después de sincronizar:
+(src/types/suunto.ts). Úsalo después de sincronizar:
 
     python3 fetch/validate_output.py
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { ActivitySummary } from '../types/garmin'
+import type { ActivitySummary } from '../types/suunto'
 import { formatPace, formatDuration, formatDistance, formatRelativeTime, sportLabel, sportColor, sportIcon } from '../utils/formatters'
 
 interface Props {

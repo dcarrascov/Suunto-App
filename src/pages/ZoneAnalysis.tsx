@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
-import type { Sport } from '../types/garmin'
-import { estimateZonesFromHR, HR_ZONE_DEFS } from '../utils/calculations'
+import type { Sport } from '../types/suunto'
+import { estimateZonesFromHR, HR_ZONE_DEFS, localWeekStart } from '../utils/calculations'
 import { formatDuration } from '../utils/formatters'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -32,12 +32,7 @@ export default function ZoneAnalysis() {
   const weeklyZoneData = useMemo(() => {
     const weeks: Record<string, number[]> = {}
     for (const act of filtered) {
-      const d = new Date(act.startTime)
-      const day = d.getDay()
-      const diff = day === 0 ? -6 : 1 - day
-      const monday = new Date(d)
-      monday.setDate(d.getDate() + diff)
-      const weekKey = monday.toISOString().slice(0, 10)
+      const weekKey = localWeekStart(new Date(act.startTime))
       if (!weeks[weekKey]) weeks[weekKey] = [0, 0, 0, 0, 0]
       const zones = estimateZonesFromHR(act.avgHR, act.duration, settings.maxHR)
       zones.forEach(z => { weeks[weekKey][z.zone - 1] += z.seconds / 3600 })

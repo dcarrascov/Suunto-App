@@ -82,7 +82,7 @@ def _fit_laps(lap_msgs: list, start, hr, alts) -> list:
 
 
 def parse_fit(path: Path, max_hr: int = 185) -> tuple[dict, dict]:
-    """Devuelve (resumen, detalle) en el formato de garmin.ts. Lanza ValueError si no es una actividad."""
+    """Devuelve (resumen, detalle) en el formato de suunto.ts. Lanza ValueError si no es una actividad."""
     decoder = Decoder(Stream.from_file(str(path)))
     if not decoder.is_fit():
         raise ValueError("no es un fichero FIT")

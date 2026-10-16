@@ -2,8 +2,8 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --color-garmin-blue: #0079c1;
-  --color-garmin-dark: #003d6b;
+  --color-suunto-blue: #0079c1;
+  --color-suunto-dark: #003d6b;
   --color-run: #ef4444;
   --color-ride: #f97316;
   --color-swim: #3b82f6;

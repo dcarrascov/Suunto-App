@@ -1,5 +1,5 @@
 import { useActivityStore } from '../stores/activityStore'
-import type { UserSettings } from '../types/garmin'
+import type { UserSettings } from '../types/suunto'
 
 export default function Settings() {
   const settings = useActivityStore(s => s.settings)

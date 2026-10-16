@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
+import { toLocalISODate } from '../utils/date'
 
 export function useTrainingStreak(): number {
   const activities = useActivityStore(s => s.activities)
@@ -8,12 +9,12 @@ export function useTrainingStreak(): number {
     const activeDays = new Set(activities.map(a => a.startTime.slice(0, 10)))
 
     const candidate = new Date()
-    let iso = candidate.toISOString().slice(0, 10)
+    let iso = toLocalISODate(candidate)
 
     // Allow streak to start from yesterday if today has no activity yet
     if (!activeDays.has(iso)) {
       candidate.setDate(candidate.getDate() - 1)
-      iso = candidate.toISOString().slice(0, 10)
+      iso = toLocalISODate(candidate)
       if (!activeDays.has(iso)) return 0
     }
 
@@ -21,7 +22,7 @@ export function useTrainingStreak(): number {
     while (activeDays.has(iso)) {
       streak++
       candidate.setDate(candidate.getDate() - 1)
-      iso = candidate.toISOString().slice(0, 10)
+      iso = toLocalISODate(candidate)
     }
 
     return streak

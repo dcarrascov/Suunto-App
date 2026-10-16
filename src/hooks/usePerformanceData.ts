@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { isoDateOffset, monthKey } from '../utils/date'
-import type { ActivitySummary, Sport } from '../types/garmin'
+import type { ActivitySummary, Sport } from '../types/suunto'
 
 // ─── Aerobic Efficiency ───────────────────────────────────────────────────────
 

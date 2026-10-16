@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { isoDateOffset } from '../utils/date'
-import type { Sport } from '../types/garmin'
+import type { Sport } from '../types/suunto'
 
 export interface SportVolume {
   hours: number

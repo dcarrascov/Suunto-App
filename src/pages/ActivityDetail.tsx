@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import type { ActivityDetail } from '../types/garmin'
+import type { ActivityDetail } from '../types/suunto'
 import { useActivityStore } from '../stores/activityStore'
 import { formatPace, formatDuration, formatDistance, formatDate, sportLabel } from '../utils/formatters'
 import { HR_ZONE_DEFS } from '../utils/calculations'

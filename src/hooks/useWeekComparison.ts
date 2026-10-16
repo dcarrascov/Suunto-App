@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { estimateTSS } from '../utils/calculations'
 import { startOfWeek, endOfWeek } from '../utils/date'
-import type { ActivitySummary } from '../types/garmin'
+import type { ActivitySummary } from '../types/suunto'
 
 export interface WeekTotals {
   count: number

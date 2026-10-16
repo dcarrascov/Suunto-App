@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import { estimateZonesFromHR, HR_ZONE_DEFS } from '../utils/calculations'
 import { isoDateOffset } from '../utils/date'
-import type { Sport } from '../types/garmin'
+import type { Sport } from '../types/suunto'
 
 export interface ZoneSlice {
   zone: string

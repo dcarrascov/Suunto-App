@@ -1,4 +1,5 @@
-import type { Sport } from '../types/garmin'
+import type { Sport } from '../types/suunto'
+import { daysAgo } from './date'
 
 export function formatPace(secPerKm: number | null): string {
   if (!secPerKm) return '–'
@@ -38,9 +39,7 @@ export function formatShortDate(isoString: string): string {
 }
 
 export function formatRelativeTime(isoString: string): string {
-  const now = new Date()
-  const d = new Date(isoString)
-  const days = Math.floor((now.getTime() - d.getTime()) / 86400000)
+  const days = daysAgo(isoString)
   if (days === 0) return 'Hoy'
   if (days === 1) return 'Ayer'
   if (days < 7) return `Hace ${days} días`

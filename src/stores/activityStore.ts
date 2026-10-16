@@ -1,7 +1,22 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings } from '../types/garmin'
-import { DEFAULT_SETTINGS } from '../types/garmin'
+import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings } from '../types/suunto'
+import { DEFAULT_SETTINGS } from '../types/suunto'
+
+const SETTINGS_KEY = 'suunto-settings'
+const LEGACY_SETTINGS_KEY = 'garmin-settings' // nombre antiguo: se migra una vez para no perder los ajustes
+
+try {
+  if (!localStorage.getItem(SETTINGS_KEY)) {
+    const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY)
+    if (legacy) {
+      localStorage.setItem(SETTINGS_KEY, legacy)
+      localStorage.removeItem(LEGACY_SETTINGS_KEY)
+    }
+  }
+} catch {
+  // sin acceso a localStorage (modo privado...): se usan los ajustes por defecto
+}
 
 interface ActivityState {
   activities: ActivitySummary[]
@@ -70,7 +85,7 @@ export const useActivityStore = create<ActivityState>()(
       },
     }),
     {
-      name: 'garmin-settings',
+      name: SETTINGS_KEY,
       partialize: (state) => ({ settings: state.settings }),
     }
   )

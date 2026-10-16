@@ -1,4 +1,5 @@
-import type { ActivitySummary, FitnessPoint, HRZone, UserSettings } from '../types/garmin'
+import type { ActivitySummary, FitnessPoint, HRZone, UserSettings } from '../types/suunto'
+import { parseLocalDate, toLocalISODate } from './date'
 
 // ─── TSS Estimation ─────────────────────────────────────────────────────────
 
@@ -50,12 +51,12 @@ export function calculateFitnessHistory(
   const dates = Object.keys(dailyTSS).sort()
   if (dates.length === 0) return []
 
-  const startDate = new Date(dates[0])
-  const endDate = new Date()
+  // Días seguidos en hora local, desde la primera actividad hasta hoy
+  const endDate = toLocalISODate(new Date())
   const allDates: string[] = []
-  const d = new Date(startDate)
-  while (d <= endDate) {
-    allDates.push(d.toISOString().slice(0, 10))
+  const d = parseLocalDate(dates[0])
+  for (let day = dates[0]; day <= endDate; day = toLocalISODate(d)) {
+    allDates.push(day)
     d.setDate(d.getDate() + 1)
   }
 
@@ -148,9 +149,7 @@ export interface WeekSummary {
 // Lunes de la semana de una fecha, como YYYY-MM-DD en hora LOCAL.
 // (toISOString() convierte a UTC y mandaba las actividades de madrugada a una semana "fantasma")
 export function localWeekStart(d: Date): string {
-  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${monday.getFullYear()}-${pad(monday.getMonth() + 1)}-${pad(monday.getDate())}`
+  return toLocalISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)))
 }
 
 export interface WeeklyVo2 {

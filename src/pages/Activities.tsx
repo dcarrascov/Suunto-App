@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
-import type { Sport } from '../types/garmin'
+import type { Sport } from '../types/suunto'
 import ActivityCard from '../components/ActivityCard'
 
 const SPORTS: { value: Sport | 'all'; label: string }[] = [
