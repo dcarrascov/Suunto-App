@@ -3,15 +3,17 @@ import { useParams, Link } from 'react-router-dom'
 import type { ActivityDetail } from '../types/suunto'
 import { useActivityStore } from '../stores/activityStore'
 import { formatPace, formatDuration, formatDistance, formatDate, sportLabel } from '../utils/formatters'
-import { HR_ZONE_DEFS } from '../utils/calculations'
+import { HR_ZONE_DEFS, paceZoneFor } from '../utils/calculations'
 import ActivityMap from '../components/ActivityMap'
 import MetricCard from '../components/MetricCard'
 import ActivityStats from '../components/ActivityStats'
+import BestEfforts from '../components/BestEfforts'
 
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const loadDetail = useActivityStore(s => s.loadDetail)
   const activities = useActivityStore(s => s.activities)
+  const thresholdPace = useActivityStore(s => s.settings.thresholdPace)
   const [detail, setDetail] = useState<ActivityDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -45,7 +47,7 @@ export default function ActivityDetailPage() {
   }
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
       {/* Header */}
       <div className="mb-5">
         <Link to="/activities" className="text-xs text-slate-500 hover:text-slate-300 mb-2 inline-block">← Actividades</Link>
@@ -63,7 +65,7 @@ export default function ActivityDetailPage() {
       )}
 
       {/* Key metrics */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard label="Distancia" value={formatDistance(act.distance, act.sport)} />
         <MetricCard label="Duración" value={formatDuration(act.duration)} />
         {act.sport === 'running' && act.avgPace
@@ -75,7 +77,7 @@ export default function ActivityDetailPage() {
         <MetricCard label="FC Media" value={act.avgHR > 0 ? act.avgHR : '–'} unit={act.avgHR > 0 ? 'bpm' : ''} />
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard label="FC Máxima" value={act.maxHR > 0 ? act.maxHR : '–'} unit={act.maxHR > 0 ? 'bpm' : ''} />
         <MetricCard label="Elevación +" value={act.elevationGain} unit="m" />
         {act.tss != null && <MetricCard label="TSS" value={Math.round(act.tss)} />}
@@ -88,6 +90,9 @@ export default function ActivityDetailPage() {
           : null
         }
       </div>
+
+      {/* Mejores tramos (1 km, 5 km...) con marca de récord */}
+      <BestEfforts act={act} />
 
       {/* HR Zones */}
       {detail?.hrZones && detail.hrZones.length > 0 && (
@@ -142,9 +147,20 @@ export default function ActivityDetailPage() {
                     <td className="py-2 pr-4 text-slate-400">{lap.index}</td>
                     <td className="py-2 pr-4 text-slate-200">{lap.distance.toFixed(2)} km</td>
                     <td className="py-2 pr-4 font-mono text-slate-200">{formatDuration(lap.duration)}</td>
-                    {act.sport === 'running' && (
-                      <td className="py-2 pr-4 font-mono text-slate-200">{formatPace(lap.avgPace)}</td>
-                    )}
+                    {act.sport === 'running' && (() => {
+                      const z = paceZoneFor(lap.avgPace, thresholdPace)
+                      return (
+                        <td className="py-2 pr-4 font-mono text-slate-200 whitespace-nowrap">
+                          {formatPace(lap.avgPace)}
+                          {z && (
+                            <span className="ml-2 text-[10px] font-sans px-1.5 py-0.5 rounded-full"
+                              style={{ color: z.color, background: z.color + '1a' }} title={z.name}>
+                              Z{z.zone}
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })()}
                     {act.sport === 'cycling' && (
                       <td className="py-2 pr-4 text-slate-200">{lap.avgSpeed ? `${lap.avgSpeed} km/h` : '–'}</td>
                     )}

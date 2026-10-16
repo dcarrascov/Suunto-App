@@ -99,13 +99,13 @@ export default function Dashboard() {
     <div className="flex-1 overflow-y-auto bg-[#080f1e]">
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden px-6 pt-7 pb-6"
+      <div className="relative overflow-hidden px-4 md:px-6 pt-7 pb-6"
         style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0c1a3a 50%, #0f172a 100%)' }}>
         <div className="absolute top-0 left-1/4 w-96 h-48 rounded-full opacity-10 blur-3xl pointer-events-none"
           style={{ background: tsbColor }} />
 
         {/* Form title row */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex flex-wrap gap-4 items-start justify-between mb-6">
           <div>
             <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">Estado de forma</div>
             <div className="flex items-center gap-3">
@@ -135,7 +135,7 @@ export default function Dashboard() {
         </div>
 
         {/* CTL / ATL radials + streak */}
-        <div className="flex items-center gap-8 mb-6">
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mb-6">
           <div className="flex items-center gap-3">
             <RadialProgress value={ctl} max={100} color="#3b82f6" size={72} stroke={6}>
               <span className="text-base font-bold text-blue-300">{Math.round(ctl)}</span>
@@ -221,12 +221,12 @@ export default function Dashboard() {
       </div>
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 md:px-6 py-5 space-y-5">
 
         {/* Week comparison */}
         <section>
           <SectionHeader left="Esta semana" right="vs semana anterior" />
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Sesiones',    value: week.count,            prev: lastWeek.count,            fmt: (v: number) => String(v),              unit: '' },
               { label: 'Distancia',   value: week.distance,         prev: lastWeek.distance,         fmt: (v: number) => v.toFixed(1),           unit: 'km' },
@@ -245,7 +245,7 @@ export default function Dashboard() {
         </section>
 
         {/* Sport rings + Zone radar */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-5">
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Volumen · últimos 30 días</div>

@@ -136,24 +136,25 @@ export function useCadenceData(): CadencePoint[] {
 // ─── VO2max Trend ─────────────────────────────────────────────────────────────
 
 export interface Vo2maxPoint {
-  date: string
-  vo2max: number
+  date: string    // lunes de la semana (YYYY-MM-DD)
+  vo2max: number  // media de las mediciones de esa semana
 }
 
 export function useVo2maxTrend(): { points: Vo2maxPoint[]; current: number | null } {
   const activities = useActivityStore(s => s.activities)
 
   return useMemo(() => {
-    const bestPerDay: Record<string, number> = {}
+    // Media semanal (como en el Dashboard): con una medición por carrera la serie diaria era ilegible
+    const byWeek: Record<string, number[]> = {}
     for (const a of activities) {
       if (!a.vo2max) continue
-      const day = a.startTime.slice(0, 10)
-      bestPerDay[day] = Math.max(bestPerDay[day] ?? 0, a.vo2max)
+      const week = localWeekStart(new Date(a.startTime))
+      ;(byWeek[week] ??= []).push(a.vo2max)
     }
 
-    const points = Object.entries(bestPerDay)
+    const points = Object.entries(byWeek)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, vo2max]) => ({ date: date.slice(5), vo2max }))
+      .map(([date, vals]) => ({ date, vo2max: +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) }))
 
     const current = points.length > 0 ? points.at(-1)!.vo2max : null
     return { points, current }

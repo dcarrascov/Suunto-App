@@ -34,8 +34,8 @@ export default function FitnessChartPage() {
   const current = fitnessHistory[fitnessHistory.length - 1]
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
-      <div className="flex items-start justify-between mb-6">
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+      <div className="flex flex-wrap gap-3 items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Fitness & Forma</h1>
           <p className="text-sm text-slate-500 mt-0.5">Modelo de carga CTL/ATL/TSB</p>
@@ -56,7 +56,7 @@ export default function FitnessChartPage() {
       </div>
 
       {current && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <div className="bg-slate-800/60 border border-blue-500/20 rounded-xl p-4">
             <div className="text-xs text-slate-500 uppercase tracking-wider">Fitness (CTL)</div>
             <div className="text-3xl font-bold text-blue-400 mt-1">{Math.round(current.ctl)}</div>

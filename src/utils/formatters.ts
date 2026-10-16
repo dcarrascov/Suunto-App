@@ -16,6 +16,16 @@ export function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/** Tiempo de carrera como crono: 18:05, 1:20:31 (con segundos, a diferencia de formatDuration). */
+export function formatRaceTime(seconds: number): string {
+  const total = Math.round(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const ss = String(s).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+}
+
 export function formatDistance(km: number, sport: Sport): string {
   if (sport === 'swimming') {
     const m = Math.round(km * 1000)

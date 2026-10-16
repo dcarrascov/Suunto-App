@@ -106,10 +106,10 @@ export interface ZoneDef {
 }
 
 export const HR_ZONE_DEFS: ZoneDef[] = [
-  { zone: 1, name: 'Recovery', color: '#22c55e', minPct: 0, maxPct: 0.6 },
-  { zone: 2, name: 'Aerobic', color: '#84cc16', minPct: 0.6, maxPct: 0.7 },
+  { zone: 1, name: 'Recuperación', color: '#22c55e', minPct: 0, maxPct: 0.6 },
+  { zone: 2, name: 'Aeróbica', color: '#84cc16', minPct: 0.6, maxPct: 0.7 },
   { zone: 3, name: 'Tempo', color: '#eab308', minPct: 0.7, maxPct: 0.8 },
-  { zone: 4, name: 'Threshold', color: '#f97316', minPct: 0.8, maxPct: 0.9 },
+  { zone: 4, name: 'Umbral', color: '#f97316', minPct: 0.8, maxPct: 0.9 },
   { zone: 5, name: 'VO2max', color: '#ef4444', minPct: 0.9, maxPct: 1.0 },
 ]
 
@@ -255,6 +255,11 @@ const CYCLING_DISTANCES = [
   { km: 180, label: '180 km' },
 ]
 
+/** Nombre de cada distancia de bestEfforts (clave en metros). */
+export const EFFORT_LABELS: Record<string, string> = Object.fromEntries(
+  [...RUNNING_DISTANCES, ...CYCLING_DISTANCES].map(d => [String(Math.round(d.km * 1000)), d.label]),
+)
+
 export function computePRs(activities: ActivitySummary[]): Record<string, PR[]> {
   const running = activities.filter(a => a.sport === 'running')
   const cycling = activities.filter(a => a.sport === 'cycling')
@@ -288,4 +293,189 @@ function findPRsForSport(
     }
     return best
   }).filter(Boolean) as PR[]
+}
+
+// ─── Predicción de carreras (Riegel) ─────────────────────────────────────────
+
+export const RIEGEL_EXPONENT = 1.06
+
+/** Tiempo (s) previsto para `toKm` a partir de un tiempo real en `fromKm` (fórmula de Riegel). */
+export function riegel(fromSecs: number, fromKm: number, toKm: number): number {
+  return fromSecs * Math.pow(toKm / fromKm, RIEGEL_EXPONENT)
+}
+
+export interface RacePrediction {
+  label: string
+  km: number
+  seconds: number
+  pace: number           // s/km
+  fromLabel: string      // distancia de la que sale la predicción
+  fromSeconds: number
+  fromActivityId: number
+  fromDate: string
+  approx: boolean        // el tramo de origen se calculó con parciales
+}
+
+export const PREDICTION_TARGETS = [
+  { km: 5, label: '5 km' },
+  { km: 10, label: '10 km' },
+  { km: 21.097, label: 'Media maratón' },
+  { km: 42.195, label: 'Maratón' },
+]
+
+interface RecentEffort { km: number; label: string; seconds: number; activityId: number; date: string; approx: boolean }
+
+/** Mejor tramo de cada distancia en las carreras desde `sinceDate` (YYYY-MM-DD). */
+function recentRunningEfforts(activities: ActivitySummary[], sinceDate: string): RecentEffort[] {
+  return RUNNING_DISTANCES.flatMap(({ km, label }) => {
+    const key = String(Math.round(km * 1000))
+    let best: RecentEffort | null = null
+    for (const a of activities) {
+      if (a.sport !== 'running' || a.startTime.slice(0, 10) < sinceDate) continue
+      const secs = a.bestEfforts?.[key]
+      if (secs && (!best || secs < best.seconds)) {
+        best = { km, label, seconds: secs, activityId: a.id, date: a.startTime.slice(0, 10), approx: a.bestEffortsSource === 'laps' }
+      }
+    }
+    return best ? [best] : []
+  })
+}
+
+/**
+ * Predicción de 5K, 10K, media y maratón con los mejores tramos desde `sinceDate`.
+ * Para cada objetivo se usa el tramo de distancia más parecida (en escala logarítmica),
+ * que es la predicción más fiable; el de 1 km solo se usa si no hay otro.
+ */
+export function predictRaces(activities: ActivitySummary[], sinceDate: string): RacePrediction[] {
+  const efforts = recentRunningEfforts(activities, sinceDate)
+  const usable = efforts.some(e => e.km >= 5) ? efforts.filter(e => e.km >= 5) : efforts
+  if (usable.length === 0) return []
+  return PREDICTION_TARGETS.map(({ km, label }) => {
+    const src = usable.reduce((a, b) => Math.abs(Math.log(b.km / km)) < Math.abs(Math.log(a.km / km)) ? b : a)
+    const seconds = Math.round(riegel(src.seconds, src.km, km))
+    return {
+      label, km, seconds, pace: Math.round(seconds / km),
+      fromLabel: src.label, fromSeconds: src.seconds, fromActivityId: src.activityId, fromDate: src.date,
+      approx: src.approx,
+    }
+  })
+}
+
+/**
+ * Ritmo umbral estimado (s/km) = ritmo que se puede mantener ~60 min, por Riegel desde
+ * el tramo reciente más largo (de 5 km o más). null si no hay datos.
+ */
+export function estimateThresholdPace(activities: ActivitySummary[], sinceDate: string): number | null {
+  const efforts = recentRunningEfforts(activities, sinceDate).filter(e => e.km >= 5)
+  if (efforts.length === 0) return null
+  const src = efforts.reduce((a, b) => (b.km > a.km ? b : a))
+  // distancia que se cubriría en 3600 s: D = D1 · (3600 / T1)^(1/k)
+  const km = src.km * Math.pow(3600 / src.seconds, 1 / RIEGEL_EXPONENT)
+  return Math.round(3600 / km)
+}
+
+// ─── Zonas de ritmo (a partir del ritmo umbral) ──────────────────────────────
+
+export interface PaceZoneDef {
+  zone: number
+  name: string
+  color: string
+  minPct: number   // % del ritmo umbral (en tiempo por km: 100 = umbral, 120 = 20 % más lento)
+  maxPct: number
+}
+
+// Zonas de ritmo de Friel simplificadas a 5: cuanto mayor el %, más lento
+export const PACE_ZONE_DEFS: PaceZoneDef[] = [
+  { zone: 1, name: 'Recuperación', color: '#22c55e', minPct: 129, maxPct: Infinity },
+  { zone: 2, name: 'Suave', color: '#84cc16', minPct: 114, maxPct: 129 },
+  { zone: 3, name: 'Tempo', color: '#eab308', minPct: 106, maxPct: 114 },
+  { zone: 4, name: 'Umbral', color: '#f97316', minPct: 100, maxPct: 106 },
+  { zone: 5, name: 'Intervalos', color: '#ef4444', minPct: 0, maxPct: 100 },
+]
+
+/** Zona de ritmo (1-5) de un ritmo en s/km, o null si no hay ritmo. */
+export function paceZoneFor(pace: number | null, thresholdPace: number): PaceZoneDef | null {
+  if (!pace || !thresholdPace) return null
+  const pct = (pace / thresholdPace) * 100
+  return PACE_ZONE_DEFS.find(z => pct >= z.minPct && pct < z.maxPct) ?? null
+}
+
+/** Rango de ritmos (s/km) de cada zona: `slow` null = sin límite (Z1), `fast` null = sin límite (Z5). */
+export function paceZoneRanges(thresholdPace: number): { def: PaceZoneDef; fast: number | null; slow: number | null }[] {
+  return PACE_ZONE_DEFS.map(def => ({
+    def,
+    fast: def.minPct > 0 ? Math.round(thresholdPace * def.minPct / 100) : null,
+    slow: Number.isFinite(def.maxPct) ? Math.round(thresholdPace * def.maxPct / 100) : null,
+  }))
+}
+
+// ─── Distribución de intensidad (80/20) ──────────────────────────────────────
+
+/** Segundos en Z1..Z5: los del reloj si están en el resumen; si no, estimados con la FC media. */
+export function zoneSecondsFor(a: ActivitySummary, maxHR: number): { seconds: number[]; real: boolean } {
+  if (a.hrZoneSeconds && a.hrZoneSeconds.length === 5) return { seconds: a.hrZoneSeconds, real: true }
+  if (!a.avgHR) return { seconds: [0, 0, 0, 0, 0], real: false }
+  return { seconds: estimateZonesFromHR(a.avgHR, a.duration, maxHR).map(z => z.seconds), real: false }
+}
+
+export interface IntensitySplit {
+  low: number    // segundos en Z1-Z2 (suave)
+  mid: number    // Z3 (zona media / tempo)
+  high: number   // Z4-Z5 (umbral e intervalos)
+}
+
+/** Reparte el tiempo en suave / medio / intenso (modelo de 3 zonas para el 80/20). */
+export function intensitySplit(activities: ActivitySummary[], maxHR: number): IntensitySplit {
+  const out = { low: 0, mid: 0, high: 0 }
+  for (const a of activities) {
+    const [z1, z2, z3, z4, z5] = zoneSecondsFor(a, maxHR).seconds
+    out.low += z1 + z2
+    out.mid += z3
+    out.high += z4 + z5
+  }
+  return out
+}
+
+// ─── Totales por año ─────────────────────────────────────────────────────────
+
+export interface PeriodTotals {
+  km: number
+  seconds: number
+  runs: number
+  elevation: number
+}
+
+const emptyTotals = (): PeriodTotals => ({ km: 0, seconds: 0, runs: 0, elevation: 0 })
+
+function addTo(t: PeriodTotals, a: ActivitySummary) {
+  t.km += a.distance
+  t.seconds += a.duration
+  t.runs += 1
+  t.elevation += a.elevationGain
+}
+
+/** Totales del año entero y hasta el mismo día del año que `today` (para comparar años). */
+export function yearTotals(
+  activities: ActivitySummary[], year: number, today: Date = new Date(),
+): { full: PeriodTotals; toDate: PeriodTotals } {
+  const prefix = String(year)
+  const mmdd = toLocalISODate(today).slice(5)  // "MM-DD"
+  const full = emptyTotals()
+  const toDate = emptyTotals()
+  for (const a of activities) {
+    if (!a.startTime.startsWith(prefix)) continue
+    addTo(full, a)
+    if (a.startTime.slice(5, 10) <= mmdd) addTo(toDate, a)
+  }
+  return { full, toDate }
+}
+
+/** Km por mes (índice 0 = enero) de un año. */
+export function monthlyKm(activities: ActivitySummary[], year: number): number[] {
+  const km = Array(12).fill(0)
+  const prefix = String(year)
+  for (const a of activities) {
+    if (a.startTime.startsWith(prefix)) km[Number(a.startTime.slice(5, 7)) - 1] += a.distance
+  }
+  return km.map(v => +v.toFixed(1))
 }

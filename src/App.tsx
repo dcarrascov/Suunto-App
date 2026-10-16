@@ -10,6 +10,7 @@ import ZoneAnalysis from './pages/ZoneAnalysis'
 import Records from './pages/Records'
 import Settings from './pages/Settings'
 import PerformanceAnalysis from './pages/PerformanceAnalysis'
+import History from './pages/History'
 
 export default function App() {
   const loadActivities = useActivityStore(s => s.loadActivities)
@@ -22,7 +23,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex min-h-screen">
+      <div className="flex flex-col md:flex-row min-h-screen">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex flex-col">
           <Routes>
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/fitness" element={<FitnessChartPage />} />
             <Route path="/zones" element={<ZoneAnalysis />} />
             <Route path="/records" element={<Records />} />
+            <Route path="/history" element={<History />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

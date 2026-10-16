@@ -50,6 +50,9 @@ def check_summary(a, where):
     if num(a.get("avgHR")) and a["avgHR"] < 0:
         errors.append(f"{where}: avgHR negativo")
     check_efforts(a, where)
+    hz = a.get("hrZoneSeconds")
+    if hz is not None and not (isinstance(hz, list) and len(hz) == 5 and all(num(v) and v >= 0 for v in hz)):
+        errors.append(f"{where}: hrZoneSeconds debe ser null o 5 números >= 0 (Z1..Z5)")
 
 
 EFFORT_SOURCES = {"samples", "laps"}

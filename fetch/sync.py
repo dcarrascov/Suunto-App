@@ -39,7 +39,6 @@ OUT_DIR = ROOT / "public" / "data"
 PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
 DEBUG_DIR = Path(__file__).resolve().parent / "debug"
 DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "extra", "partial")  # claves que no van en el resumen
-EFFORT_KEYS = ("bestEfforts", "bestEffortsSource")  # se calculan en el detalle y se copian al resumen
 
 
 def save_json(path: Path, data):
@@ -280,7 +279,7 @@ def main():
     save_json(OUT_DIR / "activities.json", [e["summary"] for e in entries])
     print(f"Guardados {len(entries)} resúmenes → public/data/activities.json")
 
-    from normalizer import build_extra, normalize_summary, set_best_efforts
+    from normalizer import SUMMARY_FROM_DETAIL, build_extra, detail_to_summary, normalize_summary
     from suunto_client import SuuntoAuthError  # solo para capturar el error de sesión
     print(f"\nProcesando el detalle de {len(entries)} actividades...")
     updated = 0
@@ -301,10 +300,10 @@ def main():
                     for k in ("vo2max", "aerobicTE"):
                         cached[k] = fresh[k]
                     changed = True
-                if "bestEfforts" not in cached:
-                    # detalle sin mejores tramos (versión anterior): se estiman con los parciales
-                    # guardados; con --force se recalculan exactos a partir de las muestras
-                    set_best_efforts(cached)
+                if any(k not in cached for k in SUMMARY_FROM_DETAIL):
+                    # detalle de una versión anterior: mejores tramos (con los parciales guardados;
+                    # --force los recalcula exactos con las muestras) y segundos por zona
+                    detail_to_summary(cached)
                     changed = True
                 if changed:
                     save_json(path, cached)
@@ -316,8 +315,7 @@ def main():
         print(f"  {tag} ({s.get('title', '')})...")
         try:
             new_summary, detail = e["load"]()
-            for k in EFFORT_KEYS:
-                new_summary[k] = detail.get(k)
+            new_summary.update(detail_to_summary(detail))
             save_json(path, detail)
             e["summary"] = new_summary
         except SuuntoAuthError as err:

@@ -16,13 +16,15 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   - `types/suunto.ts`: tipos (espejo del normalizador; si cambias uno, cambia el otro y `validate_output.py`).
   - `stores/activityStore.ts`: carga los JSON; ajustes persistidos en localStorage con clave `suunto-settings` (migra desde `garmin-settings`).
   - `utils/calculations.ts`: TSS estimado (TRIMP), CTL/ATL/TSB (EMA 42/7), zonas, agregados semanales, récords.
-  - `utils/date.ts`, `hooks/`, `pages/` (Dashboard, Actividades, Detalle, Fitness, Zonas, Rendimiento, Récords, Ajustes).
+  - `utils/date.ts`, `hooks/`, `pages/` (Dashboard, Actividades, Detalle, Fitness, Zonas, Rendimiento, Récords, Historial, Ajustes).
+  - Resumen con datos copiados del detalle (`SUMMARY_FROM_DETAIL` / `detail_to_summary()` en normalizer.py):
+    `bestEfforts`, `bestEffortsSource`, `hrZoneSeconds` (Z1..Z5 del reloj). Así la web no carga 1400 detalles.
 
 ## Convenciones
 - **Fechas siempre en hora local.** `startTime` es ISO local sin zona. Nunca usar `toISOString()` para sacar un día:
   usar `toLocalISODate`, `parseLocalDate`, `isoDateOffset`, `daysAgo` (date.ts) y `localWeekStart` (calculations.ts).
 - Datos personales (`public/data/`, `fetch/debug/`, `fetch/fit/`, `.env`) están en `.gitignore`: no subirlos.
-- Comprobar antes de commit: `npx tsc -b` y `py fetch\validate_output.py`.
+- Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
 
 ## Datos actuales
@@ -40,5 +42,13 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - Rendimiento orientado a corredor: «Volumen de carrera» (km/semana, tirada larga, rampa frente a
   la media de 4 semanas) en lugar del balance de triatlón; bici/natación quedan como «Otros».
 
+- Predictor de carreras (Riegel, últimos 90 días) en Récords; mejores tramos con marca de récord en el Detalle.
+- 80/20 en Zonas (con las zonas reales del reloj); zonas de ritmo (Friel) desde el ritmo umbral, con
+  estimación automática en Ajustes y etiqueta por parcial en el Detalle.
+- Página Historial (totales por año, comparación a la misma fecha, km por mes).
+- VO2max semanal en Rendimiento; filtros y orden en Actividades; diseño adaptado a móvil; tests de utils.
+
 ## Pendiente
-(nada por ahora)
+- Sincronización automática programada (el usuario avisará cuándo).
+- Zapatillas: km por par con aviso (el usuario avisará cuándo).
+- Evolución de récords (mejor por año / top 5): descartado por ahora.

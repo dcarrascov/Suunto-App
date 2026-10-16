@@ -246,6 +246,8 @@ def make_summary(*, start_s, sport, name, distance_m, duration_s, ascent_m, avg_
         # Mejor tiempo (s) por distancia ("1000", "5000"...); lo rellena set_best_efforts()
         "bestEfforts": None,
         "bestEffortsSource": None,  # "samples" (exacto) | "laps" (aprox. con los parciales)
+        # Segundos en Z1..Z5 según el reloj (copia de hrZones del detalle); lo rellena detail_to_summary()
+        "hrZoneSeconds": None,
     }
     if sport == "swimming":
         summary["swolf"] = None
@@ -497,6 +499,20 @@ def set_best_efforts(detail: dict, dist_pts=None) -> dict:
         source = "laps" if efforts else None
     detail["bestEfforts"], detail["bestEffortsSource"] = efforts, source
     return detail
+
+
+# Claves que se calculan en el detalle y se copian al resumen (para no cargar 1400 detalles en la web)
+SUMMARY_FROM_DETAIL = ("bestEfforts", "bestEffortsSource", "hrZoneSeconds")
+
+
+def detail_to_summary(detail: dict) -> dict:
+    """Rellena en el detalle los datos que también van en el resumen y los devuelve."""
+    zones = sorted(detail.get("hrZones") or [], key=lambda z: z.get("zone") or 0)
+    secs = [round(z.get("seconds") or 0) for z in zones]
+    detail["hrZoneSeconds"] = secs if len(secs) == 5 and any(secs) else None
+    if "bestEfforts" not in detail:
+        set_best_efforts(detail)
+    return {k: detail.get(k) for k in SUMMARY_FROM_DETAIL}
 
 
 def sample_extra(dist_pts, hr, alts) -> dict:

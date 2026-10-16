@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import type { Sport } from '../types/suunto'
-import { estimateZonesFromHR, HR_ZONE_DEFS, localWeekStart } from '../utils/calculations'
+import { HR_ZONE_DEFS, intensitySplit, localWeekStart, zoneSecondsFor } from '../utils/calculations'
+import { isoDateOffset, parseLocalDate, toLocalISODate } from '../utils/date'
 import { formatDuration } from '../utils/formatters'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts'
+
+const INTENSITY = [
+  { key: 'low', name: 'Suave (Z1-Z2)', color: '#22c55e' },
+  { key: 'mid', name: 'Medio (Z3)', color: '#eab308' },
+  { key: 'high', name: 'Intenso (Z4-Z5)', color: '#ef4444' },
+] as const
+const INTENSITY_WEEKS = 12
 
 export default function ZoneAnalysis() {
   const activities = useActivityStore(s => s.activities)
@@ -21,21 +29,50 @@ export default function ZoneAnalysis() {
   const zoneSeconds = useMemo(() => {
     const totals: number[] = [0, 0, 0, 0, 0]
     for (const act of filtered) {
-      const zones = estimateZonesFromHR(act.avgHR, act.duration, settings.maxHR)
-      zones.forEach(z => { totals[z.zone - 1] += z.seconds })
+      zoneSecondsFor(act, settings.maxHR).seconds.forEach((sec, i) => { totals[i] += sec })
     }
     return totals
   }, [filtered, settings.maxHR])
 
   const totalSeconds = zoneSeconds.reduce((a, b) => a + b, 0)
+  const realShare = filtered.length
+    ? Math.round(filtered.filter(a => zoneSecondsFor(a, settings.maxHR).real).length / filtered.length * 100)
+    : 0
+
+  // 80/20 de carrera: % del tiempo suave / medio / intenso por semana (también las semanas sin carreras)
+  const intensity = useMemo(() => {
+    const runs = activities.filter(a => a.sport === 'running')
+    const monday = parseLocalDate(localWeekStart(new Date()))
+    monday.setDate(monday.getDate() - 7 * (INTENSITY_WEEKS - 1))
+    const start = toLocalISODate(monday)
+    const byWeek: Record<string, typeof runs> = {}
+    for (let i = 0; i < INTENSITY_WEEKS; i++) {
+      byWeek[toLocalISODate(monday)] = []
+      monday.setDate(monday.getDate() + 7)
+    }
+    for (const a of runs) {
+      if (a.startTime.slice(0, 10) < start) continue
+      byWeek[localWeekStart(new Date(a.startTime))]?.push(a)
+    }
+    const weeks = Object.entries(byWeek).map(([week, acts]) => {
+      const sp = intensitySplit(acts, settings.maxHR)
+      const tot = sp.low + sp.mid + sp.high
+      const pct = (v: number) => (tot ? Math.round(v / tot * 100) : 0)
+      return { week: week.slice(5), low: pct(sp.low), mid: pct(sp.mid), high: pct(sp.high), hours: +(tot / 3600).toFixed(1) }
+    })
+    const last4 = intensitySplit(runs.filter(a => a.startTime.slice(0, 10) >= isoDateOffset(28)), settings.maxHR)
+    const tot4 = last4.low + last4.mid + last4.high
+    const lowPct4 = tot4 ? Math.round(last4.low / tot4 * 100) : null
+    const midPct4 = tot4 ? Math.round(last4.mid / tot4 * 100) : null
+    return { weeks, lowPct4, midPct4 }
+  }, [activities, settings.maxHR])
 
   const weeklyZoneData = useMemo(() => {
     const weeks: Record<string, number[]> = {}
     for (const act of filtered) {
       const weekKey = localWeekStart(new Date(act.startTime))
       if (!weeks[weekKey]) weeks[weekKey] = [0, 0, 0, 0, 0]
-      const zones = estimateZonesFromHR(act.avgHR, act.duration, settings.maxHR)
-      zones.forEach(z => { weeks[weekKey][z.zone - 1] += z.seconds / 3600 })
+      zoneSecondsFor(act, settings.maxHR).seconds.forEach((sec, i) => { weeks[weekKey][i] += sec / 3600 })
     }
     return Object.entries(weeks)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -51,8 +88,8 @@ export default function ZoneAnalysis() {
   }, [filtered, settings.maxHR])
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
-      <div className="flex items-start justify-between mb-6">
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+      <div className="flex flex-wrap gap-3 items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Análisis de Zonas</h1>
           <p className="text-sm text-slate-500 mt-0.5">Distribución del tiempo por zonas de FC</p>
@@ -92,6 +129,41 @@ export default function ZoneAnalysis() {
         })}
       </div>
 
+      {/* 80/20 */}
+      <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 mb-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+          <div className="text-sm font-medium text-slate-200">Distribución de intensidad (carrera, 80/20)</div>
+          {intensity.lowPct4 != null && (
+            <div className={`text-xs ${intensity.lowPct4 >= 75 ? 'text-green-400' : intensity.lowPct4 >= 65 ? 'text-yellow-400' : 'text-red-400'}`}>
+              Últimas 4 semanas: {intensity.lowPct4}% suave · {intensity.midPct4}% medio
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Lo recomendable es ~80 % del tiempo en suave y poco en zona media (Z3), que cansa sin dar el estímulo de las series.
+        </p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={intensity.weeks} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} />
+            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} unit="%" domain={[0, 100]} width={40} />
+            <Tooltip
+              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: '#94a3b8' }}
+              formatter={(v: unknown, n: unknown) => [`${v}%`, String(n)]}
+            />
+            <ReferenceLine y={80} stroke="#e2e8f0" strokeDasharray="4 2" strokeOpacity={0.6} />
+            {INTENSITY.map(it => (
+              <Bar key={it.key} dataKey={it.key} name={it.name} stackId="i" fill={it.color} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex flex-wrap gap-3 mt-2">
+          {INTENSITY.map(it => <span key={it.key} className="text-xs" style={{ color: it.color }}>■ {it.name}</span>)}
+          <span className="text-xs text-slate-500">— línea = 80 %</span>
+        </div>
+      </div>
+
       {weeklyZoneData.length > 0 && (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Distribución semanal (últimas 24 semanas)</div>
@@ -114,7 +186,8 @@ export default function ZoneAnalysis() {
       )}
 
       <p className="mt-4 text-xs text-slate-600">
-        Zonas estimadas en base a FC media y FCmax configurada ({settings.maxHR} bpm).
+        Tiempo por zona según el reloj (zonas de tu Suunto) en el {realShare}% de las actividades;
+        el resto se estima con la FC media y la FCmax configurada ({settings.maxHR} bpm).
       </p>
     </div>
   )

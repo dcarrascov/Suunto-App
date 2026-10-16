@@ -44,6 +44,7 @@ export interface ActivitySummary {
   // Opcional: los datos de versiones anteriores no lo traen.
   bestEfforts?: Record<string, number> | null
   bestEffortsSource?: 'samples' | 'laps' | null  // samples = exacto · laps = aprox. con los parciales
+  hrZoneSeconds?: number[] | null  // segundos en Z1..Z5 según el reloj (copia de hrZones del detalle)
   // Swimming only
   swolf?: number | null
   avgStrokesPerLength?: number | null

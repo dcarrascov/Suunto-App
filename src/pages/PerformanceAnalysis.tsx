@@ -74,7 +74,7 @@ export default function PerformanceAnalysis() {
   }
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
       <h1 className="text-xl font-bold text-slate-100 mb-1">Análisis de Rendimiento</h1>
       <p className="text-sm text-slate-500 mb-5">Forma física, puntos de mejora y estado actual</p>
 
@@ -84,7 +84,7 @@ export default function PerformanceAnalysis() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* 1 · Aerobic Efficiency */}
         <Section
@@ -184,21 +184,27 @@ export default function PerformanceAnalysis() {
         {/* 4 · VO2max Trend */}
         <Section
           title="Tendencia VO2max"
-          sub={currentVo2 ? `Actual: ${currentVo2.toFixed(1)} ml/kg/min — ${vo2Label}` : 'Suunto solo lo calcula en carreras y caminatas'}
+          sub={currentVo2 ? `Última semana: ${currentVo2.toFixed(1)} ml/kg/min — ${vo2Label}` : 'Suunto solo lo calcula en carreras y caminatas'}
         >
           {vo2Points.length > 1 ? (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={vo2Points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} interval={Math.floor(vo2Points.length / 6)} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: '#64748b', fontSize: 10 }}
+                  interval={Math.floor(vo2Points.length / 6)}
+                  tickFormatter={(d: string) => `${d.slice(5, 7)}/${d.slice(2, 4)}`}
+                />
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={36} domain={['auto', 'auto']} />
                 <Tooltip
                   contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
-                  formatter={(v: unknown) => [Number(v).toFixed(1), 'VO2max']}
+                  formatter={(v: unknown) => [Number(v).toFixed(1), 'VO2max (media semanal)']}
+                  labelFormatter={(d: unknown) => `Semana del ${String(d).slice(8, 10)}/${String(d).slice(5, 7)}/${String(d).slice(0, 4)}`}
                 />
                 <ReferenceArea y1={55} y2={70} fill="#22c55e" fillOpacity={0.05} />
                 <ReferenceArea y1={48} y2={55} fill="#3b82f6" fillOpacity={0.05} />
-                <Line type="monotone" dataKey="vo2max" stroke="#a855f7" dot={{ r: 3 }} strokeWidth={2} />
+                <Line type="monotone" dataKey="vo2max" stroke="#a855f7" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
