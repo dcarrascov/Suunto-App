@@ -60,7 +60,7 @@ export function formatRelativeTime(isoString: string): string {
 
 export function sportLabel(sport: Sport): string {
   const labels: Record<Sport, string> = {
-    running: 'Running',
+    running: 'Carrera',
     cycling: 'Ciclismo',
     swimming: 'Natación',
     other: 'Otro',
@@ -68,22 +68,12 @@ export function sportLabel(sport: Sport): string {
   return labels[sport] ?? sport
 }
 
-export function sportIcon(sport: Sport): string {
-  const icons: Record<Sport, string> = {
-    running: '🏃',
-    cycling: '🚴',
-    swimming: '🏊',
-    other: '⚡',
-  }
-  return icons[sport] ?? '⚡'
-}
-
 export function sportColor(sport: Sport): string {
   const colors: Record<Sport, string> = {
-    running: '#ef4444',
-    cycling: '#f97316',
-    swimming: '#3b82f6',
-    other: '#8b5cf6',
+    running: '#c5f23c',
+    cycling: '#fb923c',
+    swimming: '#60a5fa',
+    other: '#a3a3a8',
   }
   return colors[sport] ?? '#6b7280'
 }

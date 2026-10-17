@@ -5,10 +5,10 @@ import ActivityCard from '../components/ActivityCard'
 
 const SPORTS: { value: Sport | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos' },
-  { value: 'running', label: '🏃 Running' },
-  { value: 'cycling', label: '🚴 Ciclismo' },
-  { value: 'swimming', label: '🏊 Natación' },
-  { value: 'other', label: '⚡ Otro' },
+  { value: 'running', label: 'Carrera' },
+  { value: 'cycling', label: 'Bici' },
+  { value: 'swimming', label: 'Natación' },
+  { value: 'other', label: 'Otro' },
 ]
 
 // Rangos de distancia [mín, máx) en km
@@ -96,7 +96,7 @@ export default function Activities() {
                 onClick={() => change(setSportFilter)(value)}
                 className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
                   sportFilter === value
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-accent text-black font-medium'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >

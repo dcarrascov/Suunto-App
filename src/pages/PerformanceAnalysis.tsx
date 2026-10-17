@@ -14,7 +14,7 @@ import {
   ReferenceLine, ReferenceArea, Cell,
 } from 'recharts'
 
-const RAMP_COLOR: Record<string, string> = { ok: '#3b82f6', warn: '#eab308', high: '#ef4444' }
+const RAMP_COLOR: Record<string, string> = { ok: '#4a4a50', warn: '#fbbf24', high: '#f87171' }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
@@ -96,16 +96,16 @@ export default function PerformanceAnalysis() {
           {efData.some(d => d.run || d.bike) ? (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={efData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={36} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+                <XAxis dataKey="month" tick={{ fill: '#77777d', fontSize: 10 }} />
+                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={36} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown, n: unknown) => [Number(v).toFixed(2), String(n)]}
                 />
-                <Line type="monotone" dataKey="run"  name="Running EF" stroke="#ef4444" dot={{ r: 3 }} strokeWidth={2} connectNulls />
+                <Line type="monotone" dataKey="run"  name="Running EF" stroke="#c5f23c" dot={{ r: 2 }} strokeWidth={2} connectNulls />
                 {hasBikeEF && (
-                  <Line type="monotone" dataKey="bike" name="Cycling EF" stroke="#f97316" dot={{ r: 3 }} strokeWidth={2} connectNulls />
+                  <Line type="monotone" dataKey="bike" name="Cycling EF" stroke="#fb923c" dot={{ r: 2 }} strokeWidth={2} connectNulls />
                 )}
               </LineChart>
             </ResponsiveContainer>
@@ -128,11 +128,11 @@ export default function PerformanceAnalysis() {
           {runVolume.some(w => w.km > 0) ? (
             <ResponsiveContainer width="100%" height={200}>
               <ComposedChart data={runVolume} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={36} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+                <XAxis dataKey="week" tick={{ fill: '#77777d', fontSize: 10 }} />
+                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={36} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown, n: unknown) => [`${v} km`, String(n)]}
                 />
                 <Bar dataKey="km" name="Km semana" radius={[3, 3, 0, 0]}>
@@ -140,7 +140,7 @@ export default function PerformanceAnalysis() {
                     <Cell key={i} fill={RAMP_COLOR[w.riskLevel]} />
                   ))}
                 </Bar>
-                <Line type="monotone" dataKey="longRun" name="Tirada larga" stroke="#a855f7" dot={{ r: 2 }} strokeWidth={2} />
+                <Line type="monotone" dataKey="longRun" name="Tirada larga" stroke="#c5f23c" dot={{ r: 2 }} strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
@@ -154,24 +154,24 @@ export default function PerformanceAnalysis() {
         {/* 3 · Cadence vs Speed */}
         <Section
           title="Cadencia vs Velocidad (Running)"
-          sub="Zona verde = cadencia óptima (170–180 spm)"
+          sub="Banda marcada = cadencia óptima (170–180 spm)"
         >
           {cadenceData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <ScatterChart margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="cadencia" name="Cadencia" unit=" spm" tick={{ fill: '#64748b', fontSize: 10 }} type="number" domain={['auto', 'auto']} />
-                <YAxis dataKey="velocidad" name="Velocidad" unit=" km/h" tick={{ fill: '#64748b', fontSize: 10 }} width={42} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+                <XAxis dataKey="cadencia" name="Cadencia" unit=" spm" tick={{ fill: '#77777d', fontSize: 10 }} type="number" domain={['auto', 'auto']} />
+                <YAxis dataKey="velocidad" name="Velocidad" unit=" km/h" tick={{ fill: '#77777d', fontSize: 10 }} width={42} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown, n: unknown) => [String(v), String(n)]}
                 />
-                <ReferenceArea x1={170} x2={180} fill="#22c55e" fillOpacity={0.08} />
-                <ReferenceLine x={170} stroke="#22c55e" strokeDasharray="4 2" strokeOpacity={0.5} />
-                <ReferenceLine x={180} stroke="#22c55e" strokeDasharray="4 2" strokeOpacity={0.5} />
-                <Scatter data={cadenceData} fill="#ef4444">
+                <ReferenceArea x1={170} x2={180} fill="#c5f23c" fillOpacity={0.06} />
+                <ReferenceLine x={170} stroke="#c5f23c" strokeDasharray="4 2" strokeOpacity={0.5} />
+                <ReferenceLine x={180} stroke="#c5f23c" strokeDasharray="4 2" strokeOpacity={0.5} />
+                <Scatter data={cadenceData} fill="#5a5a60">
                   {cadenceData.map((entry, i) => (
-                    <Cell key={i} fill={entry.optimal ? '#22c55e' : '#ef4444'} fillOpacity={0.7} />
+                    <Cell key={i} fill={entry.optimal ? '#c5f23c' : '#5a5a60'} fillOpacity={0.75} />
                   ))}
                 </Scatter>
               </ScatterChart>
@@ -189,29 +189,29 @@ export default function PerformanceAnalysis() {
           {vo2Points.length > 1 ? (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={vo2Points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#64748b', fontSize: 10 }}
+                  tick={{ fill: '#77777d', fontSize: 10 }}
                   interval={Math.floor(vo2Points.length / 6)}
                   tickFormatter={(d: string) => `${d.slice(5, 7)}/${d.slice(2, 4)}`}
                 />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={36} domain={['auto', 'auto']} />
+                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={36} domain={['auto', 'auto']} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown) => [Number(v).toFixed(1), 'VO2max (media semanal)']}
                   labelFormatter={(d: unknown) => `Semana del ${String(d).slice(8, 10)}/${String(d).slice(5, 7)}/${String(d).slice(0, 4)}`}
                 />
-                <ReferenceArea y1={55} y2={70} fill="#22c55e" fillOpacity={0.05} />
-                <ReferenceArea y1={48} y2={55} fill="#3b82f6" fillOpacity={0.05} />
-                <Line type="monotone" dataKey="vo2max" stroke="#a855f7" dot={false} strokeWidth={2} />
+                <ReferenceArea y1={55} y2={70} fill="#c5f23c" fillOpacity={0.04} />
+                <ReferenceArea y1={48} y2={55} fill="#a3a3a8" fillOpacity={0.03} />
+                <Line type="monotone" dataKey="vo2max" stroke="#c5f23c" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
             <Empty label={vo2Points.length === 0 ? 'Sin datos VO2max' : 'Pocas mediciones aún'} />
           )}
           <div className="flex gap-3 mt-2 flex-wrap">
-            {[['≥60', 'Elite', '#22c55e'], ['55–59', 'Excelente', '#3b82f6'], ['48–54', 'Buena', '#eab308'], ['<48', 'Mejorable', '#ef4444']].map(
+            {[['≥60', 'Elite', '#c5f23c'], ['55–59', 'Excelente', '#e2e2e0'], ['48–54', 'Buena', '#a3a3a8'], ['<48', 'Mejorable', '#77777d']].map(
               ([r, l, c]) => <span key={r} className="text-xs" style={{ color: c }}>{r} {l}</span>
             )}
           </div>
@@ -225,15 +225,15 @@ export default function PerformanceAnalysis() {
           {weeklyLoad.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={weeklyLoad} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={36} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+                <XAxis dataKey="week" tick={{ fill: '#77777d', fontSize: 10 }} />
+                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={36} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
                   formatter={(v: unknown) => [String(v), 'TSS']}
                 />
-                <ReferenceLine y={avgWeeklyTSS} stroke="#475569" strokeDasharray="4 2"
-                  label={{ value: 'media', fill: '#64748b', fontSize: 9 }} />
+                <ReferenceLine y={avgWeeklyTSS} stroke="#3a3a40" strokeDasharray="4 2"
+                  label={{ value: 'media', fill: '#77777d', fontSize: 9 }} />
                 <Bar dataKey="tss" radius={[3, 3, 0, 0]}>
                   {weeklyLoad.map((w, i) => (
                     <Cell key={i} fill={RAMP_COLOR[w.riskLevel]} />
@@ -253,13 +253,13 @@ export default function PerformanceAnalysis() {
         >
           <div className="space-y-2 py-1">
             {([
-              { key: 'running', emoji: '🏃', rgb: '239,68,68', data: heatmap.running, title: 'Carrera' },
-              ...(hasCross ? [{ key: 'cross', emoji: '➕', rgb: '59,130,246', data: heatmap.cross, title: 'Otros deportes' }] : []),
+              { key: 'running', label: 'Carrera', rgb: '197,242,60', data: heatmap.running, title: 'Carrera' },
+              ...(hasCross ? [{ key: 'cross', label: 'Otros', rgb: '163,163,168', data: heatmap.cross, title: 'Otros deportes' }] : []),
             ]).map(row => {
               const maxH = Math.max(...row.data, 0.01)
               return (
                 <div key={row.key} className="flex items-center gap-2">
-                  <div className="w-5 text-sm" title={row.title}>{row.emoji}</div>
+                  <div className="w-14 shrink-0 text-xs text-slate-500" title={row.title}>{row.label}</div>
                   <div className="flex gap-0.5 flex-1">
                     {row.data.map((h, i) => (
                       <div
@@ -278,10 +278,10 @@ export default function PerformanceAnalysis() {
                 </div>
               )
             })}
-            <div className="flex gap-0.5 pl-7">
+            <div className="flex gap-0.5 pl-16">
               {heatmap.dates.map((d, i) => (
                 i % 7 === 0
-                  ? <div key={i} className="flex-1 text-center" style={{ fontSize: 8, color: '#475569' }}>{d.slice(3)}</div>
+                  ? <div key={i} className="flex-1 text-center" style={{ fontSize: 8, color: '#3a3a40' }}>{d.slice(3)}</div>
                   : <div key={i} className="flex-1" />
               ))}
             </div>
@@ -317,24 +317,24 @@ function deriveInsights({
   // Última semana completa (la actual aún no ha terminado)
   const lastWeek = runVolume.at(-2)
   if (lastWeek?.rampPct != null && lastWeek.rampPct > 30) {
-    result.push({ text: `⚠️ Km semanales +${lastWeek.rampPct}% sobre tu media — riesgo de lesión`, color: '#ef4444' })
+    result.push({ text: `Km semanales +${lastWeek.rampPct}% sobre tu media — riesgo de lesión`, color: '#ef4444' })
   }
   if (lastWeek && lastWeek.km >= 20 && lastWeek.longRun / lastWeek.km > 0.4) {
-    result.push({ text: '🛣️ La tirada larga supera el 40% de los km de la semana', color: '#eab308' })
+    result.push({ text: 'La tirada larga supera el 40% de los km de la semana', color: '#eab308' })
   }
 
-  if (efTrend != null && efTrend > 2)  result.push({ text: '📈 Eficiencia aeróbica mejorando', color: '#22c55e' })
-  if (efTrend != null && efTrend < -2) result.push({ text: '📉 Eficiencia aeróbica bajando — más Z1/Z2', color: '#f97316' })
+  if (efTrend != null && efTrend > 2)  result.push({ text: 'Eficiencia aeróbica mejorando', color: '#22c55e' })
+  if (efTrend != null && efTrend < -2) result.push({ text: 'Eficiencia aeróbica bajando — más Z1/Z2', color: '#f97316' })
 
   const highRiskWeeks = weeklyLoad.filter(w => w.riskLevel === 'high').length
-  if (highRiskWeeks >= 2) result.push({ text: '⚠️ Rampas de carga elevadas — riesgo de lesión', color: '#f97316' })
+  if (highRiskWeeks >= 2) result.push({ text: 'Rampas de carga elevadas — riesgo de lesión', color: '#f97316' })
 
-  if (heatmap.activeDaysCount >= 20) result.push({ text: '✅ Consistencia excelente (28 días)', color: '#22c55e' })
-  else if (heatmap.activeDaysCount < 12) result.push({ text: '⚡ Aumenta la frecuencia de entrenamiento', color: '#eab308' })
+  if (heatmap.activeDaysCount >= 20) result.push({ text: 'Consistencia excelente (28 días)', color: '#22c55e' })
+  else if (heatmap.activeDaysCount < 12) result.push({ text: 'Aumenta la frecuencia de entrenamiento', color: '#eab308' })
 
   const lowCadence = cadenceData.filter(c => !c.optimal).length
   if (cadenceData.length > 0 && lowCadence > cadenceData.length * 0.4) {
-    result.push({ text: '👟 Cadencia baja — trabaja frecuencia de zancada', color: '#eab308' })
+    result.push({ text: 'Cadencia baja — trabaja frecuencia de zancada', color: '#eab308' })
   }
 
   return result

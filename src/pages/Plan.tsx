@@ -8,12 +8,13 @@ import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems, planWeeks, shiftWeek, weekDays } from '../utils/plan'
 import type { PlanItem, PlanStatus, PlanWeek } from '../utils/plan'
 
-const SPORT_ICON: Record<PlanSport, string> = {
-  running: '🏃', cycling: '🚴', swimming: '🏊', strength: '🏋️', rest: '😴', other: '⚡',
+// Color de la barrita lateral de cada entreno según el deporte
+const SPORT_COLOR: Record<PlanSport, string> = {
+  running: '#c5f23c', cycling: '#fb923c', swimming: '#60a5fa', strength: '#a3a3a8', rest: '#3a3a40', other: '#a3a3a8',
 }
 
 const STATUS: Record<PlanStatus, { label: string; cls: string }> = {
-  done: { label: '✓ Hecho', cls: 'bg-green-500/15 text-green-300 border-green-500/30' },
+  done: { label: '✓ Hecho', cls: 'bg-accent text-black border-accent font-medium' },
   missed: { label: '✗ No hecho', cls: 'bg-red-500/10 text-red-300 border-red-500/30' },
   today: { label: 'Hoy', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/40' },
   upcoming: { label: 'Próximo', cls: 'bg-slate-700/40 text-slate-400 border-slate-600/50' },
@@ -55,7 +56,7 @@ function WorkoutCard({ item }: { item: PlanItem }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{SPORT_ICON[w.sport]}</span>
+            <span className="w-1 h-5" style={{ background: SPORT_COLOR[w.sport] }} aria-hidden />
             <span className="font-medium text-slate-100">{w.title}</span>
           </div>
           <div className="text-xs text-slate-500 mt-0.5">{w.typeName}</div>
@@ -189,7 +190,7 @@ export default function Plan() {
           <button onClick={() => setWeek(w => shiftWeek(w, -1))} className="px-3 py-1.5 rounded-md text-sm text-slate-300 hover:bg-slate-700" aria-label="Semana anterior">←</button>
           <button
             onClick={() => setWeek(thisWeek)}
-            className={`px-3 py-1.5 rounded-md text-sm ${week === thisWeek ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+            className={`px-3 py-1.5 rounded-md text-sm ${week === thisWeek ? 'bg-accent text-black font-medium' : 'text-slate-300 hover:bg-slate-700'}`}
           >
             Esta semana
           </button>

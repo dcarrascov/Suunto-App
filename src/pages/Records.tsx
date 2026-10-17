@@ -12,7 +12,7 @@ function Predictions({ predictions }: { predictions: RacePrediction[] }) {
   if (predictions.length === 0) return null
   return (
     <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-      <h2 className="text-sm font-medium text-slate-200">🔮 Predicción de carreras</h2>
+      <h2 className="text-sm font-medium text-slate-200">Predicción de carreras</h2>
       <p className="text-xs text-slate-500 mt-0.5 mb-4">
         Con tus mejores tramos de los últimos {PREDICTION_DAYS} días (fórmula de Riegel)
       </p>
@@ -41,11 +41,11 @@ function Predictions({ predictions }: { predictions: RacePrediction[] }) {
   )
 }
 
-function PRTable({ title, prs, icon, speed = false }: { title: string; prs: PR[]; icon: string; speed?: boolean }) {
+function PRTable({ title, prs, speed = false }: { title: string; prs: PR[]; speed?: boolean }) {
   if (prs.length === 0) return null
   return (
     <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-      <h2 className="text-sm font-medium text-slate-200 mb-4">{icon} {title}</h2>
+      <h2 className="text-sm font-medium text-slate-200 mb-4">{title}</h2>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-slate-500 border-b border-slate-700">
@@ -98,8 +98,8 @@ export default function Records() {
       ) : (
         <div className="space-y-4">
           <Predictions predictions={predictions} />
-          <PRTable title="Running" icon="🏃" prs={personalRecords.running ?? []} />
-          <PRTable title="Ciclismo" icon="🚴" prs={personalRecords.cycling ?? []} speed />
+          <PRTable title="Carrera" prs={personalRecords.running ?? []} />
+          <PRTable title="Ciclismo" prs={personalRecords.cycling ?? []} speed />
           {hasApprox && (
             <p className="text-xs text-slate-500">
               ≈ Aproximado con los parciales guardados. Para calcularlo exacto con las muestras

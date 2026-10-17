@@ -50,8 +50,8 @@ export default function BestEfforts({ act }: { act: ActivitySummary }) {
           <div key={r.key} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500">{r.label}</span>
-              {r.badge === 'pr' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">🏅 Récord</span>}
-              {r.badge === 'year' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">Mejor del año</span>}
+              {r.badge === 'pr' && <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-accent text-black">RÉCORD</span>}
+              {r.badge === 'year' && <span className="text-[10px] px-1.5 py-0.5 border border-slate-600 text-slate-300">Mejor del año</span>}
             </div>
             <div className="text-lg font-mono font-semibold text-slate-100 mt-1">
               {approx && <span className="text-slate-500 text-sm">≈ </span>}{formatRaceTime(r.secs)}

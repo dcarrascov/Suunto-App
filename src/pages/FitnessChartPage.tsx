@@ -46,7 +46,7 @@ export default function FitnessChartPage() {
               key={r.days}
               onClick={() => setRange(r.days)}
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                range === r.days ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                range === r.days ? 'bg-accent text-black font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {r.label}
@@ -76,7 +76,7 @@ export default function FitnessChartPage() {
               {current.tsb > 0 ? '+' : ''}{Math.round(current.tsb)}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              {current.tsb > 5 ? '😴 Descansado' : current.tsb > -5 ? '✅ Óptimo' : current.tsb > -20 ? '😓 Fatigado' : '🔴 Muy fatigado'}
+              {current.tsb > 5 ? 'Descansado' : current.tsb > -5 ? 'Óptimo' : current.tsb > -20 ? 'Fatigado' : 'Muy fatigado'}
             </div>
           </div>
         </div>
@@ -86,24 +86,24 @@ export default function FitnessChartPage() {
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
           <ResponsiveContainer width="100%" height={360}>
             <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
               <XAxis
                 dataKey="date"
-                tick={{ fill: '#64748b', fontSize: 11 }}
+                tick={{ fill: '#77777d', fontSize: 11 }}
                 tickFormatter={d => formatShortDate(d)}
                 interval={Math.floor(data.length / 8)}
               />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#77777d', fontSize: 11 }} />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
+                contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: '#a3a3a8' }}
                 formatter={(value: unknown, name: unknown) => [Math.round(Number(value) * 10) / 10, String(name)]}
               />
-              <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
-              <ReferenceLine y={0} stroke="#475569" strokeDasharray="4 4" />
-              <Line type="monotone" dataKey="ctl" name="Fitness (CTL)" stroke="#3b82f6" dot={false} strokeWidth={2} />
-              <Line type="monotone" dataKey="atl" name="Fatiga (ATL)" stroke="#f97316" dot={false} strokeWidth={2} />
-              <Line type="monotone" dataKey="tsb" name="Forma (TSB)" stroke="#22c55e" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
+              <Legend wrapperStyle={{ fontSize: 12, color: '#a3a3a8' }} />
+              <ReferenceLine y={0} stroke="#3a3a40" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="ctl" name="Fitness (CTL)" stroke="#c5f23c" dot={false} strokeWidth={2} />
+              <Line type="monotone" dataKey="atl" name="Fatiga (ATL)" stroke="#a3a3a8" dot={false} strokeWidth={2} />
+              <Line type="monotone" dataKey="tsb" name="Forma (TSB)" stroke="#fb923c" dot={false} strokeWidth={1.5} strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
         </div>

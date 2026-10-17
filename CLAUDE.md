@@ -30,6 +30,10 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - Datos personales (`public/data/`, `fetch/debug/`, `fetch/fit/`, `.env`) están en `.gitignore`: no subirlos.
   La cookie de TrainingPeaks es una credencial: nunca leerla, mostrarla ni pedirla en el chat.
 - Fusiones a `main` con `git merge --no-ff` (el usuario las revisa en SourceTree).
+- **Diseño «Grafito»** (elegido por el usuario): oscuro y plano, grises neutros, un solo acento lima `#c5f23c`
+  (`text-accent`/`bg-accent`, texto negro encima), esquinas casi rectas. Sin degradados, brillos ni emojis.
+  En `index.css` se redefinen las escalas `slate` (grises) y `blue` (= lima), así que `text-blue-400` ya es lima.
+  Dashboard con rejilla `.g-grid` / `.g-cell` / `.g-label`. Colores con significado (zonas, avisos) se mantienen.
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
 
