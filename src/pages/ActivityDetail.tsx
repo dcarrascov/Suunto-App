@@ -60,7 +60,13 @@ export default function ActivityDetailPage() {
       {/* Map */}
       {detail?.gpxCoords && detail.gpxCoords.length > 0 && (
         <div className="mb-6">
-          <ActivityMap coords={detail.gpxCoords} sport={act.sport} height={320} />
+          <ActivityMap
+            coords={detail.gpxCoords}
+            pace={detail.routePace}
+            totalKm={act.distance}
+            sport={act.sport}
+            height={380}
+          />
         </div>
       )}
 

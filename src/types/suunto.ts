@@ -85,6 +85,7 @@ export interface ActivityDetail extends ActivitySummary {
   laps: Lap[]
   hrZones: HRZone[]
   gpxCoords: [number, number][]  // [lat, lon] pairs
+  routePace?: (number | null)[] | null  // ritmo (s/km) en cada punto de gpxCoords (rutas sincronizadas a 1 Hz)
   avgStrideLength?: number | null
   trainingEffect?: number | null
 }

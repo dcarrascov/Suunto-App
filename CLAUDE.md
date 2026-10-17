@@ -47,6 +47,9 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   estimación automática en Ajustes y etiqueta por parcial en el Detalle.
 - Página Historial (totales por año, comparación a la misma fecha, km por mes).
 - VO2max semanal en Rendimiento; filtros y orden en Actividades; diseño adaptado a móvil; tests de utils.
+- Mapa: capas sin clave (OSM claro, Esri gris/oscuro/satélite; CARTO pide API key), borde blanco, marcas
+  de km y color por ritmo. La ruta sale de `LocationStreamExtension` del detalle (1 Hz, `timed_route()` →
+  `gpxCoords` + `routePace`); sync pide siempre `workout(key)`. Las rutas antiguas (~1 punto/7 s) necesitan `--force`.
 
 ## Pendiente
 - Sincronización automática programada (el usuario avisará cuándo).
