@@ -11,7 +11,11 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   - `fit_source.py`: lee `.fit` de `fetch/fit/` (librería `garmin_fit_sdk`: es su nombre real, NO renombrar).
   - `normalizer.py`: convierte al formato de la app. `make_summary()` es el ÚNICO sitio que define la forma de `ActivitySummary`.
   - `validate_output.py`: valida los JSON (debe dar 0 errores).
-  - Salida: `activities.json` (resúmenes), `activity_{id}.json` (detalle: zonas, parciales, ruta, extra), `stats.json`.
+  - `tp_sync.py` + `trainingpeaks_client.py`: plan del entrenador desde la API interna de TrainingPeaks
+    (cookie `TP_AUTH_COOKIE` en .env, solo GET) → `plan.json`. `normalize_tp()` define `PlannedWorkout`.
+    Incremental: re-pide de −21 a +42 días y conserva lo anterior. Guía: GUIA_TRAININGPEAKS.md.
+  - Salida: `activities.json` (resúmenes), `activity_{id}.json` (detalle: zonas, parciales, ruta, extra), `stats.json`,
+    `plan.json` (TrainingPeaks, opcional).
 - `src/` (React 19 + Vite + Tailwind 4 + Zustand + Recharts + Leaflet, TypeScript):
   - `types/suunto.ts`: tipos (espejo del normalizador; si cambias uno, cambia el otro y `validate_output.py`).
   - `stores/activityStore.ts`: carga los JSON; ajustes persistidos en localStorage con clave `suunto-settings` (migra desde `garmin-settings`).
@@ -24,6 +28,8 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - **Fechas siempre en hora local.** `startTime` es ISO local sin zona. Nunca usar `toISOString()` para sacar un día:
   usar `toLocalISODate`, `parseLocalDate`, `isoDateOffset`, `daysAgo` (date.ts) y `localWeekStart` (calculations.ts).
 - Datos personales (`public/data/`, `fetch/debug/`, `fetch/fit/`, `.env`) están en `.gitignore`: no subirlos.
+  La cookie de TrainingPeaks es una credencial: nunca leerla, mostrarla ni pedirla en el chat.
+- Fusiones a `main` con `git merge --no-ff` (el usuario las revisa en SourceTree).
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
 
@@ -50,6 +56,9 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 - Mapa: capas sin clave (OSM claro, Esri gris/oscuro/satélite; CARTO pide API key), borde blanco, marcas
   de km y color por ritmo. La ruta sale de `LocationStreamExtension` del detalle (1 Hz, `timed_route()` →
   `gpxCoords` + `routePace`); sync pide siempre `workout(key)`. Las rutas antiguas (~1 punto/7 s) necesitan `--force`.
+
+- Página Plan (TrainingPeaks): semana actual con estado por entreno emparejado con Suunto (`utils/plan.ts`),
+  historial semanal con % de cumplimiento y tarjeta «Hoy toca» en el Dashboard. Sin probar aún con datos reales.
 
 ## Pendiente
 - Sincronización automática programada (el usuario avisará cuándo).

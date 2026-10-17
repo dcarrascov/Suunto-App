@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ActivitySummary, ActivityDetail, GlobalStats, UserSettings } from '../types/suunto'
+import type { ActivitySummary, ActivityDetail, GlobalStats, TrainingPlan, UserSettings } from '../types/suunto'
 import { DEFAULT_SETTINGS } from '../types/suunto'
 
 const SETTINGS_KEY = 'suunto-settings'
@@ -21,6 +21,7 @@ try {
 interface ActivityState {
   activities: ActivitySummary[]
   stats: GlobalStats | null
+  plan: TrainingPlan | null   // entrenos de TrainingPeaks (opcional: solo si se ejecutó tp_sync.py)
   settings: UserSettings
   loading: boolean
   error: string | null
@@ -28,6 +29,7 @@ interface ActivityState {
 
   loadActivities: () => Promise<void>
   loadStats: () => Promise<void>
+  loadPlan: () => Promise<void>
   updateSettings: (s: Partial<UserSettings>) => void
   loadDetail: (id: number) => Promise<ActivityDetail | null>
 }
@@ -37,6 +39,7 @@ export const useActivityStore = create<ActivityState>()(
     (set, get) => ({
       activities: [],
       stats: null,
+      plan: null,
       settings: DEFAULT_SETTINGS,
       loading: false,
       error: null,
@@ -63,6 +66,17 @@ export const useActivityStore = create<ActivityState>()(
           set({ stats: data })
         } catch {
           // stats are optional
+        }
+      },
+
+      loadPlan: async () => {
+        try {
+          const res = await fetch('/data/plan.json')
+          if (!res.ok) return
+          const data: TrainingPlan = await res.json()
+          if (Array.isArray(data?.workouts)) set({ plan: data })
+        } catch {
+          // el plan es opcional
         }
       },
 
