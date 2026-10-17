@@ -154,7 +154,7 @@ export default function ActivityMap({ coords, pace, totalKm, sport = 'other', he
       for (let i = 1; i <= coords.length; i++) {
         const b = i < coords.length ? (binAt(i) ?? bin) : null
         if (i === coords.length || b !== bin) {
-          const color = bin != null ? PACE_COLORS[bin] : '#94a3b8'
+          const color = bin != null ? PACE_COLORS[bin] : '#a3a3a8'
           L.polyline(coords.slice(start, i + 1), { color, weight: 4.5, opacity: 1, lineJoin: 'round', lineCap: 'round' }).addTo(group)
           start = i
           bin = b
@@ -187,7 +187,7 @@ export default function ActivityMap({ coords, pace, totalKm, sport = 'other', he
     // Salida y meta
     const end = coords[coords.length - 1]
     L.marker(end, {
-      icon: L.divIcon({ className: 'route-pin route-pin--end', html: '<span>🏁</span>', iconSize: [26, 26] }),
+      icon: L.divIcon({ className: 'route-pin route-pin--end', html: '<span>■</span>', iconSize: [26, 26] }),
       title: 'Meta',
     }).addTo(group)
     L.marker(coords[0], {

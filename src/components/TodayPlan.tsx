@@ -2,11 +2,25 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivityStore } from '../stores/activityStore'
 import { toLocalISODate } from '../utils/date'
-import { formatDuration } from '../utils/formatters'
+import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems } from '../utils/plan'
+import type { PlanItem } from '../utils/plan'
 
-/** Tarjeta del Dashboard con el entreno que toca hoy (y mañana), según TrainingPeaks. */
-export default function TodayPlan() {
+function describe(i: PlanItem): string {
+  const p = i.workout.planned
+  return [
+    p.duration && formatDuration(p.duration),
+    p.distance && `${p.distance.toLocaleString('es-ES')} km`,
+    p.duration && p.distance && i.workout.sport === 'running' && formatPace(p.duration / p.distance),
+    p.tss && `${Math.round(p.tss)} TSS`,
+  ].filter(Boolean).join(' · ')
+}
+
+/**
+ * Celda del Dashboard con el entreno que toca hoy (y mañana) según TrainingPeaks.
+ * Devuelve null si no hay plan sincronizado: el Dashboard pone otra cosa en su sitio.
+ */
+export default function TodayPlan({ className = '' }: { className?: string }) {
   const plan = useActivityStore(s => s.plan)
   const activities = useActivityStore(s => s.activities)
 
@@ -20,35 +34,31 @@ export default function TodayPlan() {
 
   if (!plan) return null
 
-  const describe = (i: (typeof today)[number]) => {
-    const p = i.workout.planned
-    return [p.duration && formatDuration(p.duration), p.distance && `${p.distance} km`].filter(Boolean).join(' · ')
-  }
-
   return (
-    <section className="bg-slate-800/50 border border-blue-500/30 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-slate-500 uppercase tracking-wider">📋 Hoy toca</div>
-        <Link to="/plan" className="text-xs text-blue-400 hover:text-blue-300">Ver la semana →</Link>
+    <div className={`g-cell ${className}`}>
+      <div className="flex items-center justify-between">
+        <div className="g-label">Hoy toca</div>
+        <Link to="/plan" className="text-xs text-slate-500 hover:text-white">Ver la semana →</Link>
       </div>
       {today.length === 0 ? (
-        <div className="text-sm text-slate-400">Nada planificado para hoy.</div>
+        <div className="text-lg font-semibold text-slate-300 mt-2">Nada planificado</div>
       ) : (
-        <div className="space-y-1.5">
-          {today.map(i => (
-            <div key={i.workout.id} className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-medium text-slate-100">{i.workout.title}</span>
-              <span className="text-xs text-slate-400">{describe(i)}</span>
-              {i.status === 'done' && <span className="text-xs text-green-400">✓ hecho</span>}
+        today.map(i => (
+          <div key={i.workout.id} className="mt-2">
+            <div className="text-xl font-semibold text-slate-100">
+              {i.workout.title}
+              {i.status === 'done' && <span className="text-sm text-accent font-normal ml-2">✓ hecho</span>}
             </div>
-          ))}
-        </div>
+            <div className="text-sm text-slate-400 mt-0.5">{describe(i)}</div>
+          </div>
+        ))
       )}
-      {tomorrow.length > 0 && (
-        <div className="text-xs text-slate-500 mt-2">
-          Mañana: {tomorrow.map(i => i.workout.title).join(', ')}
-        </div>
-      )}
-    </section>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <span className="text-[11px] font-semibold bg-accent text-black px-2 py-0.5">PLAN DE TU ENTRENADOR</span>
+        {tomorrow.length > 0 && (
+          <span className="text-xs text-slate-500">Mañana: {tomorrow.map(i => i.workout.title).join(', ')}</span>
+        )}
+      </div>
+    </div>
   )
 }

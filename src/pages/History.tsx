@@ -81,10 +81,10 @@ export default function History() {
               key={String(v)}
               onClick={() => setOnlyRunning(v)}
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                onlyRunning === v ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                onlyRunning === v ? 'bg-accent text-black font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {v ? '🏃 Carrera' : 'Todo'}
+              {v ? 'Carrera' : 'Todo'}
             </button>
           ))}
         </div>
@@ -128,16 +128,16 @@ export default function History() {
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 10 }} />
-            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} width={40} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+            <XAxis dataKey="month" tick={{ fill: '#77777d', fontSize: 10 }} />
+            <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={40} />
             <Tooltip
-              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+              contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
               formatter={(v: unknown, n: unknown) => [`${v} km`, String(n)]}
             />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey={String(chartYear - 1)} fill="#475569" radius={[3, 3, 0, 0]} />
-            <Bar dataKey={String(chartYear)} fill="#3b82f6" radius={[3, 3, 0, 0]} />
+            <Bar dataKey={String(chartYear - 1)} fill="#3a3a40" radius={[3, 3, 0, 0]} />
+            <Bar dataKey={String(chartYear)} fill="#c5f23c" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

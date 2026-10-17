@@ -100,10 +100,10 @@ export default function ZoneAnalysis() {
               key={s}
               onClick={() => setSport(s)}
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                sport === s ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                sport === s ? 'bg-accent text-black font-medium' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {s === 'all' ? 'Todos' : s === 'running' ? '🏃' : s === 'cycling' ? '🚴' : '🏊'}
+              {s === 'all' ? 'Todos' : s === 'running' ? 'Carrera' : s === 'cycling' ? 'Bici' : 'Natación'}
             </button>
           ))}
         </div>
@@ -144,12 +144,12 @@ export default function ZoneAnalysis() {
         </p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={intensity.weeks} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 10 }} />
-            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} unit="%" domain={[0, 100]} width={40} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+            <XAxis dataKey="week" tick={{ fill: '#77777d', fontSize: 10 }} />
+            <YAxis tick={{ fill: '#77777d', fontSize: 10 }} unit="%" domain={[0, 100]} width={40} />
             <Tooltip
-              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: '#94a3b8' }}
+              contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: '#a3a3a8' }}
               formatter={(v: unknown, n: unknown) => [`${v}%`, String(n)]}
             />
             <ReferenceLine y={80} stroke="#e2e8f0" strokeDasharray="4 2" strokeOpacity={0.6} />
@@ -169,12 +169,12 @@ export default function ZoneAnalysis() {
           <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Distribución semanal (últimas 24 semanas)</div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={weeklyZoneData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} />
-              <YAxis tick={{ fill: '#64748b', fontSize: 10 }} unit="h" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
+              <XAxis dataKey="date" tick={{ fill: '#77777d', fontSize: 10 }} />
+              <YAxis tick={{ fill: '#77777d', fontSize: 10 }} unit="h" />
               <Tooltip
-                contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8' }}
+                contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: '#a3a3a8' }}
                 formatter={(v: unknown) => [`${Number(v).toFixed(1)}h`]}
               />
               {HR_ZONE_DEFS.map(def => (

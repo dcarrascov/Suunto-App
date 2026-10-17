@@ -3,15 +3,15 @@ import { NavLink } from 'react-router-dom'
 import { useActivityStore } from '../stores/activityStore'
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: '◉' },
-  { to: '/activities', label: 'Actividades', icon: '▤' },
-  { to: '/plan', label: 'Plan', icon: '📋' },
-  { to: '/fitness', label: 'Fitness & Forma', icon: '📈' },
-  { to: '/zones', label: 'Zonas', icon: '🔥' },
-  { to: '/performance', label: 'Rendimiento', icon: '⚡' },
-  { to: '/records', label: 'Récords', icon: '🏅' },
-  { to: '/history', label: 'Historial', icon: '📅' },
-  { to: '/settings', label: 'Ajustes', icon: '⚙' },
+  { to: '/', label: 'Resumen' },
+  { to: '/activities', label: 'Actividades' },
+  { to: '/plan', label: 'Plan' },
+  { to: '/fitness', label: 'Forma' },
+  { to: '/zones', label: 'Zonas' },
+  { to: '/performance', label: 'Rendimiento' },
+  { to: '/records', label: 'Récords' },
+  { to: '/history', label: 'Historial' },
+  { to: '/settings', label: 'Ajustes' },
 ]
 
 export default function Sidebar() {
@@ -20,18 +20,18 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false)  // menú desplegado (solo en pantallas estrechas)
 
   return (
-    <aside className="md:w-56 shrink-0 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-700/50 flex flex-col md:min-h-screen">
+    <aside className="md:w-52 shrink-0 bg-[#0f0f11] border-b md:border-b-0 md:border-r border-line flex flex-col md:min-h-screen">
       {/* Logo (+ botón de menú en móvil) */}
-      <div className="px-5 py-4 md:py-5 border-b border-slate-700/50 flex items-center justify-between">
+      <div className="px-6 py-4 md:pt-7 md:pb-6 flex items-center justify-between">
         <div>
-          <div className="text-blue-400 font-bold text-lg tracking-tight">Suunto Stats</div>
+          <div className="font-bold tracking-wide text-slate-100">SUUNTO<span className="text-accent">/</span>STATS</div>
           <div className="text-slate-500 text-xs mt-0.5">
             {activities.length > 0 ? `${activities.length} actividades` : 'Sin datos aún'}
           </div>
         </div>
         <button
           onClick={() => setOpen(o => !o)}
-          className="md:hidden text-slate-300 text-xl px-2 py-1 rounded-lg hover:bg-slate-800"
+          className="md:hidden text-slate-300 text-xl px-2 py-1 hover:text-white"
           aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={open}
         >
@@ -40,22 +40,21 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className={`${open ? 'block' : 'hidden'} md:block flex-1 py-4 px-2 space-y-0.5`}>
-        {NAV.map(({ to, label, icon }) => (
+      <nav className={`${open ? 'block' : 'hidden'} md:block flex-1 pb-4`}>
+        {NAV.map(({ to, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             onClick={() => setOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              `block py-2 text-sm transition-colors border-l-2 ${
                 isActive
-                  ? 'bg-blue-600/20 text-blue-300 font-medium'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'border-accent pl-[22px] text-white font-medium'
+                  : 'border-transparent pl-[22px] text-slate-500 hover:text-slate-200'
               }`
             }
           >
-            <span className="text-base">{icon}</span>
             {label}
           </NavLink>
         ))}
@@ -63,17 +62,12 @@ export default function Sidebar() {
 
       {/* Sync info */}
       {stats && (
-        <div className="hidden md:block px-5 py-4 border-t border-slate-700/50">
-          <div className="text-xs text-slate-500">
-            Última sync
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
+        <div className="hidden md:block px-6 py-5 border-t border-line text-xs">
+          <div className="text-slate-500">Última sync</div>
+          <div className="text-slate-300 mt-0.5">
             {new Date(stats.syncedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
-          <div className="mt-3 text-xs text-slate-600 leading-relaxed">
-            Para actualizar:<br />
-            <code className="text-slate-500">python3 fetch/sync.py</code>
-          </div>
+          <code className="block mt-3 text-slate-600">py fetch\sync.py</code>
         </div>
       )}
     </aside>

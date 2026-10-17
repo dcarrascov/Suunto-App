@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ActivitySummary } from '../types/suunto'
-import { formatPace, formatDuration, formatDistance, formatRelativeTime, sportLabel, sportColor, sportIcon } from '../utils/formatters'
+import { formatPace, formatDuration, formatDistance, formatRelativeTime, sportLabel, sportColor } from '../utils/formatters'
 
 interface Props {
   activity: ActivitySummary
@@ -16,14 +16,14 @@ export default function ActivityCard({ activity: a, compact }: Props) {
       className="block bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 hover:border-slate-500/70 hover:bg-slate-800 transition-colors"
     >
       {/* Header row */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xl">{sportIcon(a.sport)}</span>
+      <div className="flex items-center gap-3 mb-2">
+        <span className="w-1 self-stretch" style={{ background: color }} aria-hidden />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-slate-200 truncate">{a.title}</div>
           <div className="text-xs text-slate-500">{formatRelativeTime(a.startTime)} · {sportLabel(a.sport)}</div>
         </div>
         {a.aerobicTE != null && (
-          <div className="text-xs px-2 py-0.5 rounded-full border" style={{ color, borderColor: color + '40', background: color + '15' }}>
+          <div className="text-xs px-2 py-0.5 border border-slate-700 text-slate-400">
             TE {a.aerobicTE.toFixed(1)}
           </div>
         )}
