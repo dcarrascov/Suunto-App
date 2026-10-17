@@ -11,7 +11,7 @@ from garmin_fit_sdk import Decoder, Stream
 
 from normalizer import (
     EXTRA_KEYS, _lap, _num, _pace, _spm, auto_splits, hr_zones_from_samples, make_summary,
-    sample_extra, set_best_efforts, timed_route,
+    decoupling_from_laps, decoupling_from_samples, sample_extra, set_best_efforts, timed_route,
 )
 
 SEMICIRCLES = 180.0 / 2 ** 31  # los FIT guardan las coordenadas en semicírculos
@@ -172,6 +172,7 @@ def parse_fit(path: Path, max_hr: int = 185) -> tuple[dict, dict]:
     detail["laps"] = laps
     detail["gpxCoords"], detail["routePace"] = timed_route(route)
     set_best_efforts(detail, dist_pts)
+    detail["decoupling"] = decoupling_from_samples(dist_pts, hr) or decoupling_from_laps(laps)
 
     # Datos extra (los que un FIT permite calcular)
     max_speed = _positive(first.get("enhanced_max_speed"), first.get("max_speed"))

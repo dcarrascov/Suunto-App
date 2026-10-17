@@ -297,6 +297,8 @@ def make_summary(*, start_s, sport, name, distance_m, duration_s, ascent_m, avg_
         "bestEffortsSource": None,  # "samples" (exacto) | "laps" (aprox. con los parciales)
         # Segundos en Z1..Z5 según el reloj (copia de hrZones del detalle); lo rellena detail_to_summary()
         "hrZoneSeconds": None,
+        # % de pérdida de eficiencia (velocidad/FC) de la 2.ª mitad frente a la 1.ª; lo rellena detail_to_summary()
+        "decoupling": None,
     }
     if sport == "swimming":
         summary["swolf"] = None
@@ -551,7 +553,56 @@ def set_best_efforts(detail: dict, dist_pts=None) -> dict:
 
 
 # Claves que se calculan en el detalle y se copian al resumen (para no cargar 1400 detalles en la web)
-SUMMARY_FROM_DETAIL = ("bestEfforts", "bestEffortsSource", "hrZoneSeconds")
+SUMMARY_FROM_DETAIL = ("bestEfforts", "bestEffortsSource", "hrZoneSeconds", "decoupling")
+
+DECOUPLING_MIN_S = 2400  # solo actividades de 40 min o más (en las cortas no tiene sentido)
+
+
+def _pct_drop(d1, t1, hr1, d2, t2, hr2):
+    """% que cae la eficiencia (m/s por pulsación) de la 1.ª a la 2.ª mitad. Positivo = el pulso se dispara."""
+    if min(d1, t1, hr1, d2, t2, hr2) <= 0:
+        return None
+    ef1, ef2 = d1 / t1 / hr1, d2 / t2 / hr2
+    return round((ef1 - ef2) / ef1 * 100, 1)
+
+
+def decoupling_from_samples(dist_pts, hr) -> float | None:
+    """Desacoplamiento con las muestras [(t_s, dist_m)] y [(t_s, bpm)], partiendo la actividad por la mitad del tiempo."""
+    pts = sorted((t, d) for t, d in dist_pts if t is not None and d is not None)
+    beats = [(t, v) for t, v in hr if t is not None and v]
+    if len(pts) < 10 or len(beats) < 10 or pts[-1][0] - pts[0][0] < DECOUPLING_MIN_S:
+        return None
+    t0, t_end = pts[0][0], pts[-1][0]
+    half = t0 + (t_end - t0) / 2
+    d_half = max(d for t, d in pts if t <= half)
+    hr1 = [v for t, v in beats if t <= half]
+    hr2 = [v for t, v in beats if t > half]
+    if not hr1 or not hr2:
+        return None
+    return _pct_drop(d_half - pts[0][1], half - t0, mean(hr1), pts[-1][1] - d_half, t_end - half, mean(hr2))
+
+
+def decoupling_from_laps(laps) -> float | None:
+    """Aproximación con los parciales (distancia, duración y FC media de cada uno): cada vuelta va a la mitad de su punto medio."""
+    rows = [(l.get("distance") or 0.0, l.get("duration") or 0.0, l.get("avgHR")) for l in laps or []]
+    rows = [(d * 1000, t, h) for d, t, h in rows if t > 0]
+    total = sum(t for _, t, _ in rows)
+    if total < DECOUPLING_MIN_S or sum(1 for _, _, h in rows if h) < 4:
+        return None
+    halves = [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]  # distancia, tiempo, FC·tiempo, tiempo con FC
+    elapsed = 0.0
+    for d, t, h in rows:
+        half = halves[0 if elapsed + t / 2 <= total / 2 else 1]
+        half[0] += d
+        half[1] += t
+        if h:
+            half[2] += h * t
+            half[3] += t
+        elapsed += t
+    (d1, t1, w1, n1), (d2, t2, w2, n2) = halves
+    if not n1 or not n2:
+        return None
+    return _pct_drop(d1, t1, w1 / n1, d2, t2, w2 / n2)
 
 
 def detail_to_summary(detail: dict) -> dict:
@@ -561,6 +612,8 @@ def detail_to_summary(detail: dict) -> dict:
     detail["hrZoneSeconds"] = secs if len(secs) == 5 and any(secs) else None
     if "bestEfforts" not in detail:
         set_best_efforts(detail)
+    if "decoupling" not in detail:  # con muestras lo calcula normalize_detail; si no, con los parciales
+        detail["decoupling"] = decoupling_from_laps(detail.get("laps"))
     return {k: detail.get(k) for k in SUMMARY_FROM_DETAIL}
 
 
@@ -673,4 +726,5 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
         laps = auto_splits(dist_pts, hr, alts, split_m) or laps
     detail["laps"] = laps
     detail["extra"] = build_extra(w, summary, sample_extra(dist_pts, hr, alts))
+    detail["decoupling"] = decoupling_from_samples(dist_pts, hr) or decoupling_from_laps(laps)
     return set_best_efforts(detail, dist_pts)

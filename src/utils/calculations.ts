@@ -325,13 +325,14 @@ export const PREDICTION_TARGETS = [
 
 interface RecentEffort { km: number; label: string; seconds: number; activityId: number; date: string; approx: boolean }
 
-/** Mejor tramo de cada distancia en las carreras desde `sinceDate` (YYYY-MM-DD). */
-function recentRunningEfforts(activities: ActivitySummary[], sinceDate: string): RecentEffort[] {
+/** Mejor tramo de cada distancia en las carreras desde `sinceDate` (y antes de `untilDate`, si se da). */
+function recentRunningEfforts(activities: ActivitySummary[], sinceDate: string, untilDate?: string): RecentEffort[] {
   return RUNNING_DISTANCES.flatMap(({ km, label }) => {
     const key = String(Math.round(km * 1000))
     let best: RecentEffort | null = null
     for (const a of activities) {
-      if (a.sport !== 'running' || a.startTime.slice(0, 10) < sinceDate) continue
+      const day = a.startTime.slice(0, 10)
+      if (a.sport !== 'running' || day < sinceDate || (untilDate && day >= untilDate)) continue
       const secs = a.bestEfforts?.[key]
       if (secs && (!best || secs < best.seconds)) {
         best = { km, label, seconds: secs, activityId: a.id, date: a.startTime.slice(0, 10), approx: a.bestEffortsSource === 'laps' }
@@ -346,8 +347,8 @@ function recentRunningEfforts(activities: ActivitySummary[], sinceDate: string):
  * Para cada objetivo se usa el tramo de distancia más parecida (en escala logarítmica),
  * que es la predicción más fiable; el de 1 km solo se usa si no hay otro.
  */
-export function predictRaces(activities: ActivitySummary[], sinceDate: string): RacePrediction[] {
-  const efforts = recentRunningEfforts(activities, sinceDate)
+export function predictRaces(activities: ActivitySummary[], sinceDate: string, untilDate?: string): RacePrediction[] {
+  const efforts = recentRunningEfforts(activities, sinceDate, untilDate)
   const usable = efforts.some(e => e.km >= 5) ? efforts.filter(e => e.km >= 5) : efforts
   if (usable.length === 0) return []
   return PREDICTION_TARGETS.map(({ km, label }) => {
@@ -478,4 +479,93 @@ export function monthlyKm(activities: ActivitySummary[], year: number): number[]
     if (a.startTime.startsWith(prefix)) km[Number(a.startTime.slice(5, 7)) - 1] += a.distance
   }
   return km.map(v => +v.toFixed(1))
+}
+
+// ─── Forma prevista con el plan del entrenador ───────────────────────────────
+
+/**
+ * Continúa la serie CTL/ATL/TSB día a día desde el último punto (hoy) con el TSS planificado
+ * de cada día futuro (`plannedTss`, YYYY-MM-DD → TSS; los días sin plan cuentan 0).
+ */
+export function projectFitness(
+  history: FitnessPoint[], plannedTss: Record<string, number>, untilDate: string,
+): FitnessPoint[] {
+  const last = history.at(-1)
+  if (!last || untilDate <= last.date) return []
+  const ctlK = 2 / (42 + 1)
+  const atlK = 2 / (7 + 1)
+  let { ctl, atl } = last
+  const out: FitnessPoint[] = []
+  const d = parseLocalDate(last.date)
+  for (;;) {
+    d.setDate(d.getDate() + 1)
+    const date = toLocalISODate(d)
+    if (date > untilDate) break
+    const tss = plannedTss[date] ?? 0
+    ctl = ctl + ctlK * (tss - ctl)
+    atl = atl + atlK * (tss - atl)
+    out.push({
+      date,
+      ctl: Math.round(ctl * 10) / 10,
+      atl: Math.round(atl * 10) / 10,
+      tsb: Math.round((ctl - atl) * 10) / 10,
+      tss,
+    })
+  }
+  return out
+}
+
+// ─── Eficiencia a la misma FC ────────────────────────────────────────────────
+
+export const SAME_HR_BAND = 4      // ±ppm alrededor de tu FC habitual
+const SAME_HR_MIN_S = 1500          // carreras de 25 min o más
+const SAME_HR_MIN_RUNS = 2          // meses con menos carreras en la banda no se muestran
+
+export interface EfficiencyPoint {
+  month: string        // YYYY-MM
+  paceAtRef: number    // s/km que saldrían a refHR con la eficiencia mediana de ese mes
+  runs: number
+}
+
+/**
+ * Ritmo a una misma FC, por mes. Se usan las carreras de 25 min o más cuya FC media está a ±4 ppm
+ * de tu FC habitual (`refHR`, la mediana de esas carreras): así se compara lo comparable sin depender
+ * de las zonas del reloj. Si el ritmo a la misma FC baja, la base aeróbica mejora.
+ */
+export function sameHrEfficiency(
+  activities: ActivitySummary[], excludeIds: Set<number> = new Set(),
+): { points: EfficiencyPoint[]; refHR: number | null } {
+  const runs = activities.filter(a =>
+    a.sport === 'running' && !excludeIds.has(a.id) && a.duration >= SAME_HR_MIN_S && a.avgHR > 0 && a.distance > 0)
+  if (runs.length === 0) return { points: [], refHR: null }
+  const median = (v: number[]) => {
+    const s = [...v].sort((x, y) => x - y)
+    const m = Math.floor(s.length / 2)
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+  }
+  const refHR = Math.round(median(runs.map(a => a.avgHR)))
+  const byMonth: Record<string, number[]> = {}
+  for (const a of runs) {
+    if (Math.abs(a.avgHR - refHR) > SAME_HR_BAND) continue
+    const ef = (a.distance * 1000) / (a.duration / 60) / a.avgHR   // m/min por pulsación
+    ;(byMonth[a.startTime.slice(0, 7)] ??= []).push(ef)
+  }
+  const points = Object.entries(byMonth)
+    .filter(([, efs]) => efs.length >= SAME_HR_MIN_RUNS)
+    .sort(([x], [y]) => x.localeCompare(y))
+    .map(([month, efs]) => ({ month, paceAtRef: Math.round(60000 / (median(efs) * refHR)), runs: efs.length }))
+  return { points, refHR }
+}
+
+// ─── Estado de forma (TSB) ───────────────────────────────────────────────────
+
+export const RACE_FORM_BAND = { min: -10, max: 5 }  // forma típica para competir
+
+/** Texto y color del estado de forma, el mismo en toda la app. */
+export function formState(tsb: number): { label: string; color: string } {
+  if (tsb > 10) return { label: 'Descansado', color: '#86efac' }
+  if (tsb > -5) return { label: 'Óptima', color: '#c5f23c' }
+  if (tsb > -15) return { label: 'Entrenando fuerte', color: '#fbbf24' }
+  if (tsb > -25) return { label: 'Acumulando fatiga', color: '#fb923c' }
+  return { label: 'Descansa ya', color: '#f87171' }
 }

@@ -4,8 +4,10 @@ import { useActivityStore } from '../stores/activityStore'
 
 const NAV = [
   { to: '/', label: 'Resumen' },
+  { to: '/calendar', label: 'Calendario' },
   { to: '/activities', label: 'Actividades' },
   { to: '/plan', label: 'Plan' },
+  { to: '/races', label: 'Competiciones' },
   { to: '/fitness', label: 'Forma' },
   { to: '/zones', label: 'Zonas' },
   { to: '/performance', label: 'Rendimiento' },
