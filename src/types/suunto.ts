@@ -107,6 +107,30 @@ export interface GlobalStats {
   recovery?: { seconds: number; endedAt: number } | null
 }
 
+// ─── TrainingPeaks (plan del entrenador) ─── espejo de normalize_tp() en fetch/tp_sync.py
+
+export type PlanSport = 'running' | 'cycling' | 'swimming' | 'strength' | 'rest' | 'other'
+
+export interface PlannedWorkout {
+  id: number
+  date: string               // YYYY-MM-DD (día local del entreno)
+  sport: PlanSport
+  typeName: string           // "Carrera", "Fuerza", "Descanso"...
+  title: string
+  description: string | null // lo que escribe el entrenador
+  coachComments: string | null
+  athleteComments: string | null
+  planned: { duration: number | null; distance: number | null; tss: number | null; if: number | null }  // s, km
+  actual: { duration: number | null; distance: number | null; tss: number | null } | null
+  completed: boolean
+  hasPlan: boolean           // false = entreno registrado sin plan (subido desde el reloj)
+}
+
+export interface TrainingPlan {
+  syncedAt: string
+  workouts: PlannedWorkout[]
+}
+
 export interface UserSettings {
   maxHR: number
   ftp: number          // Functional Threshold Power (watts)

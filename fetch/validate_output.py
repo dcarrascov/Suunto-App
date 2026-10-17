@@ -134,6 +134,47 @@ def check_detail(d, where):
             errors.append(f"{where}: {len(bad)} coordenadas inválidas en gpxCoords (esperado [lat, lon])")
 
 
+PLAN_SPORTS = {"running", "cycling", "swimming", "strength", "rest", "other"}
+
+
+def check_plan():
+    """plan.json (TrainingPeaks) es opcional; si existe debe seguir el tipo TrainingPlan de suunto.ts."""
+    path = DATA / "plan.json"
+    if not path.exists():
+        return
+    try:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as e:
+        errors.append(f"plan.json no es JSON válido: {e}")
+        return
+    ws = plan.get("workouts") if isinstance(plan, dict) else None
+    if not isinstance(ws, list):
+        errors.append("plan.json: 'workouts' debe ser una lista")
+        return
+    ids = [w.get("id") for w in ws if isinstance(w, dict)]
+    if len(ids) != len(set(ids)):
+        errors.append("plan.json: hay ids de entreno repetidos")
+    for i, w in enumerate(ws):
+        where = f"plan.json[{i}]"
+        if not isinstance(w, dict):
+            errors.append(f"{where}: debe ser un objeto")
+            continue
+        if not isinstance(w.get("id"), int):
+            errors.append(f"{where}: 'id' debe ser entero")
+        if not (isinstance(w.get("date"), str) and re.match(r"^\d{4}-\d{2}-\d{2}$", w["date"])):
+            errors.append(f"{where}: 'date' debe ser YYYY-MM-DD")
+        if w.get("sport") not in PLAN_SPORTS:
+            errors.append(f"{where}: 'sport' debe ser uno de {sorted(PLAN_SPORTS)}")
+        if not isinstance(w.get("title"), str) or not isinstance(w.get("completed"), bool):
+            errors.append(f"{where}: necesita title (texto) y completed (booleano)")
+        p = w.get("planned")
+        if not isinstance(p, dict) or any(p.get(k) is not None and not num(p.get(k)) for k in ("duration", "distance", "tss", "if")):
+            errors.append(f"{where}: 'planned' debe tener duration/distance/tss/if numéricos o null")
+        a = w.get("actual")
+        if a is not None and (not isinstance(a, dict) or any(a.get(k) is not None and not num(a.get(k)) for k in ("duration", "distance", "tss"))):
+            errors.append(f"{where}: 'actual' debe ser null o tener duration/distance/tss numéricos o null")
+
+
 def main():
     acts_path = DATA / "activities.json"
     if not acts_path.exists():
@@ -176,6 +217,8 @@ def main():
                 errors.append(f"stats.json: vo2maxHistory[{i}] necesita date (texto) y value (número)")
     else:
         warnings.append("no existe stats.json (es opcional)")
+
+    check_plan()
 
     print(f"{len(acts)} actividades revisadas · {len(errors)} errores · {len(warnings)} avisos")
     for w in warnings:

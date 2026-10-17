@@ -13,6 +13,7 @@ import { useWeeklyLoad } from '../hooks/useWeeklyLoad'
 import RadialProgress from '../components/RadialProgress'
 import FormBadge from '../components/FormBadge'
 import DeltaBadge from '../components/DeltaBadge'
+import TodayPlan from '../components/TodayPlan'
 import {
   AreaChart, Area, XAxis, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -222,6 +223,9 @@ export default function Dashboard() {
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
       <div className="px-4 md:px-6 py-5 space-y-5">
+
+        {/* Entreno de hoy según TrainingPeaks (solo si hay plan) */}
+        <TodayPlan />
 
         {/* Week comparison */}
         <section>

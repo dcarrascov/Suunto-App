@@ -5,6 +5,7 @@ import { useActivityStore } from '../stores/activityStore'
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '◉' },
   { to: '/activities', label: 'Actividades', icon: '▤' },
+  { to: '/plan', label: 'Plan', icon: '📋' },
   { to: '/fitness', label: 'Fitness & Forma', icon: '📈' },
   { to: '/zones', label: 'Zonas', icon: '🔥' },
   { to: '/performance', label: 'Rendimiento', icon: '⚡' },

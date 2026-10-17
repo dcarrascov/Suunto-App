@@ -187,6 +187,9 @@ Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
 # 1. Sincronizar datos nuevos de Suunto
 python3 fetch/sync.py
 
+# 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
+python3 fetch/tp_sync.py
+
 # 2. Arrancar la app
 npm run dev
 ```
