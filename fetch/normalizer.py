@@ -116,6 +116,55 @@ def route_points(latlons, limit: int = 500) -> list:
     return downsample(pts, limit)
 
 
+ROUTE_LIMIT = 1500       # puntos de ruta que se guardan (1 Hz -> uno cada ~2-3 s en 1 h)
+PACE_WINDOW_S = 10.0     # el ritmo de cada punto es el de los ±10 s de alrededor
+PACE_RANGE = (120, 1200)  # s/km creíbles: más rápido = salto del GPS; más lento = parado
+
+
+def _haversine_m(a, b) -> float:
+    la1, lo1, la2, lo2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6_371_000 * math.asin(min(1.0, math.sqrt(h)))
+
+
+def timed_route(points, limit: int = ROUTE_LIMIT) -> tuple[list, list]:
+    """
+    [(t_s, lat, lon), ...] -> (gpxCoords, routePace): ruta reducida a `limit` puntos y,
+    para cada punto, el ritmo (s/km) en una ventana de ±PACE_WINDOW_S (None si parado o sin datos).
+    """
+    pts = sorted((t, la, lo) for t, la, lo in points if t is not None and _valid_latlon(la, lo))
+    if not pts:
+        return [], []
+    ts = [p[0] for p in pts]
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        cum.append(cum[-1] + _haversine_m(a[1:], b[1:]))
+
+    paces = []
+    for t in ts:
+        j0 = bisect.bisect_left(ts, t - PACE_WINDOW_S)
+        j1 = bisect.bisect_right(ts, t + PACE_WINDOW_S) - 1
+        dt, dist = ts[j1] - ts[j0], cum[j1] - cum[j0]
+        pace = dt / dist * 1000 if dt >= 4 and dist > 0 else None
+        paces.append(round(pace) if pace and PACE_RANGE[0] <= pace <= PACE_RANGE[1] else None)
+
+    idx = downsample(list(range(len(pts))), limit)
+    return [[round(pts[i][1], 6), round(pts[i][2], 6)] for i in idx], [paces[i] for i in idx]
+
+
+def _location_stream(w: dict) -> list:
+    """Ruta a 1 Hz del detalle de Suunto (LocationStreamExtension) como [(t_s, lat, lon)]."""
+    for e in _ext(w, "LocationStreamExtension"):
+        rows = [r for r in e.get("locationPoints") or [] if isinstance(r, dict)]
+        stamps = [_num(r.get("timestamp")) for r in rows]
+        t0 = min((s for s in stamps if s is not None), default=None)
+        if t0 is None:
+            continue
+        return [((s - t0) / 1000, _num(r.get("latitude")), _num(r.get("longitude")))
+                for s, r in zip(stamps, rows) if s is not None]
+    return []
+
+
 def _window_mean(samples, t0, t1):
     vals = [v for t, v in samples if t0 < t <= t1 and v]
     return round(mean(vals)) if vals else None
@@ -597,6 +646,10 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
     detail["hrZones"] = hr_zones_suunto(w)
     detail["laps"], detail["gpxCoords"] = [], []
     detail["extra"] = build_extra(w, summary, None)
+    # Ruta: la del detalle (1 posición por segundo) si está; si no, las posiciones de /data (~1 cada 7 s)
+    stream = _location_stream(w)
+    if stream:
+        detail["gpxCoords"], detail["routePace"] = timed_route(stream)
     if not data:
         return set_best_efforts(detail)
 
@@ -608,7 +661,9 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
     alts = [(_num(r.get("t")), _num(r.get("h"))) for r in loc]
     alts = sorted((t, h) for t, h in alts if t is not None and h is not None)
 
-    detail["gpxCoords"] = route_points([(_num(r.get("la")), _num(r.get("ln"))) for r in loc])
+    if not stream:
+        detail["gpxCoords"], detail["routePace"] = timed_route(
+            [(_num(r.get("t")), _num(r.get("la")), _num(r.get("ln"))) for r in loc])
 
     dist_pts = [(_num(r.get("t")), (_num(r.get("s")) or 0.0) * scale) for r in loc if r.get("s") is not None]
     events = _rows(data, "eventlaps")

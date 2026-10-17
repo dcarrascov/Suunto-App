@@ -118,6 +118,12 @@ def check_detail(d, where):
             for k in ("lowBPM", "highBPM"):
                 if k not in z or (z[k] is not None and not num(z[k])):
                     errors.append(f"{where}: hrZones[{i}].{k} debe ser número o null")
+    pace = d.get("routePace")  # opcional: ritmo (s/km) de cada punto de gpxCoords
+    if pace is not None:
+        if not isinstance(pace, list) or len(pace) != len(d.get("gpxCoords") or []):
+            errors.append(f"{where}: 'routePace' debe ser una lista del mismo largo que gpxCoords")
+        elif any(v is not None and not (num(v) and v > 0) for v in pace):
+            errors.append(f"{where}: routePace debe tener números > 0 o null")
     coords = d.get("gpxCoords")
     if not isinstance(coords, list):
         errors.append(f"{where}: 'gpxCoords' debe ser una lista")

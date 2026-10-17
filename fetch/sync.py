@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):  # evita errores con consolas de codifi
 OUT_DIR = ROOT / "public" / "data"
 PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
 DEBUG_DIR = Path(__file__).resolve().parent / "debug"
-DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "extra", "partial")  # claves que no van en el resumen
+DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "routePace", "extra", "partial")  # claves que no van en el resumen
 
 
 def save_json(path: Path, data):
@@ -94,13 +94,13 @@ def collect_cloud(args):
         def load(raw=raw, summary=summary):
             w, data = raw, None
             if not args.no_gpx:
-                if raw.get("extensions") is None:  # la lista no trae VO2max/TE: pedir el detalle
-                    try:
-                        w = {**raw, **client.workout(raw["key"])}
-                    except SuuntoAuthError:
-                        raise
-                    except SuuntoError as e:
-                        print(f"  WARNING: detalle {raw['key']}: {e}")
+                # el detalle trae la ruta a 1 Hz (y VO2max/TE, que a veces no vienen en la lista)
+                try:
+                    w = {**raw, **client.workout(raw["key"])}
+                except SuuntoAuthError:
+                    raise
+                except SuuntoError as e:
+                    print(f"  WARNING: detalle {raw['key']}: {e}")
                 try:
                     data = client.workout_data(raw["key"])
                 except SuuntoAuthError:
