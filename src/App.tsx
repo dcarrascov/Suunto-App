@@ -12,6 +12,8 @@ import Settings from './pages/Settings'
 import PerformanceAnalysis from './pages/PerformanceAnalysis'
 import History from './pages/History'
 import Plan from './pages/Plan'
+import Races from './pages/Races'
+import CalendarPage from './pages/CalendarPage'
 
 export default function App() {
   const loadActivities = useActivityStore(s => s.loadActivities)
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/records" element={<Records />} />
             <Route path="/history" element={<History />} />
             <Route path="/plan" element={<Plan />} />
+            <Route path="/races" element={<Races />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

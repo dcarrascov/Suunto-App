@@ -45,6 +45,7 @@ export interface ActivitySummary {
   bestEfforts?: Record<string, number> | null
   bestEffortsSource?: 'samples' | 'laps' | null  // samples = exacto · laps = aprox. con los parciales
   hrZoneSeconds?: number[] | null  // segundos en Z1..Z5 según el reloj (copia de hrZones del detalle)
+  decoupling?: number | null       // % que cae velocidad/FC de la 2.ª mitad frente a la 1.ª (≥ 40 min)
   // Swimming only
   swolf?: number | null
   avgStrokesPerLength?: number | null
@@ -140,6 +141,8 @@ export interface UserSettings {
   lthrSwimming?: number
   thresholdPace: number // seconds per km at threshold
   ftpDate?: string
+  raceIds?: number[]      // actividades marcadas a mano como competición
+  notRaceIds?: number[]   // actividades que la detección automática toma por competición y no lo son
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {

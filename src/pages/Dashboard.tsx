@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import type { GlobalStats } from '../types/suunto'
-import { localWeekStart, weeklyVo2max } from '../utils/calculations'
+import { formState, localWeekStart, weeklyVo2max } from '../utils/calculations'
 import { useActivityStore } from '../stores/activityStore'
 import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems, planWeeks } from '../utils/plan'
@@ -50,15 +50,6 @@ function recoveryLeft(stats: GlobalStats | null): number | null {
   const r = stats?.recovery
   if (!r) return null
   return Math.max(0, r.seconds - (Date.now() - r.endedAt) / 1000)
-}
-
-// Estado de forma (TSB) → texto y color
-function formState(tsb: number): { label: string; color: string } {
-  if (tsb > 10) return { label: 'Descansado', color: '#86efac' }
-  if (tsb > -5) return { label: 'Óptima', color: '#c5f23c' }
-  if (tsb > -15) return { label: 'Entrenando fuerte', color: '#fbbf24' }
-  if (tsb > -25) return { label: 'Acumulando fatiga', color: '#fb923c' }
-  return { label: 'Descansa ya', color: '#f87171' }
 }
 
 const FORM_RANGE = 30  // el anillo va de −30 a +30

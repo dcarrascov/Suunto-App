@@ -22,7 +22,7 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   - `utils/calculations.ts`: TSS estimado (TRIMP), CTL/ATL/TSB (EMA 42/7), zonas, agregados semanales, récords.
   - `utils/date.ts`, `hooks/`, `pages/` (Dashboard, Actividades, Detalle, Fitness, Zonas, Rendimiento, Récords, Historial, Ajustes).
   - Resumen con datos copiados del detalle (`SUMMARY_FROM_DETAIL` / `detail_to_summary()` en normalizer.py):
-    `bestEfforts`, `bestEffortsSource`, `hrZoneSeconds` (Z1..Z5 del reloj). Así la web no carga 1400 detalles.
+    `bestEfforts`, `bestEffortsSource`, `hrZoneSeconds` (Z1..Z5 del reloj), `decoupling` (%). Así la web no carga 1400 detalles.
 
 ## Convenciones
 - **Fechas siempre en hora local.** `startTime` es ISO local sin zona. Nunca usar `toISOString()` para sacar un día:
@@ -34,6 +34,7 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   (`text-accent`/`bg-accent`, texto negro encima), esquinas casi rectas. Sin degradados, brillos ni emojis.
   En `index.css` se redefinen las escalas `slate` (grises) y `blue` (= lima), así que `text-blue-400` ya es lima.
   Dashboard con rejilla `.g-grid` / `.g-cell` / `.g-label`. Colores con significado (zonas, avisos) se mantienen.
+- Actualizar todo: `.ctualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`).
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
 
@@ -63,6 +64,13 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
 
 - Página Plan (TrainingPeaks): semana actual con estado por entreno emparejado con Suunto (`utils/plan.ts`),
   historial semanal con % de cumplimiento y tarjeta «Hoy toca» en el Dashboard. Sin probar aún con datos reales.
+
+- Forma prevista (`projectFitness` + `useFitnessProjection`) con el TSS planificado; Competiciones (`utils/races.ts`):
+  día siguiente a «Activación precompetición» → la carrera más rápida ≥ 3 km; marcar/desmarcar en el Detalle
+  (`raceIds`/`notRaceIds` en ajustes); se comparan con la anterior (Riegel), no con el predictor.
+- Rendimiento: ritmo a la FC habitual (±4 ppm, sin depender de las zonas del reloj, que el usuario tiene bajas)
+  y desacoplamiento de tiradas ≥ 1 h. Página Calendario (mes con actividades y plan). `actualizar.ps1`.
+- Ojo con los datos de FC del usuario: en competiciones la FC media sale baja (≈145 a 3:30/km); no fiarse de ella.
 
 ## Pendiente
 - Sincronización automática programada (el usuario avisará cuándo).

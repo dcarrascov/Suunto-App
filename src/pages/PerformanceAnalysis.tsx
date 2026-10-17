@@ -1,6 +1,9 @@
-import { formatDuration } from '../utils/formatters'
+import { useMemo } from 'react'
+import { formatDuration, formatPace } from '../utils/formatters'
+import { SAME_HR_BAND, sameHrEfficiency } from '../utils/calculations'
+import { raceActivityIds } from '../utils/races'
+import { isoDateOffset } from '../utils/date'
 import {
-  useAerobicEfficiency,
   useRunningVolume,
   useCadenceData,
   useVo2maxTrend,
@@ -43,8 +46,32 @@ function Insight({ label, color }: { label: string; color: string }) {
 
 export default function PerformanceAnalysis() {
   const activities = useActivityStore(s => s.activities)
+  const settings = useActivityStore(s => s.settings)
+  const plan = useActivityStore(s => s.plan)
 
-  const { data: efData, trendPct: efTrend } = useAerobicEfficiency()
+  // Ritmo a tu FC habitual, por mes (últimos 12 meses, sin competiciones)
+  const easy = useMemo(() => {
+    const cut = isoDateOffset(365)
+    const recent = activities.filter(a => a.startTime.slice(0, 10) >= cut)
+    const { points: last, refHR } = sameHrEfficiency(recent, raceActivityIds(activities, plan?.workouts ?? [], settings))
+    const avg = (v: typeof last) => v.reduce((s, p) => s + p.paceAtRef, 0) / v.length
+    // % de mejora: media de los 3 primeros meses frente a los 3 últimos (ritmo más bajo = mejor)
+    const trend = last.length >= 6 ? +((avg(last.slice(0, 3)) - avg(last.slice(-3))) / avg(last.slice(0, 3)) * 100).toFixed(1) : null
+    return { points: last.map(p => ({ ...p, label: p.month.slice(5) + '/' + p.month.slice(2, 4) })), refHR, trend }
+  }, [activities, settings, plan])
+  const efTrend = easy.trend
+
+  // Desacoplamiento de las tiradas de 60 min o más (últimos 12 meses)
+  const longRuns = useMemo(() => {
+    const cut = isoDateOffset(365)
+    return activities
+      .filter(a => a.sport === 'running' && a.duration >= 3600 && a.decoupling != null && a.startTime.slice(0, 10) >= cut)
+      .map(a => ({ id: a.id, date: a.startTime.slice(0, 10), label: a.startTime.slice(8, 10) + '/' + a.startTime.slice(5, 7), value: a.decoupling!, km: a.distance }))
+      .sort((x, y) => x.date.localeCompare(y.date))
+  }, [activities])
+  const lastLong = longRuns.at(-1)
+  const recentLong = longRuns.slice(-6)
+  const recentLongAvg = recentLong.length ? recentLong.reduce((s, r) => s + r.value, 0) / recentLong.length : null
   const runVolume = useRunningVolume(12)
   const cadenceData = useCadenceData()
   const { points: vo2Points, current: currentVo2 } = useVo2maxTrend()
@@ -60,7 +87,6 @@ export default function PerformanceAnalysis() {
     : null
 
   const thisWeek = runVolume.at(-1)
-  const hasBikeEF = efData.some(d => d.bike != null)
   const hasCross = heatmap.cross.some(h => h > 0)
 
   const insights = deriveInsights({ runVolume, efTrend, weeklyLoad, heatmap, cadenceData })
@@ -86,34 +112,74 @@ export default function PerformanceAnalysis() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* 1 · Aerobic Efficiency */}
+        {/* 1 · Ritmo en rodajes a la misma FC */}
         <Section
-          title="Eficiencia Aeróbica"
+          title={`Ritmo a tu FC habitual (${easy.refHR ?? '–'} ppm)`}
           sub={efTrend != null
-            ? `Running: ${efTrend > 0 ? '+' : ''}${efTrend}% en 12 meses`
-            : 'Velocidad / FC — sube = mejor base aeróbica'}
+            ? `${efTrend > 0 ? 'Mejora' : 'Empeora'} del ${Math.abs(efTrend).toLocaleString('es-ES')} % en 12 meses · más rápido a la misma FC = mejor base aeróbica`
+            : 'Más rápido a la misma FC = mejor base aeróbica'}
         >
-          {efData.some(d => d.run || d.bike) ? (
+          {easy.points.length > 1 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={efData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />
-                <XAxis dataKey="month" tick={{ fill: '#77777d', fontSize: 10 }} />
-                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={36} />
-                <Tooltip
-                  contentStyle={{ background: '#17171a', border: '1px solid #26262b', borderRadius: 8, fontSize: 11 }}
-                  formatter={(v: unknown, n: unknown) => [Number(v).toFixed(2), String(n)]}
+              <LineChart data={easy.points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke="#222226" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: '#77777d', fontSize: 10 }} />
+                <YAxis
+                  reversed
+                  domain={['dataMin - 5', 'dataMax + 5']}
+                  tickFormatter={(v: number) => formatPace(v).replace(' /km', '')}
+                  tick={{ fill: '#77777d', fontSize: 10 }}
+                  width={40}
                 />
-                <Line type="monotone" dataKey="run"  name="Running EF" stroke="#c5f23c" dot={{ r: 2 }} strokeWidth={2} connectNulls />
-                {hasBikeEF && (
-                  <Line type="monotone" dataKey="bike" name="Cycling EF" stroke="#fb923c" dot={{ r: 2 }} strokeWidth={2} connectNulls />
-                )}
+                <Tooltip
+                  contentStyle={{ background: '#17171a', border: '1px solid #2a2a2f', borderRadius: 4, fontSize: 11 }}
+                  formatter={(v: unknown) => [formatPace(Number(v)), `Ritmo a ${easy.refHR} ppm`]}
+                  labelFormatter={(l: unknown, p: readonly { payload?: { runs?: number } }[]) => `${String(l)} · ${p?.[0]?.payload?.runs ?? 0} carreras`}
+                />
+                <Line type="monotone" dataKey="paceAtRef" stroke="#c5f23c" dot={{ r: 2 }} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <Empty label="Sin datos suficientes" />
+            <Empty label="Sin carreras suficientes a tu FC habitual" />
           )}
           <p className="text-xs text-slate-600 mt-2">
-            Running: km/h ÷ bpm × 100.{hasBikeEF && ' Cycling: W ÷ bpm.'} Sube = mejoras.
+            Mediana de cada mes de las carreras de 25 min o más con FC media a ±{SAME_HR_BAND} ppm de tu FC habitual
+            (sin competiciones; meses con al menos 2). Así se compara lo comparable sin depender de las zonas del reloj.
+          </p>
+        </Section>
+
+        {/* 1b · Desacoplamiento en tiradas largas */}
+        <Section
+          title="Desacoplamiento en tiradas largas"
+          sub={lastLong
+            ? `Última: ${lastLong.value.toLocaleString('es-ES')} % (${lastLong.label})` + (recentLongAvg != null ? ` · media de las 6 últimas: ${recentLongAvg.toFixed(1).replace('.', ',')} %` : '')
+            : 'Cuánto se dispara el pulso respecto al ritmo en la 2.ª mitad'}
+        >
+          {longRuns.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={longRuns} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke="#222226" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: '#77777d', fontSize: 10 }} interval={Math.max(Math.floor(longRuns.length / 8), 0)} />
+                <YAxis tick={{ fill: '#77777d', fontSize: 10 }} width={32} unit="%" />
+                <Tooltip
+                  contentStyle={{ background: '#17171a', border: '1px solid #2a2a2f', borderRadius: 4, fontSize: 11 }}
+                  formatter={(v: unknown) => [`${Number(v).toLocaleString('es-ES')} %`, 'Desacoplamiento']}
+                  labelFormatter={(l: unknown, p: readonly { payload?: { km?: number } }[]) => `${String(l)} · ${p?.[0]?.payload?.km?.toFixed(1) ?? ''} km`}
+                />
+                <ReferenceLine y={5} stroke="#c5f23c" strokeDasharray="4 3" label={{ value: '5 %', fill: '#c5f23c', fontSize: 10, position: 'right' }} />
+                <Bar dataKey="value">
+                  {longRuns.map(r => (
+                    <Cell key={r.id} fill={r.value < 5 ? '#c5f23c' : r.value < 8 ? '#fbbf24' : '#f87171'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <Empty label="Sin tiradas de más de 1 hora" />
+          )}
+          <p className="text-xs text-slate-600 mt-2">
+            Tiradas de 1 h o más. Por debajo del 5 % = base aeróbica sólida para esa duración; por encima, el pulso
+            sube aunque mantengas el ritmo (fatiga, calor o falta de base).
           </p>
         </Section>
 

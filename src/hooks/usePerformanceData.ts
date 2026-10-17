@@ -1,55 +1,7 @@
 import { useMemo } from 'react'
 import { useActivityStore } from '../stores/activityStore'
-import { isoDateOffset, monthKey, parseLocalDate, toLocalISODate } from '../utils/date'
+import { isoDateOffset, parseLocalDate, toLocalISODate } from '../utils/date'
 import { localWeekStart } from '../utils/calculations'
-import type { ActivitySummary } from '../types/suunto'
-
-// ─── Aerobic Efficiency ───────────────────────────────────────────────────────
-
-function aerobicEF(a: ActivitySummary): number | null {
-  if (!a.avgHR || a.avgHR < 60) return null
-  if (a.sport === 'running' && a.avgSpeed) return +(a.avgSpeed / a.avgHR * 100).toFixed(2)
-  if (a.sport === 'cycling' && a.avgPower) return +(a.avgPower / a.avgHR).toFixed(2)
-  return null
-}
-
-export interface AerobicEFPoint {
-  month: string
-  run: number | null
-  bike: number | null
-}
-
-export function useAerobicEfficiency(): { data: AerobicEFPoint[]; trendPct: number | null } {
-  const activities = useActivityStore(s => s.activities)
-
-  return useMemo(() => {
-    const byMonth: Record<string, { run: number[]; bike: number[] }> = {}
-
-    for (const a of activities) {
-      const m = monthKey(a.startTime)
-      if (!byMonth[m]) byMonth[m] = { run: [], bike: [] }
-      const ef = aerobicEF(a)
-      if (ef == null) continue
-      if (a.sport === 'running') byMonth[m].run.push(ef)
-      if (a.sport === 'cycling') byMonth[m].bike.push(ef)
-    }
-
-    const avg = (arr: number[]): number | null =>
-      arr.length ? +(arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : null
-
-    const data = Object.entries(byMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-12)
-      .map(([month, d]) => ({ month: month.slice(5), run: avg(d.run), bike: avg(d.bike) }))
-
-    const runPoints = data.filter(d => d.run != null)
-    const trendPct = runPoints.length >= 2
-      ? +((runPoints.at(-1)!.run! - runPoints[0].run!) / runPoints[0].run! * 100).toFixed(1)
-      : null
-
-    return { data, trendPct }
-  }, [activities])
-}
 
 // ─── Running Volume ───────────────────────────────────────────────────────────
 

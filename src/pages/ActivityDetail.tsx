@@ -8,6 +8,38 @@ import ActivityMap from '../components/ActivityMap'
 import MetricCard from '../components/MetricCard'
 import ActivityStats from '../components/ActivityStats'
 import BestEfforts from '../components/BestEfforts'
+import { isRaceActivity } from '../utils/races'
+import type { ActivitySummary } from '../types/suunto'
+
+/** Botón para marcar o desmarcar la actividad como competición (corrige la detección automática). */
+function RaceToggle({ act }: { act: ActivitySummary }) {
+  const activities = useActivityStore(s => s.activities)
+  const plan = useActivityStore(s => s.plan)
+  const settings = useActivityStore(s => s.settings)
+  const updateSettings = useActivityStore(s => s.updateSettings)
+  if (act.sport !== 'running') return null
+  const { race, auto } = isRaceActivity(act, activities, plan?.workouts ?? [], settings)
+  const raceIds = settings.raceIds ?? []
+  const notRaceIds = settings.notRaceIds ?? []
+
+  function toggle() {
+    if (race) {
+      updateSettings(auto ? { notRaceIds: [...notRaceIds, act.id] } : { raceIds: raceIds.filter(id => id !== act.id) })
+    } else {
+      updateSettings(auto ? { notRaceIds: notRaceIds.filter(id => id !== act.id) } : { raceIds: [...raceIds, act.id] })
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      className={`text-xs px-3 py-1.5 border ${race ? 'bg-accent text-black border-accent font-medium' : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
+      title={auto ? 'Detectada con tu plan (día siguiente a la activación precompetición)' : undefined}
+    >
+      {race ? '✓ Competición' : 'Marcar como competición'}
+    </button>
+  )
+}
 
 export default function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -46,15 +78,20 @@ export default function ActivityDetailPage() {
     )
   }
 
+  const decoupling = summary?.decoupling ?? act.decoupling ?? null
+
   return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
       {/* Header */}
-      <div className="mb-5">
-        <Link to="/activities" className="text-xs text-slate-500 hover:text-slate-300 mb-2 inline-block">← Actividades</Link>
-        <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
-        <div className="text-sm text-slate-500 mt-0.5">
-          {formatDate(act.startTime)} · {sportLabel(act.sport)}
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link to="/activities" className="text-xs text-slate-500 hover:text-slate-300 mb-2 inline-block">← Actividades</Link>
+          <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
+          <div className="text-sm text-slate-500 mt-0.5">
+            {formatDate(act.startTime)} · {sportLabel(act.sport)}
+          </div>
         </div>
+        <RaceToggle act={summary ?? act} />
       </div>
 
       {/* Map */}
@@ -95,6 +132,9 @@ export default function ActivityDetailPage() {
           ? <MetricCard label="Cadencia" value={act.avgCadence} unit="spm" />
           : null
         }
+        {decoupling != null && (
+          <MetricCard label="Desacoplamiento" value={`${decoupling.toLocaleString('es-ES')} %`} />
+        )}
       </div>
 
       {/* Mejores tramos (1 km, 5 km...) con marca de récord */}
