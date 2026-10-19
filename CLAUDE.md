@@ -34,7 +34,7 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   (`text-accent`/`bg-accent`, texto negro encima), esquinas casi rectas. Sin degradados, brillos ni emojis.
   En `index.css` se redefinen las escalas `slate` (grises) y `blue` (= lima), así que `text-blue-400` ya es lima.
   Dashboard con rejilla `.g-grid` / `.g-cell` / `.g-label`. Colores con significado (zonas, avisos) se mantienen.
-- Actualizar todo: `.ctualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`).
+- Actualizar todo: `.\actualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`).
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
 

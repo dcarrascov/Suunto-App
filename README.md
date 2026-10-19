@@ -184,7 +184,7 @@ Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
 ## Resumen rápido (cuando ya lo hayas hecho una vez)
 
 ```bash
-# 1. Sincronizar datos nuevos de Suunto (o todo de una vez en Windows: .ctualizar.ps1)
+# 1. Sincronizar datos nuevos de Suunto (o todo de una vez en Windows: .\actualizar.ps1)
 python3 fetch/sync.py
 
 # 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
