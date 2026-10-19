@@ -104,6 +104,7 @@ export interface GlobalStats {
   byType: Record<string, number>
   vo2maxHistory: { date: string; value: number }[]
   syncedAt: string
+  userMaxHR?: number   // FC máxima según Suunto (la escribe sync.py si la cuenta la tiene)
   // Tiempo de recuperación acumulado tras el último entrenamiento (s) y cuándo terminó (ms epoch)
   recovery?: { seconds: number; endedAt: number } | null
 }

@@ -72,6 +72,15 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   y desacoplamiento de tiradas ≥ 1 h. Página Calendario (mes con actividades y plan). `actualizar.ps1`.
 - Ojo con los datos de FC del usuario: en competiciones la FC media sale baja (≈145 a 3:30/km); no fiarse de ella.
 
+- Entrenador IA (opción A, sin API ni coste): la app prepara textos para pegar en Gemini (el usuario tiene
+  Gemini Plus, que no incluye API) y lee la respuesta pegada. `utils/coach.ts` (tipo de sesión por título,
+  estadísticas del entrenador), `utils/aiPrompt.ts` (pregunta / perfil / semana), `utils/aiProposal.ts` (lee el
+  JSON y compara: 60 % tipos por día, 25 % tiempo, 15 % TSS), `stores/aiStore.ts` (localStorage `suunto-ai`).
+  Reglas: nunca escribir en TrainingPeaks; las propuestas se marcan «PROPUESTA IA»; nunca rutas GPS en los
+  textos; el texto de una semana no incluye nada de esa semana ni posterior (semanas pasadas = prueba justa,
+  sin perfil). El entrenador planifica por TIEMPO: duración en el 100 % de sesiones, distancia solo en el 26 %
+  (no usar km planificados como volumen).
+
 ## Pendiente
 - Sincronización automática programada (el usuario avisará cuándo).
 - Zapatillas: km por par con aviso (el usuario avisará cuándo).

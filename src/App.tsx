@@ -13,6 +13,7 @@ import PerformanceAnalysis from './pages/PerformanceAnalysis'
 import History from './pages/History'
 import Plan from './pages/Plan'
 import Races from './pages/Races'
+import AiCoach from './pages/AiCoach'
 import CalendarPage from './pages/CalendarPage'
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/history" element={<History />} />
             <Route path="/plan" element={<Plan />} />
             <Route path="/races" element={<Races />} />
+            <Route path="/ia" element={<AiCoach />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
             <Route path="/settings" element={<Settings />} />

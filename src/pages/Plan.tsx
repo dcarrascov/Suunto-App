@@ -7,6 +7,8 @@ import { toLocalISODate } from '../utils/date'
 import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems, planWeeks, shiftWeek, weekDays } from '../utils/plan'
 import type { PlanItem, PlanStatus, PlanWeek } from '../utils/plan'
+import { useAiStore } from '../stores/aiStore'
+import AiProposalView from '../components/AiProposalView'
 
 // Color de la barrita lateral de cada entreno según el deporte
 const SPORT_COLOR: Record<PlanSport, string> = {
@@ -127,7 +129,7 @@ function WeekSummary({ week }: { week: PlanWeek | undefined }) {
       {[
         { label: 'Sesiones', value: `${week.done} / ${week.planned}`, sub: `${pct}% hechas` },
         { label: 'Tiempo', value: formatDuration(week.doneSeconds), sub: week.plannedSeconds ? `de ${formatDuration(week.plannedSeconds)} planificado` : '' },
-        { label: 'Distancia', value: `${week.doneKm.toFixed(1)} km`, sub: week.plannedKm ? `de ${week.plannedKm.toFixed(1)} km planificados` : '' },
+        { label: 'Distancia', value: `${week.doneKm.toFixed(1)} km`, sub: week.plannedKm && week.plannedKmComplete ? `de ${week.plannedKm.toFixed(1)} km planificados` : 'tu entrenador planifica por tiempo' },
         { label: 'No hechas', value: String(week.missed), sub: week.missed ? 'sesiones pasadas sin hacer' : 'ninguna' },
       ].map(c => (
         <div key={c.label} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-3">
@@ -146,6 +148,7 @@ export default function Plan() {
   const today = toLocalISODate(new Date())
   const thisWeek = localWeekStart(new Date())
   const [week, setWeek] = useState(thisWeek)
+  const aiProposal = useAiStore(s => s.proposals[week])
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE)
   const pageRef = useRef<HTMLDivElement>(null)
 
@@ -204,6 +207,16 @@ export default function Plan() {
       </div>
 
       <WeekSummary week={current} />
+
+      {/* Propuesta de la IA para esta semana (si la hay): aparte del plan del entrenador */}
+      {aiProposal && (
+        <details className="mb-6">
+          <summary className="text-xs text-slate-400 cursor-pointer hover:text-white mb-2">
+            Hay una propuesta de la IA para esta semana · <Link to="/ia" className="text-accent">Entrenador IA</Link>
+          </summary>
+          <AiProposalView proposal={aiProposal} />
+        </details>
+      )}
 
       <div className="space-y-4 mb-10">
         {days.map(day => {
@@ -268,7 +281,7 @@ export default function Plan() {
                       {formatDuration(w.doneSeconds)}{w.plannedSeconds ? ` / ${formatDuration(w.plannedSeconds)}` : ''}
                     </td>
                     <td className="py-2 font-mono text-xs text-slate-400 whitespace-nowrap">
-                      {w.doneKm.toFixed(1)}{w.plannedKm ? ` / ${w.plannedKm.toFixed(1)}` : ''} km
+                      {w.doneKm.toFixed(1)}{w.plannedKm && w.plannedKmComplete ? ` / ${w.plannedKm.toFixed(1)}` : ''} km
                     </td>
                   </tr>
                 )
