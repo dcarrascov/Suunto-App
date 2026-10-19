@@ -1,5 +1,5 @@
-// Textos que la app prepara para pegarlos en Gemini (opción A: sin API, sin coste).
-// Llevan tus datos ya resumidos; nunca rutas GPS. Nada se envía a ningún sitio desde la app.
+// Textos que la app manda a Gemini por la ruta /api/gemini (server/gemini.ts).
+// Llevan tus datos ya resumidos; nunca rutas GPS.
 
 import type { ActivitySummary, FitnessPoint, GlobalStats, PlannedWorkout, UserSettings } from '../types/suunto'
 import { computePRs, formState, localWeekStart, predictRaces, sameHrEfficiency } from './calculations'
@@ -246,10 +246,8 @@ export function weekPrompt(full: AthleteData, weekStart: string, profile: string
     '- Indica siempre "duracion_min" y "tss"; "distancia_km" solo si el entrenador la indicaría en esa sesión (si no, null).',
     '- Esto es solo una propuesta orientativa: el plan real lo decide el entrenador.',
     '',
-    'Responde SOLO con un bloque ```json``` con exactamente este formato (sin texto fuera del bloque):',
-    '```json',
+    'Responde solo con un objeto JSON con exactamente este formato (sin texto antes ni después):',
     PROPOSAL_FORMAT,
-    '```',
     '',
     useProfile ? `## Perfil del entrenador\n${useProfile}` : '## Estadísticas del entrenador\n' + coachStatsText(coachStats(d.workouts)),
     '',

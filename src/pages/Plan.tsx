@@ -149,6 +149,7 @@ export default function Plan() {
   const thisWeek = localWeekStart(new Date())
   const [week, setWeek] = useState(thisWeek)
   const aiProposal = useAiStore(s => s.proposals[week])
+  const deleteProposal = useAiStore(s => s.deleteProposal)
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE)
   const pageRef = useRef<HTMLDivElement>(null)
 
@@ -214,7 +215,10 @@ export default function Plan() {
           <summary className="text-xs text-slate-400 cursor-pointer hover:text-white mb-2">
             Hay una propuesta de la IA para esta semana · <Link to="/ia" className="text-accent">Entrenador IA</Link>
           </summary>
-          <AiProposalView proposal={aiProposal} />
+          <AiProposalView
+            proposal={aiProposal}
+            onDelete={() => { if (window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(week)}?`)) deleteProposal(week) }}
+          />
         </details>
       )}
 

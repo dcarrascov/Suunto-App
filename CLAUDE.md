@@ -72,14 +72,20 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   y desacoplamiento de tiradas ≥ 1 h. Página Calendario (mes con actividades y plan). `actualizar.ps1`.
 - Ojo con los datos de FC del usuario: en competiciones la FC media sale baja (≈145 a 3:30/km); no fiarse de ella.
 
-- Entrenador IA (opción A, sin API ni coste): la app prepara textos para pegar en Gemini (el usuario tiene
-  Gemini Plus, que no incluye API) y lee la respuesta pegada. `utils/coach.ts` (tipo de sesión por título,
-  estadísticas del entrenador), `utils/aiPrompt.ts` (pregunta / perfil / semana), `utils/aiProposal.ts` (lee el
-  JSON y compara: 60 % tipos por día, 25 % tiempo, 15 % TSS), `stores/aiStore.ts` (localStorage `suunto-ai`).
-  Reglas: nunca escribir en TrainingPeaks; las propuestas se marcan «PROPUESTA IA»; nunca rutas GPS en los
-  textos; el texto de una semana no incluye nada de esa semana ni posterior (semanas pasadas = prueba justa,
-  sin perfil). El entrenador planifica por TIEMPO: duración en el 100 % de sesiones, distancia solo en el 26 %
-  (no usar km planificados como volumen).
+- Entrenador IA (rama `feature/entrenador-ia`): la app habla con Gemini por la API (nivel gratuito; Gemini Plus no
+  incluye API). `server/gemini.ts` = plugin de Vite con la ruta `/api/gemini` (dev y preview): lee `GEMINI_API_KEY` y
+  `GEMINI_MODEL` (por defecto `gemini-3.8-flash`) del .env en cada petición, llama a `models.generateContent` con la clave
+  en la cabecera `x-goog-api-key` (nunca en la URL ni en el navegador) y solo acepta peticiones de localhost.
+  Reintentos (`callWithFallback`): 500/502/503 → hasta 3 intentos por modelo (esperas 2 s y 4 s); si sigue, o con
+  429/404/504, pasa al inferior (`FALLBACK_MODELS`: gemini-3.5-flash-lite → gemini-3.1-flash-lite). 400/401/403 no se
+  reintentan. La respuesta dice qué modelo contestó (`fellBack`) y perfil/propuestas guardan `model`.
+  `src/utils/gemini.ts` (cliente), `utils/coach.ts` (tipo de sesión por título, estadísticas del entrenador),
+  `utils/aiPrompt.ts` (pregunta / perfil / semana), `utils/aiProposal.ts` (lee el JSON y compara: 60 % tipos por día,
+  25 % tiempo, 15 % TSS), `stores/aiStore.ts` (localStorage `suunto-ai`). La opción de copiar y pegar se quitó.
+  Reglas: nunca escribir en TrainingPeaks; las propuestas se marcan «PROPUESTA IA» y se pueden borrar (con
+  confirmación) desde Entrenador IA y desde Plan; nunca rutas GPS en los textos; el texto de una semana no incluye
+  nada de esa semana ni posterior (semanas pasadas = prueba justa, sin perfil). El entrenador planifica por TIEMPO:
+  duración en el 100 % de sesiones, distancia solo en el 26 % (no usar km planificados como volumen).
 
 ## Pendiente
 - Sincronización automática programada (el usuario avisará cuándo).

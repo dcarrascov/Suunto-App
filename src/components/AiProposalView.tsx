@@ -35,7 +35,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
             <span className="text-sm text-slate-200">Semana del {parseLocalDate(proposal.weekStart).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {formatDuration(totalMin * 60)} · {Math.round(totalTss)} TSS · generada el {proposal.createdAt} · no es el plan de tu entrenador
+            {formatDuration(totalMin * 60)} · {Math.round(totalTss)} TSS · generada el {proposal.createdAt}{proposal.model ? ` con ${proposal.model}` : ''} · no es el plan de tu entrenador
           </div>
         </div>
         {cmp ? (
