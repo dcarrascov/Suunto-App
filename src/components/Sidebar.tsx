@@ -8,6 +8,7 @@ const NAV = [
   { to: '/activities', label: 'Actividades' },
   { to: '/plan', label: 'Plan' },
   { to: '/races', label: 'Competiciones' },
+  { to: '/ia', label: 'Entrenador IA' },
   { to: '/fitness', label: 'Forma' },
   { to: '/zones', label: 'Zonas' },
   { to: '/performance', label: 'Rendimiento' },
