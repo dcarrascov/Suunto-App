@@ -94,12 +94,13 @@ export default function Dashboard() {
   const streak = useTrainingStreak()
   const runVolume = useRunningVolume(12)
 
-  // Km planificados esta semana por el entrenador (si hay plan de TrainingPeaks)
-  const plannedKm = useMemo(() => {
+  // Tiempo planificado esta semana por el entrenador (si hay plan de TrainingPeaks).
+  // Se usa el tiempo y no los km: indica la duración en todas las sesiones y la distancia solo en algunas.
+  const plannedSeconds = useMemo(() => {
     if (!plan) return null
     const items = planItems(plan.workouts.filter(w => w.hasPlan), activities)
     const thisWeek = planWeeks(items).find(w => w.weekStart === localWeekStart(new Date()))
-    return thisWeek && thisWeek.plannedKm > 0 ? thisWeek.plannedKm : null
+    return thisWeek && thisWeek.plannedSeconds > 0 ? thisWeek.plannedSeconds : null
   }, [plan, activities])
 
   if (loading) return <LoadingScreen />
@@ -169,21 +170,21 @@ export default function Dashboard() {
             {week.distance.toFixed(1).replace('.', ',')} <span className="text-[15px] text-slate-500 font-normal">km</span>
           </div>
           <Delta value={week.distance - lastWeek.distance} unit=" km" digits={1} />
-          {plannedKm != null && (
-            <>
-              <div className="h-1 bg-[#26262b] mt-3">
-                <div className="h-1 bg-accent" style={{ width: `${Math.min(week.distance / plannedKm * 100, 100)}%` }} />
-              </div>
-              <div className="text-xs text-slate-500 mt-1.5">
-                {Math.round(week.distance / plannedKm * 100)} % de los {plannedKm.toFixed(1).replace('.', ',')} km planificados
-              </div>
-            </>
-          )}
         </div>
         <div className="g-cell col-span-6 lg:col-span-3">
           <div className="g-label">Tiempo</div>
           <div className="text-[28px] font-semibold tracking-tight mt-2 text-slate-100">{formatDuration(week.duration)}</div>
           <Delta value={Math.round((week.duration - lastWeek.duration) / 60)} unit=" min" />
+          {plannedSeconds != null && (
+            <>
+              <div className="h-1 bg-[#26262b] mt-3">
+                <div className="h-1 bg-accent" style={{ width: `${Math.min(week.duration / plannedSeconds * 100, 100)}%` }} />
+              </div>
+              <div className="text-xs text-slate-500 mt-1.5">
+                {Math.round(week.duration / plannedSeconds * 100)} % de las {formatDuration(plannedSeconds)} planificadas
+              </div>
+            </>
+          )}
         </div>
         <div className="g-cell col-span-6 lg:col-span-3">
           <div className="g-label">Sesiones</div>

@@ -79,6 +79,7 @@ export interface PlanWeek {
   plannedSeconds: number
   doneSeconds: number
   plannedKm: number
+  plannedKmComplete: boolean  // todas las sesiones (sin descansos) traen distancia: si no, plannedKm se queda corto
   doneKm: number
 }
 
@@ -89,7 +90,7 @@ export function planWeeks(items: PlanItem[]): PlanWeek[] {
     const key = localWeekStart(parseLocalDate(it.workout.date))
     let w = weeks.get(key)
     if (!w) {
-      w = { weekStart: key, items: [], planned: 0, done: 0, missed: 0, plannedSeconds: 0, doneSeconds: 0, plannedKm: 0, doneKm: 0 }
+      w = { weekStart: key, items: [], planned: 0, done: 0, missed: 0, plannedSeconds: 0, doneSeconds: 0, plannedKm: 0, plannedKmComplete: true, doneKm: 0 }
       weeks.set(key, w)
     }
     w.items.push(it)
@@ -97,6 +98,7 @@ export function planWeeks(items: PlanItem[]): PlanWeek[] {
     w.planned += 1
     w.plannedSeconds += it.workout.planned.duration ?? 0
     w.plannedKm += it.workout.planned.distance ?? 0
+    if (it.workout.planned.distance == null) w.plannedKmComplete = false
     if (it.status === 'done') {
       w.done += 1
       w.doneSeconds += it.activity?.duration ?? it.workout.actual?.duration ?? 0
