@@ -23,7 +23,6 @@ const NAV = [
 ]
 
 export default function Sidebar() {
-  const stats = useActivityStore(s => s.stats)
   const activities = useActivityStore(s => s.activities)
   const [open, setOpen] = useState(false)  // menú desplegado (solo en pantallas estrechas)
   const syncing = useSyncStore(s => s.status?.running ?? false)
@@ -85,17 +84,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-
-      {/* Sync info */}
-      {stats && (
-        <div className="hidden md:block px-6 py-5 border-t border-line text-xs">
-          <div className="text-slate-500">Última sync</div>
-          <div className="text-slate-300 mt-0.5">
-            {new Date(stats.syncedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </div>
-          <code className="block mt-3 text-slate-600">py fetch\sync.py</code>
-        </div>
-      )}
     </aside>
   )
 }
