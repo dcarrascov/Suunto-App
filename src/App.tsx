@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useActivityStore } from './stores/activityStore'
 import Sidebar from './components/Sidebar'
+import SyncBar from './components/SyncBar'
 import Dashboard from './pages/Dashboard'
 import Activities from './pages/Activities'
 import ActivityDetailPage from './pages/ActivityDetail'
@@ -29,6 +30,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <SyncBar />
       <div className="flex flex-col md:flex-row min-h-screen">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex flex-col">
