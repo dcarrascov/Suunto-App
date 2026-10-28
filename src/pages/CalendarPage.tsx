@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import CustomWorkoutDialog from '../components/CustomWorkoutDialog'
+import { useCustomWorkoutStore } from '../stores/customWorkoutStore'
 import { useActivityStore } from '../stores/activityStore'
 import type { ActivitySummary, PlannedWorkout } from '../types/suunto'
 import { localWeekStart } from '../utils/calculations'
 import { parseLocalDate, toLocalISODate } from '../utils/date'
 import { formatDuration, sportColor } from '../utils/formatters'
+import { customByDate, customSummary, EMPTY_FORM, toForm, type CustomWorkoutForm } from '../utils/customWorkouts'
 import { matchPlan } from '../utils/plan'
 import { eventLabel, eventsByDate, raceDatesFromPlan } from '../utils/races'
 
@@ -30,6 +33,11 @@ export default function CalendarPage() {
   const now = new Date()
   const today = toLocalISODate(now)
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
+  const custom = useCustomWorkoutStore(s => s.workouts)
+  const { addWorkout, updateWorkout, deleteWorkout } = useCustomWorkoutStore()
+  const customOfDay = useMemo(() => customByDate(custom), [custom])
+  // Ventana abierta: entreno nuevo (id null) o el que se edita
+  const [dialog, setDialog] = useState<{ id: string | null; form: CustomWorkoutForm } | null>(null)
 
   const { byDay, plannedByDay, raceDays, eventsOfDay } = useMemo(() => {
     const byDay = new Map<string, ActivitySummary[]>()
@@ -95,14 +103,25 @@ export default function CalendarPage() {
                 const inMonth = parseLocalDate(day).getMonth() === cursor.month
                 const acts = byDay.get(day) ?? []
                 const planned = plannedByDay.get(day) ?? []
+                const own = customOfDay.get(day) ?? []
                 return (
-                  <div key={day} className={`bg-cell min-h-[104px] p-1.5 ${inMonth ? '' : 'opacity-35'} ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
+                  <div key={day} className={`group bg-cell min-h-[104px] p-1.5 ${inMonth ? '' : 'opacity-35'} ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
                     <div className="flex items-center justify-between">
                       <span className={`text-xs ${day === today ? 'text-accent font-semibold' : 'text-slate-500'}`}>{parseLocalDate(day).getDate()}</span>
-                      {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
-                      {eventsOfDay.get(day)?.some(e => e.priority) && (
-                        <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
+                        {eventsOfDay.get(day)?.some(e => e.priority) && (
+                          <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
+                        )}
+                        <button
+                          onClick={() => setDialog({ id: null, form: { ...EMPTY_FORM, date: day } })}
+                          className="w-4 h-4 leading-none text-sm text-slate-400 hover:text-black hover:bg-accent md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
+                          aria-label={`Añadir entreno el ${day}`}
+                          title="Añadir entreno propio"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-1 space-y-1">
                       {(eventsOfDay.get(day) ?? []).map(e => (
@@ -137,6 +156,17 @@ export default function CalendarPage() {
                           {w.title}
                         </Link>
                       ))}
+                      {own.map(w => (
+                        <button
+                          key={w.id}
+                          onClick={() => setDialog({ id: w.id, form: toForm(w) })}
+                          className="w-full flex items-center gap-1.5 text-left text-[11px] leading-tight border border-slate-500 bg-[#1b1b1f] text-slate-200 px-1 py-0.5 hover:border-accent"
+                          title={[`Propio: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
+                        >
+                          <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(w.sport) }} />
+                          <span className="truncate">{w.title}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )
@@ -154,7 +184,28 @@ export default function CalendarPage() {
         <span><span className="inline-block w-0.5 h-3 align-middle mr-1.5" style={{ background: '#fb923c' }} />Bici</span>
         <span><span className="inline-block w-0.5 h-3 align-middle mr-1.5" style={{ background: '#60a5fa' }} />Natación</span>
         <span><span className="inline-block w-3 h-2.5 border border-dashed border-slate-600 align-middle mr-1.5" />Planificado, sin actividad</span>
+        <span><span className="inline-block w-3 h-2.5 border border-slate-500 bg-[#1b1b1f] align-middle mr-1.5" />Entreno propio (pulsa + en un día para crearlo)</span>
       </div>
+
+      {dialog && (
+        <CustomWorkoutDialog
+          key={dialog.id ?? `new-${dialog.form.date}`}
+          initial={dialog.form}
+          editing={dialog.id !== null}
+          onClose={() => setDialog(null)}
+          onSave={w => {
+            if (dialog.id) updateWorkout(dialog.id, w)
+            else addWorkout(w)
+            setDialog(null)
+          }}
+          onDelete={dialog.id ? () => {
+            if (window.confirm(`¿Eliminar el entreno «${dialog.form.title}»?`)) {
+              deleteWorkout(dialog.id!)
+              setDialog(null)
+            }
+          } : undefined}
+        />
+      )}
     </div>
   )
 }
