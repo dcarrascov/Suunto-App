@@ -9,6 +9,8 @@ import { planItems, planWeeks, shiftWeek, weekDays } from '../utils/plan'
 import type { PlanItem, PlanStatus, PlanWeek } from '../utils/plan'
 import { useAiStore } from '../stores/aiStore'
 import AiProposalView from '../components/AiProposalView'
+import RaceBanner from '../components/RaceBanner'
+import { eventsByDate } from '../utils/races'
 
 // Color de la barrita lateral de cada entreno según el deporte
 const SPORT_COLOR: Record<PlanSport, string> = {
@@ -150,6 +152,7 @@ export default function Plan() {
   const [week, setWeek] = useState(thisWeek)
   const aiProposal = useAiStore(s => s.proposals[week])
   const deleteProposal = useAiStore(s => s.deleteProposal)
+  const eventsOfDay = useMemo(() => eventsByDate(plan?.events ?? []), [plan])
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE)
   const pageRef = useRef<HTMLDivElement>(null)
 
@@ -225,13 +228,19 @@ export default function Plan() {
       <div className="space-y-4 mb-10">
         {days.map(day => {
           const dayItems = (current?.items ?? []).filter(it => it.workout.date === day)
+          const dayEvents = eventsOfDay.get(day) ?? []
           return (
             <div key={day}>
               <div className={`text-xs uppercase tracking-wider mb-2 ${day === today ? 'text-blue-300 font-semibold' : 'text-slate-500'}`}>
                 {dayLabel(day)}{day === today && ' · hoy'}
               </div>
+              {dayEvents.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {dayEvents.map(e => <RaceBanner key={e.id} event={e} />)}
+                </div>
+              )}
               {dayItems.length === 0 ? (
-                <div className="text-xs text-slate-600 pl-1">Sin entreno planificado</div>
+                dayEvents.length === 0 && <div className="text-xs text-slate-600 pl-1">Sin entreno planificado</div>
               ) : (
                 <div className="space-y-2">
                   {dayItems.map(it => <WorkoutCard key={it.workout.id} item={it} />)}

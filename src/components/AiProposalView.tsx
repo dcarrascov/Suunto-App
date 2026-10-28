@@ -8,7 +8,7 @@ import { parseLocalDate } from '../utils/date'
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const FAMILY_LABEL: Record<string, string> = {
-  suave: 'suave', calidad: 'calidad', rectas: 'rectas', activacion: 'activación',
+  suave: 'suave', calidad: 'calidad', rectas: 'rectas', activacion: 'activación', competicion: 'competición',
   fuerza: 'fuerza', natacion: 'natación', descanso: 'descanso', otro: 'otro',
 }
 
@@ -22,7 +22,9 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
   const [open, setOpen] = useState<string | null>(null)
   const workouts = plan?.workouts ?? []
   const comparable = coachHasWeek(workouts, proposal.weekStart)
-  const cmp = comparable ? compareWeek(proposal, workouts) : null
+  const events = plan?.events ?? []
+  const cmp = comparable ? compareWeek(proposal, workouts, events) : null
+  const weekRaces = events.filter(e => e.date >= proposal.weekStart && e.date <= proposal.workouts.reduce((m, w) => (w.date > m ? w.date : m), proposal.weekStart))
   const totalMin = proposal.workouts.reduce((s, w) => s + (w.durationMin ?? 0), 0)
   const totalTss = proposal.workouts.reduce((s, w) => s + (w.tss ?? 0), 0)
 
@@ -48,6 +50,9 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
         )}
       </div>
 
+      {weekRaces.length > 0 && (
+        <div className="text-xs text-accent mt-2">Semana de competición: {weekRaces.map(e => `${e.name}${e.priority ? ` (${e.priority})` : ''}`).join(', ')}</div>
+      )}
       {proposal.explanation && <p className="text-sm text-slate-400 mt-3">{proposal.explanation}</p>}
 
       <div className="mt-3 divide-y divide-line border-t border-line">

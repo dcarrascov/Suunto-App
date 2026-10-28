@@ -1,7 +1,8 @@
 # Suunto Stats — contexto para Claude
 
-Panel personal de estadísticas de entrenamiento Suunto. Sin servidor ni base de datos:
-un script Python descarga los datos a JSON locales y una app React los lee.
+Panel personal de estadísticas de entrenamiento Suunto, con el plan del entrenador (TrainingPeaks) y un
+entrenador IA (Gemini). Sin base de datos: scripts Python descargan los datos a JSON locales y una app React los
+lee. El único código de servidor es la ruta `/api/gemini` dentro del servidor de Vite.
 Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja en Windows (PowerShell, IntelliJ).
 
 ## Arquitectura
@@ -14,32 +15,45 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   - `tp_sync.py` + `trainingpeaks_client.py`: plan del entrenador desde la API interna de TrainingPeaks
     (cookie `TP_AUTH_COOKIE` en .env, solo GET) → `plan.json`. `normalize_tp()` define `PlannedWorkout`.
     Incremental: re-pide de −21 a +42 días y conserva lo anterior. Guía: GUIA_TRAININGPEAKS.md.
+    También baja los eventos (competiciones) del calendario hasta +365 días: `normalize_event()` define `PlannedEvent`
+    (nombre, prioridad A/B/C, distancia, notas) → `plan.json.events`.
   - Salida: `activities.json` (resúmenes), `activity_{id}.json` (detalle: zonas, parciales, ruta, extra), `stats.json`,
     `plan.json` (TrainingPeaks, opcional).
 - `src/` (React 19 + Vite + Tailwind 4 + Zustand + Recharts + Leaflet, TypeScript):
   - `types/suunto.ts`: tipos (espejo del normalizador; si cambias uno, cambia el otro y `validate_output.py`).
   - `stores/activityStore.ts`: carga los JSON; ajustes persistidos en localStorage con clave `suunto-settings` (migra desde `garmin-settings`).
   - `utils/calculations.ts`: TSS estimado (TRIMP), CTL/ATL/TSB (EMA 42/7), zonas, agregados semanales, récords.
-  - `utils/date.ts`, `hooks/`, `pages/` (Dashboard, Actividades, Detalle, Fitness, Zonas, Rendimiento, Récords, Historial, Ajustes).
+  - `utils/date.ts`, `hooks/`, `pages/`: Resumen (Dashboard), Calendario, Actividades, Detalle, Plan, Competiciones,
+    Entrenador IA, Forma, Zonas, Rendimiento, Récords, Historial y Ajustes.
   - Resumen con datos copiados del detalle (`SUMMARY_FROM_DETAIL` / `detail_to_summary()` en normalizer.py):
     `bestEfforts`, `bestEffortsSource`, `hrZoneSeconds` (Z1..Z5 del reloj), `decoupling` (%). Así la web no carga 1400 detalles.
+- `server/gemini.ts`: plugin de Vite (`vite.config.ts`) con la ruta `/api/gemini` en `npm run dev` y `npm run preview`.
+  Lee `GEMINI_API_KEY` / `GEMINI_MODEL` del .env en cada petición; el navegador nunca ve la clave. Detalles en «Hecho».
 
 ## Convenciones
 - **Fechas siempre en hora local.** `startTime` es ISO local sin zona. Nunca usar `toISOString()` para sacar un día:
   usar `toLocalISODate`, `parseLocalDate`, `isoDateOffset`, `daysAgo` (date.ts) y `localWeekStart` (calculations.ts).
 - Datos personales (`public/data/`, `fetch/debug/`, `fetch/fit/`, `.env`) están en `.gitignore`: no subirlos.
   La cookie de TrainingPeaks es una credencial: nunca leerla, mostrarla ni pedirla en el chat.
-- Fusiones a `main` con `git merge --no-ff` (el usuario las revisa en SourceTree).
 - **Diseño «Grafito»** (elegido por el usuario): oscuro y plano, grises neutros, un solo acento lima `#c5f23c`
   (`text-accent`/`bg-accent`, texto negro encima), esquinas casi rectas. Sin degradados, brillos ni emojis.
   En `index.css` se redefinen las escalas `slate` (grises) y `blue` (= lima), así que `text-blue-400` ya es lima.
   Dashboard con rejilla `.g-grid` / `.g-cell` / `.g-label`. Colores con significado (zonas, avisos) se mantienen.
 - Actualizar todo: `.\actualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`).
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
-- Git: rama principal `main`; trabajo en ramas (p. ej. `fix`) y fusión a `main` cuando el usuario lo pide.
+- **Git** (remoto `Suunto-App` en GitHub, repositorio público):
+  - Rama principal `main`. Correcciones en `fix`; cada funcionalidad nueva en su rama `feature/<nombre>` creada desde
+    `main` (con `fix` ya fusionada). Si dentro de una funcionalidad sale una corrección, va en un commit aparte.
+  - Commits, fusiones y push **solo cuando el usuario lo pide**: él prueba antes.
+  - Fusiones a `main` con `git merge --no-ff` (las revisa en SourceTree), con mensaje «Fusiona fix: …» / «Fusiona feature/…: …».
+  - **En cada fusión a `main`, actualizar antes este CLAUDE.md en la rama** para que entre en la misma fusión.
+  - Antes de cada push, revisar los commits nuevos: ni `.env`, ni `public/data/`, ni claves/cookies, ni emails, ni coordenadas.
+  - Los commits llevan la línea `Co-Authored-By: Claude`. No se versionan `.claude/` ni `disenos/`.
+- Antes de hacer lo que pida el usuario, explicarle cómo se hará y esperar su OK.
 
 ## Datos actuales
-~1440 actividades (jul 2023 → oct 2026), ~97 % carrera; el resto natación, bici y otros.
+~1450 actividades (jul 2023 → oct 2026), ~97 % carrera; el resto natación, bici y otros.
+Plan de TrainingPeaks desde marzo de 2026 (~180 sesiones planificadas). FC máxima: Ajustes tiene 185 y Suunto dice 199.
 
 ## Hecho
 - VO2max del Dashboard = media semanal; tooltip en la carga semanal.
@@ -63,7 +77,12 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   `gpxCoords` + `routePace`); sync pide siempre `workout(key)`. Las rutas antiguas (~1 punto/7 s) necesitan `--force`.
 
 - Página Plan (TrainingPeaks): semana actual con estado por entreno emparejado con Suunto (`utils/plan.ts`),
-  historial semanal con % de cumplimiento y tarjeta «Hoy toca» en el Dashboard. Sin probar aún con datos reales.
+  historial semanal con % de cumplimiento y tarjeta «Hoy toca» en el Dashboard. Probado con datos reales.
+- Competiciones de TrainingPeaks (`plan.events`): `findRaces` las usa primero (`source: 'event'`, con nombre y
+  prioridad) y la heurística de la activación queda de respaldo. Salen en Calendario, Plan (`RaceBanner`),
+  «Hoy toca», Forma y Competiciones (predicción a la distancia del evento). IA: la semana de una carrera se
+  anuncia como «SEMANA DE COMPETICIÓN» (también la previa y el objetivo de temporada), tipo `competicion`, y se
+  le pasan las semanas de competición anteriores del entrenador como ejemplo.
 
 - Forma prevista (`projectFitness` + `useFitnessProjection`) con el TSS planificado; Competiciones (`utils/races.ts`):
   día siguiente a «Activación precompetición» → la carrera más rápida ≥ 3 km; marcar/desmarcar en el Detalle
@@ -72,8 +91,8 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   y desacoplamiento de tiradas ≥ 1 h. Página Calendario (mes con actividades y plan). `actualizar.ps1`.
 - Ojo con los datos de FC del usuario: en competiciones la FC media sale baja (≈145 a 3:30/km); no fiarse de ella.
 
-- Entrenador IA (rama `feature/entrenador-ia`): la app habla con Gemini por la API (nivel gratuito; Gemini Plus no
-  incluye API). `server/gemini.ts` = plugin de Vite con la ruta `/api/gemini` (dev y preview): lee `GEMINI_API_KEY` y
+- Entrenador IA (en `main` desde el merge `4573f3c`): la app habla con Gemini por la API (nivel gratuito; Gemini Plus
+  no incluye API). `server/gemini.ts` = plugin de Vite con la ruta `/api/gemini` (dev y preview): lee `GEMINI_API_KEY` y
   `GEMINI_MODEL` (por defecto `gemini-3.8-flash`) del .env en cada petición, llama a `models.generateContent` con la clave
   en la cabecera `x-goog-api-key` (nunca en la URL ni en el navegador) y solo acepta peticiones de localhost.
   Reintentos (`callWithFallback`): 500/502/503 → hasta 3 intentos por modelo (esperas 2 s y 4 s); si sigue, o con

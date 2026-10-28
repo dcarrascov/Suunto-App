@@ -10,12 +10,13 @@ Uso (desde la carpeta raíz del proyecto):
     py fetch/tp_sync.py --dump              # guarda la respuesta cruda en fetch/debug/ para revisarla
 
 Necesita TP_AUTH_COOKIE en .env (ver GUIA_TRAININGPEAKS.md).
-Salida: public/data/plan.json
+Salida: public/data/plan.json (entrenos y eventos: las competiciones del calendario, hasta un año vista)
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -35,6 +36,7 @@ OUT = ROOT / "public" / "data" / "plan.json"
 DEBUG_DIR = Path(__file__).resolve().parent / "debug"
 PAST_DAYS = 21     # en cada sync se vuelve a pedir esta ventana (el entrenador puede cambiar entrenos)
 FUTURE_DAYS = 42
+EVENTS_FUTURE_DAYS = 365  # las competiciones se apuntan con mucha antelación: hasta un año vista
 
 # workoutTypeValueId de TrainingPeaks -> (deporte de la app, nombre)
 TP_TYPES = {
@@ -109,15 +111,69 @@ def normalize_tp(w: dict) -> dict | None:
     }
 
 
-def load_existing() -> list[dict]:
+# ── Eventos (competiciones) ────────────────────────────────────────────────
+
+# Distancia a partir del nombre, cuando TrainingPeaks no la trae (casi siempre viene vacía o a 0)
+_NAMED_DISTANCES = ((re.compile(r"media\s*marat|medio\s*marat|half", re.I), 21.097),
+                    (re.compile(r"marat[oó]n|marathon", re.I), 42.195))
+_KM_IN_NAME = re.compile(r"(\d+(?:[.,]\d+)?)\s*k(?:m|ms)?\b", re.I)
+
+
+def event_distance_km(e: dict) -> float | None:
+    meters = _num(e.get("distance"))
+    units = (e.get("distanceUnits") or "").lower()
+    if meters and meters > 0:
+        if units.startswith("kilo"):
+            return round(meters, 3)
+        if units.startswith("mile"):
+            return round(meters * 1.609344, 3)
+        return round(meters / 1000, 3)
+    name = e.get("name") or ""
+    for pattern, km in _NAMED_DISTANCES:
+        if pattern.search(name):
+            return km
+    m = _KM_IN_NAME.search(name)
+    return float(m.group(1).replace(",", ".")) if m else None
+
+
+def normalize_event(e: dict) -> dict | None:
+    """Evento de TrainingPeaks -> PlannedEvent (src/types/suunto.ts). None si no tiene fecha o está oculto."""
+    day = e.get("eventDate")
+    if not isinstance(day, str) or len(day) < 10 or e.get("isHidden"):
+        return None
+    priority = e.get("atpPriority")
+    return {
+        "id": int(e["id"]),
+        "date": day[:10],
+        "name": _text(e.get("name")) or "Competición",
+        "type": _text(e.get("eventType")),
+        "priority": priority if priority in ("A", "B", "C") else None,
+        "distanceKm": event_distance_km(e),
+        "description": _text(e.get("description")),
+        "comment": _text(e.get("comment")),
+    }
+
+
+def load_existing() -> tuple[list[dict], list[dict]]:
+    """(entrenos, eventos) ya guardados en plan.json."""
     if not OUT.exists():
-        return []
+        return [], []
     try:
         data = json.loads(OUT.read_text(encoding="utf-8"))
-        return [w for w in data.get("workouts") or [] if isinstance(w, dict)]
+        return ([w for w in data.get("workouts") or [] if isinstance(w, dict)],
+                [e for e in data.get("events") or [] if isinstance(e, dict)])
     except (ValueError, AttributeError):
         print("  AVISO: plan.json no es válido; se vuelve a descargar todo")
-        return []
+        return [], []
+
+
+def merge(existing: list[dict], fresh: list[dict], start: date, end: date) -> list[dict]:
+    """Lo descargado sustituye a lo guardado en esa ventana (así desaparece lo que se borró en TrainingPeaks)
+    y a cualquier copia con el mismo id (algo movido desde una fecha fuera de la ventana)."""
+    s0, s1 = start.isoformat(), end.isoformat()
+    fresh_ids = {x["id"] for x in fresh}
+    kept = [x for x in existing if not (s0 <= x["date"] <= s1) and x["id"] not in fresh_ids]
+    return sorted(kept + fresh, key=lambda x: (x["date"], x["id"]))
 
 
 def default_since() -> date:
@@ -149,20 +205,26 @@ def main():
         client = TrainingPeaksClient()
         if args.dump:
             raw = client.workouts(today - timedelta(days=14), today + timedelta(days=14))
+            raw_events = client.events(today - timedelta(days=365), today + timedelta(days=365))
             DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-            path = DEBUG_DIR / "tp_workouts.json"
-            path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"{len(raw)} entrenos guardados en {path.relative_to(ROOT)} (contiene tus datos: no lo compartas)")
+            for name, payload in (("tp_workouts.json", raw), ("tp_events.json", raw_events)):
+                path = DEBUG_DIR / name
+                path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+                print(f"{len(payload)} registros guardados en {path.relative_to(ROOT)} (contiene tus datos: no lo compartas)")
             return
 
-        existing = load_existing()
+        existing, existing_events = load_existing()
         if args.full or not existing:
             start = since or default_since()
         else:
             start = today - timedelta(days=PAST_DAYS)
         end = today + timedelta(days=FUTURE_DAYS)
-        print(f"Leyendo entrenos de TrainingPeaks del {start} al {end}...")
+        events_end = today + timedelta(days=EVENTS_FUTURE_DAYS)
+        print(f"Leyendo entrenos de TrainingPeaks del {start} al {end} y competiciones hasta el {events_end}...")
         raw = client.workouts(start, end)
+        # La primera vez que se guardan competiciones se piden todas (aunque la sync de entrenos sea incremental)
+        events_start = start if existing_events else min(start, since or default_since())
+        raw_events = client.events(events_start, events_end)
     except TrainingPeaksAuthError as e:
         sys.exit(f"ERROR: {e}")
     except TrainingPeaksError as e:
@@ -178,18 +240,26 @@ def main():
         if n:
             fresh.append(n)
 
-    # Lo descargado sustituye a lo guardado en esa ventana (así desaparecen los entrenos que el entrenador borró)
-    # y a cualquier copia con el mismo id (un entreno movido desde una fecha fuera de la ventana)
-    s0, s1 = start.isoformat(), end.isoformat()
-    fresh_ids = {w["id"] for w in fresh}
-    kept = [w for w in existing if not (s0 <= w["date"] <= s1) and w["id"] not in fresh_ids]
-    workouts = sorted(kept + fresh, key=lambda w: (w["date"], w["id"]))
+    fresh_events = []
+    for e in raw_events:
+        try:
+            n = normalize_event(e)
+        except (KeyError, TypeError, ValueError) as err:
+            print(f"  AVISO: no pude procesar el evento {e.get('id')}: {err}")
+            continue
+        if n:
+            fresh_events.append(n)
+
+    workouts = merge(existing, fresh, start, end)
+    events = merge(existing_events, fresh_events, events_start, events_end)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"syncedAt": datetime.now().isoformat(timespec="seconds"), "workouts": workouts},
+    OUT.write_text(json.dumps({"syncedAt": datetime.now().isoformat(timespec="seconds"), "workouts": workouts, "events": events},
                               ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     planned = sum(1 for w in workouts if w["hasPlan"])
-    print(f"Guardados {len(workouts)} entrenos ({planned} con plan del entrenador) → public/data/plan.json")
+    upcoming = [e for e in events if e["date"] >= today.isoformat()]
+    print(f"Guardados {len(workouts)} entrenos ({planned} con plan del entrenador) y {len(events)} competiciones "
+          f"({len(upcoming)} próximas) → public/data/plan.json")
 
 
 if __name__ == "__main__":

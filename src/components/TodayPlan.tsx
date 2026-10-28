@@ -4,6 +4,8 @@ import { useActivityStore } from '../stores/activityStore'
 import { toLocalISODate } from '../utils/date'
 import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems } from '../utils/plan'
+import { upcomingEvents } from '../utils/races'
+import { parseLocalDate } from '../utils/date'
 import type { PlanItem } from '../utils/plan'
 
 function describe(i: PlanItem): string {
@@ -33,6 +35,7 @@ export default function TodayPlan({ className = '' }: { className?: string }) {
   }, [plan, activities])
 
   if (!plan) return null
+  const nextRace = upcomingEvents(plan.events ?? [])[0]
 
   return (
     <div className={`g-cell ${className}`}>
@@ -59,6 +62,13 @@ export default function TodayPlan({ className = '' }: { className?: string }) {
           <span className="text-xs text-slate-500">Mañana: {tomorrow.map(i => i.workout.title).join(', ')}</span>
         )}
       </div>
+      {nextRace && (
+        <div className="text-xs text-slate-400 mt-2">
+          Próxima competición: <span className="text-accent font-medium">{nextRace.name}</span>
+          {nextRace.priority ? ` (${nextRace.priority})` : ''} ·{' '}
+          {parseLocalDate(nextRace.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+        </div>
+      )}
     </div>
   )
 }

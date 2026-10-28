@@ -1,17 +1,18 @@
 // Textos que la app manda a Gemini por la ruta /api/gemini (server/gemini.ts).
 // Llevan tus datos ya resumidos; nunca rutas GPS.
 
-import type { ActivitySummary, FitnessPoint, GlobalStats, PlannedWorkout, UserSettings } from '../types/suunto'
+import type { ActivitySummary, FitnessPoint, GlobalStats, PlannedEvent, PlannedWorkout, UserSettings } from '../types/suunto'
 import { computePRs, formState, localWeekStart, predictRaces, sameHrEfficiency } from './calculations'
 import { isoDateOffset, parseLocalDate, toLocalISODate } from './date'
 import { formatDuration, formatPace, formatRaceTime } from './formatters'
-import { findRaces, raceActivityIds } from './races'
+import { eventLabel, findRaces, raceActivityIds, upcomingEvents } from './races'
 import { coachStats, coachStatsText, coachWeeks, SESSION_LABEL, sessionType } from './coach'
 
 export interface AthleteData {
   activities: ActivitySummary[]
   stats: GlobalStats | null
   workouts: PlannedWorkout[]       // plan de TrainingPeaks (puede estar vacío)
+  events: PlannedEvent[]           // competiciones del calendario de TrainingPeaks (pueden faltar)
   settings: UserSettings
   history: FitnessPoint[]
   projection: FitnessPoint[]
@@ -47,7 +48,7 @@ export function athleteContext(d: AthleteData): string {
   const today = d.today ?? toLocalISODate(new Date())
   const runs = d.activities.filter(a => a.sport === 'running')
   const cur = d.history.at(-1)
-  const races = findRaces(d.activities, d.workouts, [...d.history, ...d.projection], d.settings, today)
+  const races = findRaces(d.activities, d.workouts, [...d.history, ...d.projection], d.settings, today, d.events)
   const next = races.filter(r => r.upcoming).sort((a, b) => a.date.localeCompare(b.date))[0]
   const nextTsb = next ? d.projection.find(p => p.date === next.date)?.tsb : undefined
   const lines: string[] = []
@@ -60,7 +61,17 @@ export function athleteContext(d: AthleteData): string {
   if (cur) {
     lines.push('', '## Forma (modelo CTL/ATL/TSB)')
     lines.push(`Hoy: Fitness ${Math.round(cur.ctl)}, Fatiga ${Math.round(cur.atl)}, Forma ${signed(cur.tsb)} (${formState(cur.tsb).label}).`)
-    if (next) lines.push(`Próxima competición: ${dayName(next.date)} ${next.date}${nextTsb != null ? `, forma prevista ${signed(nextTsb)}` : ''}.`)
+    if (next) lines.push(`Próxima competición: ${next.event ? `«${next.event.name}» ` : ''}${dayName(next.date)} ${next.date}${nextTsb != null ? `, forma prevista ${signed(nextTsb)}` : ''}.`)
+  }
+
+  // Próximas competiciones del calendario (nombre, prioridad, distancia y notas)
+  const coming = upcomingEvents(d.events, today).slice(0, 6)
+  if (coming.length) {
+    lines.push('', '## Próximas competiciones (calendario de TrainingPeaks; prioridad A = objetivo principal)')
+    for (const e of coming) {
+      const notes = [e.description, e.comment].filter(Boolean).join(' ')
+      lines.push(`- ${dayName(e.date)} ${e.date}: ${eventLabel(e)}${notes ? ` · ${notes}` : ''}`)
+    }
   }
 
   // Últimas 8 semanas de carrera
@@ -83,7 +94,7 @@ export function athleteContext(d: AthleteData): string {
     lines.push('', '## Competiciones recientes')
     for (const r of done) {
       const a = r.activity!
-      lines.push(`- ${r.date}: ${km(a.distance)} km en ${formatRaceTime(a.duration)} (${formatPace(a.avgPace)})${r.formBefore != null ? `, forma al llegar ${signed(r.formBefore)}` : ''}`)
+      lines.push(`- ${r.date}${r.event ? ` «${r.event.name}»` : ''}: ${km(a.distance)} km en ${formatRaceTime(a.duration)} (${formatPace(a.avgPace)})${r.formBefore != null ? `, forma al llegar ${signed(r.formBefore)}` : ''}`)
     }
   }
 
@@ -98,7 +109,7 @@ export function athleteContext(d: AthleteData): string {
 
   // Eficiencia y desacoplamiento
   const eff = sameHrEfficiency(d.activities.filter(a => a.startTime.slice(0, 10) >= isoDateOffset(180)),
-    raceActivityIds(d.activities, d.workouts, d.settings))
+    raceActivityIds(d.activities, d.workouts, d.settings, d.events))
   if (eff.points.length) {
     lines.push('', `## Ritmo a su FC habitual (${eff.refHR} ppm), por mes`)
     lines.push(eff.points.map(p => `${p.month}: ${formatPace(p.paceAtRef)}`).join(' · '))
@@ -146,13 +157,33 @@ export function questionPrompt(d: AthleteData, question: string): string {
 
 // ─── 2. Analizar al entrenador ───────────────────────────────────────────────
 
-/** Todas las sesiones del entrenador, por semanas y con la descripción literal. */
-function coachHistory(workouts: PlannedWorkout[], fromWeek?: string): string {
+/** Competiciones de la semana que empieza en `weekStart`. */
+function weekEvents(events: PlannedEvent[], weekStart: string): PlannedEvent[] {
+  const end = addDays(weekStart, 6)
+  return events.filter(e => e.date >= weekStart && e.date <= end)
+}
+
+/**
+ * Sesiones del entrenador por semanas, con la descripción literal. Las semanas con competición van marcadas
+ * («SEMANA DE COMPETICIÓN») y el día de la carrera aparece aunque él no ponga entreno: así se ve qué cambia.
+ * Con `onlyWeeks`, solo esas semanas.
+ */
+function coachHistory(workouts: PlannedWorkout[], events: PlannedEvent[], fromWeek?: string, onlyWeeks?: Set<string>): string {
   const out: string[] = []
   for (const wk of coachWeeks(workouts)) {
     if (fromWeek && wk.weekStart < fromWeek) continue
-    out.push(`### Semana del ${wk.weekStart} · ${wk.sessions} sesiones · ${Math.round(wk.minutes)} min · ${Math.round(wk.tss)} TSS`)
-    for (const w of wk.workouts) {
+    if (onlyWeeks && !onlyWeeks.has(wk.weekStart)) continue
+    const races = weekEvents(events, wk.weekStart)
+    const raceMark = races.length ? ` · SEMANA DE COMPETICIÓN: ${races.map(e => `${eventLabel(e)} (${dayName(e.date)})`).join(', ')}` : ''
+    out.push(`### Semana del ${wk.weekStart} · ${wk.sessions} sesiones · ${Math.round(wk.minutes)} min · ${Math.round(wk.tss)} TSS${raceMark}`)
+    const days = [...wk.workouts.map(w => ({ date: w.date, w })), ...races.map(e => ({ date: e.date, e }))]
+      .sort((a, b) => a.date.localeCompare(b.date))
+    for (const item of days) {
+      if ('e' in item) {
+        out.push(`#### ${dayName(item.date)} ${item.date} · COMPETICIÓN: ${eventLabel(item.e!)}`)
+        continue
+      }
+      const w = item.w!
       out.push(`#### ${dayName(w.date)} ${w.date} · ${SESSION_LABEL[sessionType(w)]} · ${plannedLine(w)}${w.completed ? ' · hecho' : ''}`)
       if (w.description) out.push(w.description.trim())
       if (w.coachComments) out.push(`Comentario del entrenador: ${w.coachComments.trim()}`)
@@ -162,8 +193,8 @@ function coachHistory(workouts: PlannedWorkout[], fromWeek?: string): string {
   return out.join('\n')
 }
 
-export function coachProfilePrompt(workouts: PlannedWorkout[]): string {
-  const stats = coachStats(workouts)
+export function coachProfilePrompt(workouts: PlannedWorkout[], events: PlannedEvent[] = []): string {
+  const stats = coachStats(workouts, events)
   return [
     'Te paso todos los entrenamientos que un entrenador de atletismo ha planificado a un corredor en los últimos meses',
     '(TrainingPeaks), con sus descripciones literales, y unas estadísticas calculadas a partir de ellos.',
@@ -174,7 +205,9 @@ export function coachProfilePrompt(workouts: PlannedWorkout[]): string {
     '1. Estructura de la semana tipo (qué pone cada día, cuántas sesiones, días de descanso).',
     '2. Tipos de sesión que usa y cómo los formula (títulos, series típicas, duraciones, ritmos o zonas, RPE).',
     '3. Cómo progresa la carga entre semanas (volumen, intensidad, semanas de descarga).',
-    '4. Qué hace antes de una competición (los días previos, la activación, la reducción de carga).',
+    '4. Cómo planifica las SEMANAS DE COMPETICIÓN (marcadas así abajo) y la semana anterior: qué sesiones quita,',
+    '   cuánto baja el volumen, qué hace los días previos (series precompetición, activación) y si cambia según la',
+    '   prioridad de la carrera (A = objetivo principal).',
     '5. Cómo redacta las descripciones (secciones que usa, tono, extensión) con un ejemplo corto.',
     '6. Reglas concretas para imitarle (una lista breve de «siempre / nunca / normalmente»).',
     'Máximo 1.200 palabras.',
@@ -182,8 +215,9 @@ export function coachProfilePrompt(workouts: PlannedWorkout[]): string {
     '## Estadísticas',
     coachStatsText(stats),
     '',
+    ...(events.length ? ['## Competiciones del calendario', ...events.map(e => `- ${e.date}: ${eventLabel(e)}`), ''] : []),
     '## Entrenamientos (por semanas)',
-    coachHistory(workouts),
+    coachHistory(workouts, events),
   ].join('\n')
 }
 
@@ -195,7 +229,7 @@ export const PROPOSAL_FORMAT = `{
   "entrenos": [
     {
       "fecha": "YYYY-MM-DD",
-      "tipo": "rodaje | progresivo | rectas | series | cuestas | cambios | activacion | fuerza | natacion | descanso",
+      "tipo": "rodaje | progresivo | rectas | series | cuestas | cambios | activacion | competicion | fuerza | natacion | descanso",
       "titulo": "en el mismo formato que usa el entrenador, p. ej. RODAJE 45'",
       "descripcion": "con las mismas secciones que usa el entrenador (OBJETIVO, DESCRIPCIÓN, ESTRUCTURA, RPE, OBSERVACIONES)",
       "duracion_min": 45,
@@ -232,6 +266,24 @@ export function weekPrompt(full: AthleteData, weekStart: string, profile: string
   const useProfile = backtest ? null : profile
   const weekEnd = addDays(weekStart, 6)
   const examplesFrom = addDays(weekStart, -7 * 6)  // las 6 semanas anteriores, literales
+  // Las competiciones se conocen con antelación: se usan aunque sea una semana de prueba
+  const racesThisWeek = weekEvents(d.events, weekStart)
+  const racesNextWeek = weekEvents(d.events, addDays(weekStart, 7))
+  const seasonGoal = upcomingEvents(d.events, weekStart).find(e => e.priority === 'A' && !racesThisWeek.includes(e))
+  // Ejemplos extra: sus últimas semanas de competición (y la anterior a cada una) que no estén ya entre las 6 últimas
+  const pastRaceWeeks = [...new Set(d.events.filter(e => e.date < examplesFrom).map(e => localWeekStart(parseLocalDate(e.date))))]
+    .sort().slice(-3)
+  const extraWeeks = new Set(pastRaceWeeks.flatMap(w => [addDays(w, -7), w]))
+  const raceBlock: string[] = []
+  if (racesThisWeek.length || racesNextWeek.length || seasonGoal) {
+    raceBlock.push('## Competiciones')
+    for (const e of racesThisWeek) {
+      raceBlock.push(`- ESTA ES UNA SEMANA DE COMPETICIÓN: ${eventLabel(e)}, el ${dayName(e.date)} ${e.date}.`)
+    }
+    for (const e of racesNextWeek) raceBlock.push(`- La semana siguiente hay competición: ${eventLabel(e)}, el ${dayName(e.date)} ${e.date}.`)
+    if (seasonGoal) raceBlock.push(`- Objetivo de temporada: ${eventLabel(seasonGoal)}, el ${seasonGoal.date}.`)
+    raceBlock.push('')
+  }
   return [
     'Eres un ayudante que imita a un entrenador de atletismo concreto. Tu tarea es proponer la semana del',
     `${weekStart} (lunes) al ${weekEnd} (domingo) para su corredor, lo más parecida posible a como la planificaría`,
@@ -241,7 +293,11 @@ export function weekPrompt(full: AthleteData, weekStart: string, profile: string
     'Reglas:',
     '- Imita al entrenador; no apliques tu propio método. Si dudas, sigue lo que hizo en semanas parecidas.',
     '- No subas el volumen semanal más de lo que él suele subirlo entre semanas.',
-    '- Si hay una competición esa semana o la siguiente, haz lo que él hace antes de competir.',
+    '- Una semana de competición es distinta: planifícala como él planifica sus semanas de competición (marcadas',
+    '  «SEMANA DE COMPETICIÓN» en sus semanas anteriores): menos volumen, sus series precompetición, la activación',
+    '  el día antes… El día de la carrera pon "tipo": "competicion" con el nombre de la carrera como título.',
+    '- Si la competición es la semana siguiente, haz lo que él hace la semana previa a competir.',
+    '- Ten en cuenta la prioridad: las carreras A son el objetivo; no comprometas la preparación del objetivo de temporada.',
     '- Incluye los 7 días; los días sin sesión van con "tipo": "descanso".',
     '- Indica siempre "duracion_min" y "tss"; "distancia_km" solo si el entrenador la indicaría en esa sesión (si no, null).',
     '- Esto es solo una propuesta orientativa: el plan real lo decide el entrenador.',
@@ -249,11 +305,16 @@ export function weekPrompt(full: AthleteData, weekStart: string, profile: string
     'Responde solo con un objeto JSON con exactamente este formato (sin texto antes ni después):',
     PROPOSAL_FORMAT,
     '',
-    useProfile ? `## Perfil del entrenador\n${useProfile}` : '## Estadísticas del entrenador\n' + coachStatsText(coachStats(d.workouts)),
+    ...raceBlock,
+    useProfile ? `## Perfil del entrenador\n${useProfile}` : '## Estadísticas del entrenador\n' + coachStatsText(coachStats(d.workouts, d.events)),
     '',
     athleteContext(d),
     '',
     '## Sus últimas semanas planificadas (literal)',
-    coachHistory(d.workouts.filter(w => w.date < weekStart), examplesFrom),
+    coachHistory(d.workouts.filter(w => w.date < weekStart), d.events.filter(e => e.date < weekStart), examplesFrom),
+    ...(extraWeeks.size ? [
+      '## Sus semanas de competición anteriores y la semana previa a cada una (literal)',
+      coachHistory(d.workouts.filter(w => w.date < examplesFrom), d.events.filter(e => e.date < examplesFrom), undefined, extraWeeks),
+    ] : []),
   ].join('\n')
 }

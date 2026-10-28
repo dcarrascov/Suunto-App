@@ -6,7 +6,7 @@ import { localWeekStart } from '../utils/calculations'
 import { parseLocalDate, toLocalISODate } from '../utils/date'
 import { formatDuration, sportColor } from '../utils/formatters'
 import { matchPlan } from '../utils/plan'
-import { raceDatesFromPlan } from '../utils/races'
+import { eventLabel, eventsByDate, raceDatesFromPlan } from '../utils/races'
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -31,7 +31,7 @@ export default function CalendarPage() {
   const today = toLocalISODate(now)
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
 
-  const { byDay, plannedByDay, raceDays } = useMemo(() => {
+  const { byDay, plannedByDay, raceDays, eventsOfDay } = useMemo(() => {
     const byDay = new Map<string, ActivitySummary[]>()
     for (const a of activities) {
       const d = a.startTime.slice(0, 10)
@@ -46,7 +46,11 @@ export default function CalendarPage() {
       if (matched.has(w.id) || w.completed) continue
       plannedByDay.set(w.date, [...(plannedByDay.get(w.date) ?? []), w])
     }
-    return { byDay, plannedByDay, raceDays: new Set(raceDatesFromPlan(plan?.workouts ?? [])) }
+    return {
+      byDay, plannedByDay,
+      raceDays: new Set(raceDatesFromPlan(plan?.workouts ?? [], plan?.events ?? [])),
+      eventsOfDay: eventsByDate(plan?.events ?? []),   // competiciones del calendario de TrainingPeaks (con nombre)
+    }
   }, [activities, plan])
 
   const weeks = monthWeeks(cursor.year, cursor.month)
@@ -95,9 +99,22 @@ export default function CalendarPage() {
                   <div key={day} className={`bg-cell min-h-[104px] p-1.5 ${inMonth ? '' : 'opacity-35'} ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
                     <div className="flex items-center justify-between">
                       <span className={`text-xs ${day === today ? 'text-accent font-semibold' : 'text-slate-500'}`}>{parseLocalDate(day).getDate()}</span>
-                      {raceDays.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
+                      {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
+                      {eventsOfDay.get(day)?.some(e => e.priority) && (
+                        <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
+                      )}
                     </div>
                     <div className="mt-1 space-y-1">
+                      {(eventsOfDay.get(day) ?? []).map(e => (
+                        <Link
+                          key={`ev-${e.id}`}
+                          to="/races"
+                          className="block text-[11px] leading-tight font-semibold bg-accent/15 border-l-2 border-accent text-accent px-1 py-0.5 truncate"
+                          title={eventLabel(e)}
+                        >
+                          {e.name}
+                        </Link>
+                      ))}
                       {acts.map(a => (
                         <Link
                           key={a.id}

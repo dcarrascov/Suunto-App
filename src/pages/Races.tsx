@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivityStore } from '../stores/activityStore'
 import { useFitnessProjection } from '../hooks/useFitnessProjection'
-import { formState, predictRaces, RACE_FORM_BAND } from '../utils/calculations'
+import { formState, predictRaces, RACE_FORM_BAND, riegel } from '../utils/calculations'
 import { isoDateOffset } from '../utils/date'
 import { formatPace, formatRaceTime } from '../utils/formatters'
-import { findRaces } from '../utils/races'
+import { eventLabel, findRaces } from '../utils/races'
 
 function dayLabel(iso: string, withYear = true): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('es-ES', {
@@ -25,33 +25,54 @@ export default function Races() {
   const { history, projection } = useFitnessProjection()
 
   const races = useMemo(
-    () => findRaces(activities, plan?.workouts ?? [], [...history, ...projection], settings),
+    () => findRaces(activities, plan?.workouts ?? [], [...history, ...projection], settings, undefined, plan?.events ?? []),
     [activities, plan, history, projection, settings],
   )
   const upcoming = races.filter(r => r.upcoming).sort((a, b) => a.date.localeCompare(b.date))
   const past = races.filter(r => r.activity)
   const next = upcoming[0]
   const nextTsb = next ? projection.find(p => p.date === next.date)?.tsb ?? null : null
-  // Predicción actual para una distancia como la de tus últimas carreras (normalmente 10 km)
+  // Predicción para la distancia de la próxima competición (la de TrainingPeaks) o, si no se sabe, la habitual
   const usualLabel = past.find(r => r.standardLabel)?.standardLabel ?? '10 km'
-  const nowPrediction = useMemo(
-    () => predictRaces(activities, isoDateOffset(90)).find(p => p.label === usualLabel) ?? null,
-    [activities, usualLabel],
-  )
+  const targetKm = next?.event?.distanceKm ?? null
+  const nowPrediction = useMemo(() => {
+    const preds = predictRaces(activities, isoDateOffset(90))
+    if (!targetKm) return preds.find(p => p.label === usualLabel) ?? null
+    // la predicción de distancia más parecida, llevada a la distancia exacta de la carrera
+    const base = preds.reduce<(typeof preds)[number] | null>(
+      (best, p) => (!best || Math.abs(Math.log(p.km / targetKm)) < Math.abs(Math.log(best.km / targetKm)) ? p : best), null)
+    if (!base) return null
+    const seconds = Math.round(riegel(base.seconds, base.km, targetKm))
+    return { ...base, seconds, pace: Math.round(seconds / targetKm), label: `${targetKm.toLocaleString('es-ES')} km` }
+  }, [activities, usualLabel, targetKm])
+  const later = upcoming.slice(1, 4)
 
   return (
     <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
       <h1 className="text-xl font-semibold text-slate-100">Competiciones</h1>
       <p className="text-sm text-slate-500 mt-0.5 mb-6">
-        Detectadas con tu plan (el día siguiente a la «Activación precompetición») o marcadas a mano en el detalle de la actividad
+        Las de tu calendario de TrainingPeaks, las deducidas del plan (el día siguiente a la «Activación precompetición») y
+        las que marques a mano en el detalle de la actividad
       </p>
 
       {next && (
         <div className="g-grid mb-6">
           <div className="g-cell col-span-12 md:col-span-4">
-            <div className="g-label">Próxima competición</div>
-            <div className="text-2xl font-semibold text-slate-100 mt-2 first-letter:uppercase">{dayLabel(next.date, false)}</div>
-            <div className="text-xs text-slate-500 mt-1">según tu plan de TrainingPeaks</div>
+            <div className="flex items-center gap-2">
+              <span className="g-label">Próxima competición</span>
+              {next.event?.priority && <span className="text-[10px] font-semibold bg-accent text-black px-1.5">{next.event.priority}</span>}
+            </div>
+            <div className="text-2xl font-semibold text-slate-100 mt-2">{next.event?.name ?? 'Competición'}</div>
+            <div className="text-xs text-slate-500 mt-1 first-letter:uppercase">
+              {dayLabel(next.date, false)}{next.event?.distanceKm ? ` · ${next.event.distanceKm.toLocaleString('es-ES')} km` : ''}
+            </div>
+            {later.length > 0 && (
+              <div className="text-xs text-slate-500 mt-3 space-y-0.5">
+                {later.map(r => (
+                  <div key={r.date}>Después: {r.event ? eventLabel(r.event) : 'competición'} · {dayLabel(r.date, false)}</div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="g-cell col-span-6 md:col-span-4">
             <div className="g-label">Forma prevista</div>
@@ -65,7 +86,7 @@ export default function Races() {
             ) : <div className="text-sm text-slate-500 mt-3">Sin datos de previsión</div>}
           </div>
           <div className="g-cell col-span-6 md:col-span-4">
-            <div className="g-label">Predicción · {usualLabel}</div>
+            <div className="g-label">Predicción · {nowPrediction?.label ?? usualLabel}</div>
             {nowPrediction ? (
               <>
                 <div className="text-[34px] font-semibold text-slate-100 mt-1">{formatRaceTime(nowPrediction.seconds)}</div>
@@ -103,8 +124,12 @@ export default function Races() {
                 return (
                   <tr key={a.id} className="border-t border-line hover:bg-[#1b1b1f]">
                     <td className="py-2.5 pr-4 whitespace-nowrap">
-                      <Link to={`/activity/${a.id}`} className="text-slate-100 hover:text-accent first-letter:uppercase">{dayLabel(r.date)}</Link>
+                      <Link to={`/activity/${a.id}`} className="text-slate-100 hover:text-accent">
+                        {r.event?.name ?? <span className="first-letter:uppercase">{dayLabel(r.date)}</span>}
+                      </Link>
+                      {r.event?.priority && <span className="ml-2 text-[10px] font-semibold bg-accent text-black px-1">{r.event.priority}</span>}
                       {r.source === 'manual' && <span className="ml-2 text-[10px] text-slate-500 border border-slate-700 px-1">manual</span>}
+                      {r.event && <div className="text-xs text-slate-500 first-letter:uppercase">{dayLabel(r.date)}</div>}
                     </td>
                     <td className="py-2.5 pr-4 text-slate-300 whitespace-nowrap">
                       {a.distance.toFixed(2).replace('.', ',')} km{r.standardLabel && <span className="text-slate-500"> · {r.standardLabel}</span>}

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { formatShortDate } from '../utils/formatters'
 import { isoDateOffset, toLocalISODate } from '../utils/date'
 import { useFitnessProjection } from '../hooks/useFitnessProjection'
+import { useActivityStore } from '../stores/activityStore'
 import { formState } from '../utils/calculations'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -26,6 +27,8 @@ const signed = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}`
 
 export default function FitnessChartPage() {
   const { history, projection, nextRaceDate } = useFitnessProjection()
+  const plan = useActivityStore(s => s.plan)
+  const nextRaceName = nextRaceDate ? (plan?.events ?? []).find(e => e.date === nextRaceDate)?.name ?? null : null
   const [range, setRange] = useState(180)
   const today = toLocalISODate(new Date())
 
@@ -85,7 +88,7 @@ export default function FitnessChartPage() {
           <div className="g-cell col-span-6 lg:col-span-3">
             {raceDay && nextRaceDate ? (
               <>
-                <div className="g-label">Forma prevista · competición</div>
+                <div className="g-label">Forma prevista · {nextRaceName ?? 'competición'}</div>
                 <div className="text-[34px] font-semibold mt-2" style={{ color: formColor(raceDay.tsb) }}>{signed(raceDay.tsb)}</div>
                 <div className="text-xs text-slate-500 first-letter:uppercase">{dayLabel(nextRaceDate)} · {formLabel(raceDay.tsb)}</div>
               </>
@@ -139,7 +142,7 @@ export default function FitnessChartPage() {
               )}
               {nextRaceDate && nextRaceDate > today && (
                 <ReferenceLine x={nextRaceDate} stroke="#c5f23c" strokeDasharray="2 3"
-                  label={{ value: 'competición', fill: '#c5f23c', fontSize: 10, position: 'insideTopLeft' }} />
+                  label={{ value: nextRaceName ?? 'competición', fill: '#c5f23c', fontSize: 10, position: 'insideTopLeft' }} />
               )}
               <Line type="monotone" dataKey="ctl" name="Fitness (CTL)" stroke="#c5f23c" dot={false} strokeWidth={2} connectNulls={false} />
               <Line type="monotone" dataKey="atl" name="Fatiga (ATL)" stroke="#a3a3a8" dot={false} strokeWidth={1.5} connectNulls={false} />

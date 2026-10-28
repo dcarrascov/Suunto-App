@@ -1,13 +1,13 @@
 // Lee la propuesta de semana que devuelve Gemini (pegada a mano) y la compara con la del entrenador.
 
-import type { PlannedWorkout } from '../types/suunto'
+import type { PlannedEvent, PlannedWorkout } from '../types/suunto'
 import type { AiProposal, AiWorkout } from '../stores/aiStore'
 import { FAMILY_OF, sessionType, weekdayIndex } from './coach'
 import type { SessionFamily, SessionType } from './coach'
 import { localWeekStart } from './calculations'
 import { parseLocalDate } from './date'
 
-const TYPES: SessionType[] = ['rodaje', 'progresivo', 'rectas', 'series', 'cuestas', 'cambios', 'activacion', 'fuerza', 'natacion', 'descanso', 'otro']
+const TYPES: SessionType[] = ['rodaje', 'progresivo', 'rectas', 'series', 'cuestas', 'cambios', 'activacion', 'competicion', 'fuerza', 'natacion', 'descanso', 'otro']
 
 /** Saca el JSON de la respuesta: dentro de ```json ... ``` o, si no, del primer «{» al último «}». */
 function extractJson(text: string): string | null {
@@ -112,14 +112,19 @@ const ratio = (a: number, b: number) => (Math.max(a, b) === 0 ? 1 : 1 - Math.abs
  * Jaccard; un día sin nada cuenta como descanso. Total = 60 % tipos + 25 % tiempo + 15 % TSS.
  * No se usan los km: el entrenador planifica por tiempo y solo indica la distancia en algunas sesiones.
  */
-export function compareWeek(proposal: AiProposal, coach: PlannedWorkout[]): WeekComparison {
+export function compareWeek(proposal: AiProposal, coach: PlannedWorkout[], events: PlannedEvent[] = []): WeekComparison {
   const coachWeek = coach.filter(w => (w.hasPlan || w.sport === 'rest') && localWeekStart(parseLocalDate(w.date)) === proposal.weekStart)
   const fam = (list: SessionFamily[]) => {
     const s = new Set(list.filter(f => f !== 'descanso'))
     return s.size ? [...s] : ['descanso' as SessionFamily]
   }
   const days: DayComparison[] = Array.from({ length: 7 }, (_, d) => {
-    const c = fam(coachWeek.filter(w => weekdayIndex(w.date) === d).map(w => FAMILY_OF[sessionType(w)]))
+    // el día de una competición del calendario cuenta como «competición» aunque el entrenador no ponga entreno
+    const raceDay = events.some(e => localWeekStart(parseLocalDate(e.date)) === proposal.weekStart && weekdayIndex(e.date) === d)
+    const c = fam([
+      ...coachWeek.filter(w => weekdayIndex(w.date) === d).map(w => FAMILY_OF[sessionType(w)]),
+      ...(raceDay ? ['competicion' as SessionFamily] : []),
+    ])
     const a = fam(proposal.workouts.filter(w => weekdayIndex(w.date) === d).map(w => FAMILY_OF[w.type]))
     const inter = c.filter(x => a.includes(x)).length
     const union = new Set([...c, ...a]).size

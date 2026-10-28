@@ -53,7 +53,7 @@ export default function PerformanceAnalysis() {
   const easy = useMemo(() => {
     const cut = isoDateOffset(365)
     const recent = activities.filter(a => a.startTime.slice(0, 10) >= cut)
-    const { points: last, refHR } = sameHrEfficiency(recent, raceActivityIds(activities, plan?.workouts ?? [], settings))
+    const { points: last, refHR } = sameHrEfficiency(recent, raceActivityIds(activities, plan?.workouts ?? [], settings, plan?.events ?? []))
     const avg = (v: typeof last) => v.reduce((s, p) => s + p.paceAtRef, 0) / v.length
     // % de mejora: media de los 3 primeros meses frente a los 3 últimos (ritmo más bajo = mejor)
     const trend = last.length >= 6 ? +((avg(last.slice(0, 3)) - avg(last.slice(-3))) / avg(last.slice(0, 3)) * 100).toFixed(1) : null

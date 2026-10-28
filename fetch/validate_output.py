@@ -176,6 +176,23 @@ def check_plan():
         a = w.get("actual")
         if a is not None and (not isinstance(a, dict) or any(a.get(k) is not None and not num(a.get(k)) for k in ("duration", "distance", "tss"))):
             errors.append(f"{where}: 'actual' debe ser null o tener duration/distance/tss numéricos o null")
+    events = plan.get("events", [])
+    if not isinstance(events, list):
+        errors.append("plan.json: 'events' debe ser una lista")
+        return
+    for i, e in enumerate(events):
+        where = f"plan.json events[{i}]"
+        if not isinstance(e, dict) or not isinstance(e.get("id"), int):
+            errors.append(f"{where}: debe ser un objeto con 'id' entero")
+            continue
+        if not (isinstance(e.get("date"), str) and re.match(r"^\d{4}-\d{2}-\d{2}$", e["date"])):
+            errors.append(f"{where}: 'date' debe ser YYYY-MM-DD")
+        if not isinstance(e.get("name"), str) or not e["name"]:
+            errors.append(f"{where}: 'name' debe ser texto no vacío")
+        if e.get("priority") not in (None, "A", "B", "C"):
+            errors.append(f"{where}: 'priority' debe ser A, B, C o null")
+        if e.get("distanceKm") is not None and not (num(e["distanceKm"]) and e["distanceKm"] > 0):
+            errors.append(f"{where}: 'distanceKm' debe ser > 0 o null")
 
 
 def main():

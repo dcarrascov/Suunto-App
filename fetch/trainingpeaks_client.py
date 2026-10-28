@@ -18,6 +18,7 @@ import requests
 API_BASE = os.getenv("TP_API_BASE", "https://tpapi.trainingpeaks.com")
 TIMEOUT = 45
 CHUNK_DAYS = 45  # días por petición de entrenos (rangos pequeños para no forzar al servidor)
+EVENT_CHUNK_DAYS = 180  # los eventos (competiciones) son pocos: tramos más largos
 
 
 class TrainingPeaksError(Exception):
@@ -145,5 +146,22 @@ class TrainingPeaksClient:
                 if wid is not None and wid not in seen:
                     seen.add(wid)
                     out.append(w)
+            cur = stop + timedelta(days=1)
+        return out
+
+    def events(self, start: date, end: date) -> list[dict]:
+        """Eventos del calendario (competiciones: nombre, fecha, distancia, prioridad A/B/C) entre dos fechas."""
+        aid = self.athlete_id()
+        out: list[dict] = []
+        seen: set = set()
+        cur = start
+        while cur <= end:
+            stop = min(end, cur + timedelta(days=EVENT_CHUNK_DAYS - 1))
+            page = self._get(f"/fitness/v6/athletes/{aid}/events/{cur.isoformat()}/{stop.isoformat()}")
+            for e in page if isinstance(page, list) else []:
+                eid = e.get("id") if isinstance(e, dict) else None
+                if eid is not None and eid not in seen:
+                    seen.add(eid)
+                    out.append(e)
             cur = stop + timedelta(days=1)
         return out
