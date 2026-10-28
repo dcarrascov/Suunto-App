@@ -25,7 +25,7 @@ export function useFitnessProjection(): FitnessProjection {
     const plannedTss: Record<string, number> = {}
     for (const w of future) plannedTss[w.date] = (plannedTss[w.date] ?? 0) + (w.planned.tss ?? 0)
     const until = future.reduce((max, w) => (w.date > max ? w.date : max), today)
-    const nextRaceDate = raceDatesFromPlan(plan?.workouts ?? []).find(d => d >= today) ?? null
+    const nextRaceDate = raceDatesFromPlan(plan?.workouts ?? [], plan?.events ?? []).find(d => d >= today) ?? null
     // si la próxima carrera cae después del último entreno planificado, se proyecta hasta ella igualmente
     const end = nextRaceDate && nextRaceDate > until ? nextRaceDate : until
     return { history, projection: projectFitness(history, plannedTss, end), nextRaceDate }

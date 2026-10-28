@@ -92,8 +92,8 @@ export default function AiCoach() {
   const weekOptions = [-4, -3, -2, -1, 0, 1, 2, 3].map(n => shiftWeek(thisWeek, n))
 
   const data: AthleteData = useMemo(
-    () => ({ activities, stats, workouts, settings, history, projection, today }),
-    [activities, stats, workouts, settings, history, projection, today],
+    () => ({ activities, stats, workouts, events: plan?.events ?? [], settings, history, projection, today }),
+    [activities, stats, workouts, plan, settings, history, projection, today],
   )
   const savedProposals = Object.values(proposals).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
   const backtest = isBacktestWeek(week, today)
@@ -122,7 +122,7 @@ export default function AiCoach() {
   }
 
   async function analyzeCoach() {
-    const r = await run('profile', () => askGemini(coachProfilePrompt(workouts)))
+    const r = await run('profile', () => askGemini(coachProfilePrompt(workouts, plan?.events ?? [])))
     if (r) saveProfile(r.text, r.model)
   }
 

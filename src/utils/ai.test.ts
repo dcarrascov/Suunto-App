@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActivitySummary, PlannedWorkout } from '../types/suunto'
+import type { ActivitySummary, PlannedEvent, PlannedWorkout } from '../types/suunto'
 import { DEFAULT_SETTINGS } from '../types/suunto'
 import { coachStats, sessionType } from './coach'
 import { coachProfilePrompt, questionPrompt, weekPrompt } from './aiPrompt'
@@ -70,6 +70,7 @@ describe('textos para Gemini', () => {
       workout({ id: 2, date: '2026-10-13', title: 'SERIES SECRETAS 7x700' }),   // semana objetivo de la prueba
       workout({ id: 3, date: '2026-10-21', title: 'TIRADA FUTURA 90\'' }),       // posterior
     ],
+    events: [],
     settings: DEFAULT_SETTINGS,
     history: [{ date: '2026-10-16', ctl: 40, atl: 30, tsb: 10, tss: 0 }],
     projection: [],
@@ -146,5 +147,74 @@ describe('compareWeek', () => {
     expect(c.days[3].score).toBe(0)    // jueves: descanso frente a calidad
     expect(c.typeScore).toBeCloseTo(5 / 7, 5)
     expect(c.total).toBeLessThan(75)
+  })
+})
+
+function event(over: Partial<PlannedEvent>): PlannedEvent {
+  return {
+    id: 1, date: '2026-11-01', name: '15K Sevilla', type: 'RunningRoad', priority: 'A', distanceKm: 15,
+    description: null, comment: null, ...over,
+  }
+}
+
+describe('competiciones en la IA', () => {
+  const data = (): AthleteData => ({
+    activities: [],
+    stats: null,
+    workouts: [
+      workout({ id: 1, date: '2026-10-14', title: 'SERIES PRECOMPETICION: 5X300 3x1000', description: 'OBJETIVO: afinar.' }),
+      workout({ id: 2, date: '2026-10-17', title: 'ACTIVACIÓN PRECOMPETICIÓN' }),
+      workout({ id: 3, date: '2026-10-20', title: "RODAJE 40'" }),
+    ],
+    events: [
+      event({ id: 10, date: '2026-10-18', name: '10k IMD CASCO ANTIGUO', priority: null, distanceKm: 10 }),
+      event({ id: 11, date: '2026-11-01' }),
+      event({ id: 12, date: '2026-12-13', name: 'MEDIA MARATÓN DE SEVILLA', distanceKm: 21.097, description: 'Objetivo principal de la temporada.' }),
+    ],
+    settings: DEFAULT_SETTINGS,
+    history: [{ date: '2026-10-27', ctl: 40, atl: 30, tsb: 10, tss: 0 }],
+    projection: [],
+    today: '2026-10-28',
+  })
+
+  it('la semana de la carrera se anuncia como semana de competición, con la siguiente y el objetivo', () => {
+    const p = weekPrompt(data(), '2026-10-26', null)
+    expect(p).toContain('ESTA ES UNA SEMANA DE COMPETICIÓN: 15K Sevilla · prioridad A · 15 km, el dom 2026-11-01')
+    expect(p).toContain('Objetivo de temporada: MEDIA MARATÓN DE SEVILLA')
+    expect(p).toContain('"tipo": "competicion"')
+  })
+  it('la semana previa avisa de la competición de la siguiente', () => {
+    expect(weekPrompt(data(), '2026-10-19', null)).toContain('La semana siguiente hay competición: 15K Sevilla')
+  })
+  it('en los ejemplos del entrenador marca sus semanas de competición y el día de la carrera', () => {
+    const p = weekPrompt(data(), '2026-10-26', null)
+    expect(p).toContain('### Semana del 2026-10-12 · 2 sesiones')
+    expect(p).toContain('SEMANA DE COMPETICIÓN: 10k IMD CASCO ANTIGUO · 10 km (dom)')
+    expect(p).toContain('#### dom 2026-10-18 · COMPETICIÓN: 10k IMD CASCO ANTIGUO')
+  })
+  it('las preguntas llevan las próximas competiciones con sus notas', () => {
+    const q = questionPrompt(data(), '¿Cómo llego?')
+    expect(q).toContain('## Próximas competiciones')
+    expect(q).toContain('MEDIA MARATÓN DE SEVILLA · prioridad A · 21,097 km · Objetivo principal de la temporada.')
+  })
+  it('el análisis del entrenador pide cómo planifica las semanas de competición', () => {
+    const p = coachProfilePrompt(data().workouts, data().events)
+    expect(p).toContain('SEMANAS DE COMPETICIÓN')
+    expect(p).toContain('## Competiciones del calendario')
+    expect(p).toContain('«10k IMD CASCO ANTIGUO» del 2026-10-18')
+  })
+  it('«competición» es un tipo propio, pero las series precompetición siguen siendo series', () => {
+    expect(sessionType({ title: 'Competición: 15K Sevilla', sport: 'running' })).toBe('competicion')
+    expect(sessionType({ title: 'SERIES PRECOMPETICION: 5X300', sport: 'running' })).toBe('series')
+    expect(sessionType({ title: 'ACTIVACIÓN PRECOMPETICIÓN', sport: 'running' })).toBe('activacion')
+  })
+  it('el día de la carrera del calendario cuenta como competición al comparar', () => {
+    const r = parseProposal('{"entrenos":[{"fecha":"2026-11-01","tipo":"competicion","titulo":"15K Sevilla","duracion_min":55,"tss":90}]}', '2026-10-26')
+    if (!r.ok) throw new Error(r.error)
+    const coach = [workout({ id: 1, date: '2026-10-31', title: 'ACTIVACIÓN PRECOMPETICIÓN' })]
+    const sunday = compareWeek(r.proposal, coach, [event({})]).days[6]
+    expect(sunday.coach).toEqual(['competicion'])
+    expect(sunday.score).toBe(1)
+    expect(compareWeek(r.proposal, coach, []).days[6].score).toBe(0)   // sin el evento, el domingo era descanso
   })
 })

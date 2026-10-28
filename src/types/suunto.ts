@@ -128,9 +128,22 @@ export interface PlannedWorkout {
   hasPlan: boolean           // false = entreno registrado sin plan (subido desde el reloj)
 }
 
+/** Evento del calendario de TrainingPeaks: una competición. Espejo de normalize_event() en fetch/tp_sync.py */
+export interface PlannedEvent {
+  id: number
+  date: string               // YYYY-MM-DD
+  name: string               // «15K Sevilla», «MEDIA MARATÓN DE SEVILLA»…
+  type: string | null        // RunningRoad…
+  priority: 'A' | 'B' | 'C' | null
+  distanceKm: number | null  // de TrainingPeaks o deducida del nombre («10k», «media maratón»)
+  description: string | null
+  comment: string | null
+}
+
 export interface TrainingPlan {
   syncedAt: string
   workouts: PlannedWorkout[]
+  events?: PlannedEvent[]    // los plan.json anteriores no lo traen
 }
 
 export interface UserSettings {

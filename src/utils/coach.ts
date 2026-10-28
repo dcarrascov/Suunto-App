@@ -1,4 +1,4 @@
-import type { PlannedWorkout } from '../types/suunto'
+import type { PlannedEvent, PlannedWorkout } from '../types/suunto'
 import { localWeekStart } from './calculations'
 import { parseLocalDate, toLocalISODate } from './date'
 import { raceDatesFromPlan } from './races'
@@ -8,20 +8,20 @@ import { raceDatesFromPlan } from './races'
 
 export type SessionType =
   | 'rodaje' | 'progresivo' | 'rectas' | 'series' | 'cuestas' | 'cambios'
-  | 'activacion' | 'fuerza' | 'natacion' | 'descanso' | 'otro'
+  | 'activacion' | 'competicion' | 'fuerza' | 'natacion' | 'descanso' | 'otro'
 
 export const SESSION_LABEL: Record<SessionType, string> = {
   rodaje: 'Rodaje', progresivo: 'Rodaje progresivo', rectas: 'Rectas', series: 'Series',
-  cuestas: 'Cuestas', cambios: 'Cambios de ritmo', activacion: 'Activación precompetición',
+  cuestas: 'Cuestas', cambios: 'Cambios de ritmo', activacion: 'Activación precompetición', competicion: 'Competición',
   fuerza: 'Fuerza / core', natacion: 'Natación', descanso: 'Descanso', otro: 'Otro',
 }
 
 /** Familia de la sesión, para comparar semanas sin exigir el mismo formato exacto. */
-export type SessionFamily = 'suave' | 'calidad' | 'rectas' | 'activacion' | 'fuerza' | 'natacion' | 'descanso' | 'otro'
+export type SessionFamily = 'suave' | 'calidad' | 'rectas' | 'activacion' | 'competicion' | 'fuerza' | 'natacion' | 'descanso' | 'otro'
 
 export const FAMILY_OF: Record<SessionType, SessionFamily> = {
   rodaje: 'suave', progresivo: 'suave', rectas: 'rectas', series: 'calidad', cuestas: 'calidad',
-  cambios: 'calidad', activacion: 'activacion', fuerza: 'fuerza', natacion: 'natacion',
+  cambios: 'calidad', activacion: 'activacion', competicion: 'competicion', fuerza: 'fuerza', natacion: 'natacion',
   descanso: 'descanso', otro: 'otro',
 }
 
@@ -29,6 +29,8 @@ export function sessionType(w: Pick<PlannedWorkout, 'title' | 'sport'>): Session
   const t = w.title.toLowerCase()
   if (w.sport === 'rest' || /descanso/.test(t)) return 'descanso'
   if (/activaci[oó]n/.test(t)) return 'activacion'
+  // «competición» o «carrera …», pero no «series precompetición»
+  if (!/precompetici/.test(t) && (/\bcompetici[oó]n\b/.test(t) || /^carrera\b/.test(t))) return 'competicion'
   if (w.sport === 'swimming' || /nataci[oó]n|piscina/.test(t)) return 'natacion'
   if (w.sport === 'strength' || /fuerza|core|gimnasio/.test(t)) return 'fuerza'
   if (/cuesta/.test(t)) return 'cuestas'
@@ -87,10 +89,10 @@ export interface CoachStats {
   avgTss: number
   typeCounts: Partial<Record<SessionType, number>>
   byWeekday: Partial<Record<SessionType, number>>[]   // por día (0 = lunes): cuántas veces pone cada tipo
-  preRace: { date: string; days: { offset: number; types: SessionType[] }[] }[]  // 7 días antes de cada carrera
+  preRace: { date: string; name: string | null; days: { offset: number; types: SessionType[] }[] }[]  // 7 días antes de cada carrera
 }
 
-export function coachStats(workouts: PlannedWorkout[]): CoachStats {
+export function coachStats(workouts: PlannedWorkout[], events: PlannedEvent[] = []): CoachStats {
   const planned = workouts.filter(w => w.hasPlan || w.sport === 'rest')
   const weeks = coachWeeks(planned)
   const avg = (f: (w: CoachWeek) => number) => (weeks.length ? weeks.reduce((s, w) => s + f(w), 0) / weeks.length : 0)
@@ -104,13 +106,13 @@ export function coachStats(workouts: PlannedWorkout[]): CoachStats {
   }
   const byDate = new Map<string, PlannedWorkout[]>()
   for (const w of planned) byDate.set(w.date, [...(byDate.get(w.date) ?? []), w])
-  const preRace = raceDatesFromPlan(planned).map(date => {
+  const preRace = raceDatesFromPlan(planned, events).map(date => {
     const race = parseLocalDate(date)
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(race.getFullYear(), race.getMonth(), race.getDate() - (7 - i))
       return { offset: -(7 - i), types: (byDate.get(toLocalISODate(d)) ?? []).map(sessionType) }
     })
-    return { date, days }
+    return { date, name: events.find(e => e.date === date)?.name ?? null, days }
   })
   return {
     weeks: weeks.length,
@@ -139,7 +141,7 @@ export function coachStatsText(s: CoachStats): string {
   if (s.preRace.length) {
     lines.push('Los 7 días antes de cada competición (día −7 a −1):')
     for (const r of s.preRace) {
-      lines.push(`- Carrera del ${r.date}: ` + r.days.map(d => `${d.offset}: ${d.types.map(t => SESSION_LABEL[t]).join('+') || '—'}`).join(' · '))
+      lines.push(`- ${r.name ? `«${r.name}»` : 'Carrera'} del ${r.date}: ` + r.days.map(d => `${d.offset}: ${d.types.map(t => SESSION_LABEL[t]).join('+') || '—'}`).join(' · '))
     }
   }
   return lines.join('\n')

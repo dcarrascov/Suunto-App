@@ -18,7 +18,7 @@ function RaceToggle({ act }: { act: ActivitySummary }) {
   const settings = useActivityStore(s => s.settings)
   const updateSettings = useActivityStore(s => s.updateSettings)
   if (act.sport !== 'running') return null
-  const { race, auto } = isRaceActivity(act, activities, plan?.workouts ?? [], settings)
+  const { race, auto } = isRaceActivity(act, activities, plan?.workouts ?? [], settings, plan?.events ?? [])
   const raceIds = settings.raceIds ?? []
   const notRaceIds = settings.notRaceIds ?? []
 

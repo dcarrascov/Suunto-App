@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ActivitySummary, FitnessPoint, PlannedWorkout } from '../types/suunto'
+import type { ActivitySummary, FitnessPoint, PlannedEvent, PlannedWorkout } from '../types/suunto'
 import { projectFitness, sameHrEfficiency } from './calculations'
 import { findRaces, isRaceActivity, mainRunOfDay, raceActivityIds, raceDatesFromPlan, standardDistance } from './races'
 
@@ -107,5 +107,31 @@ describe('competiciones', () => {
     expect(standardDistance(10.13)?.label).toBe('10 km')
     expect(standardDistance(21.3)?.label).toBe('Media maratón')
     expect(standardDistance(8)).toBeNull()
+  })
+})
+
+describe('competiciones del calendario de TrainingPeaks', () => {
+  const ev = (over: Partial<PlannedEvent>): PlannedEvent => ({
+    id: 1, date: '2026-09-06', name: 'CARRERA DEL PUEBLO', type: 'RunningRoad', priority: null, distanceKm: null,
+    description: null, comment: null, ...over,
+  })
+  const runs = [
+    act({ id: 30, startTime: '2026-09-06T09:00:00', distance: 8.1, duration: 1700, avgPace: 210 }),
+    act({ id: 31, startTime: '2026-09-06T08:20:00', distance: 2.0, duration: 600, avgPace: 300 }),
+  ]
+  it('los eventos son días de competición aunque no haya activación', () => {
+    expect(raceDatesFromPlan([], [ev({})])).toEqual(['2026-09-06'])
+  })
+  it('las carreras llevan el nombre, la prioridad y salen como «event»', () => {
+    const races = findRaces(runs, [], [], {}, '2026-10-28', [ev({}), ev({ id: 2, date: '2026-11-01', name: '15K Sevilla', priority: 'A', distanceKm: 15 })])
+    expect(races.map(r => [r.date, r.event?.name, r.source, r.activity?.id ?? null, r.upcoming])).toEqual([
+      ['2026-11-01', '15K Sevilla', 'event', null, true],
+      ['2026-09-06', 'CARRERA DEL PUEBLO', 'event', 30, false],
+    ])
+    expect(races[0].standardLabel).toBeNull()   // 15 km no es una distancia estándar
+  })
+  it('sin evento, la detección por la activación sigue funcionando', () => {
+    const races = findRaces(runs, [workout({ date: '2026-09-05' })], [], {}, '2026-10-28', [])
+    expect(races[0]).toMatchObject({ source: 'plan', event: null })
   })
 })
