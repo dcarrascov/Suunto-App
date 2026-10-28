@@ -17,32 +17,25 @@ Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes t�
 
 Elige una. Si cambias de una a otra, la lista de actividades se rehace con la fuente nueva (no se mezclan). El resto de la app es idéntico.
 
+Primero haz la **preparación común** y después sigue solo la sección de tu ruta: [Ruta A](#ruta-a--automática-cuenta-de-suunto) o [Ruta B](#ruta-b--ficheros-fit).
+
 ---
 
-## Qué necesitas antes de empezar
+## Preparación común (las dos rutas)
+
+### Qué necesitas
 
 | Programa | Para qué sirve | Cómo comprobarlo |
 | --- | --- | --- |
 | **Node.js** (v18 o superior) | Ejecutar la app web | `node --version` |
-| **Python** (v3.10 o superior) | Descargar datos de Suunto | `python3 --version` |
-| **suuntool** (solo Ruta A) | Iniciar sesión en Suunto una vez | `suuntool version` |
+| **Python** (v3.10 o superior) | Descargar y preparar los datos | `python3 --version` |
 
 > **¿No tienes Node.js o Python?**
 >
 > - Node.js: [https://nodejs.org](https://nodejs.org) → descarga la versión LTS.
 > - Python: [https://python.org/downloads](https://python.org/downloads) → en Mac/Linux suele venir instalado.
-
-> **Instalar suuntool (Ruta A)** — [github.com/tajchert/suuntool](https://github.com/tajchert/suuntool)
->
-> - Mac / Linux con Homebrew: `brew install --cask tajchert/tap/suuntool`
-> - Con Go instalado: `go install github.com/tajchert/suuntool@latest`
-> - Windows: no tiene binarios oficiales. Instala [Go](https://go.dev/dl/) (instalador para Windows), abre una PowerShell **nueva** y ejecuta `go install github.com/tajchert/suuntool@latest`. Queda en `%USERPROFILE%\go\bin\suuntool.exe`; añade esa carpeta al PATH o ejecútalo con la ruta completa. Alternativa: WSL (Ubuntu). Usa PowerShell o Windows Terminal (en Git Bash el login puede fallar con «stdin is not a TTY»).
 >
 > **En Windows**, donde pone `python3` usa `py`. Si PowerShell dice que la ejecución de scripts está deshabilitada (le pasa a `npm` y al entorno virtual), ejecuta una vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-
----
-
-## Guía paso a paso
 
 ### 1. Descargar el proyecto
 
@@ -51,8 +44,6 @@ Abre la carpeta del proyecto en la terminal:
 ```bash
 cd ruta/donde/está/suunto-stats
 ```
-
----
 
 ### 2. Instalar dependencias de Python
 
@@ -73,7 +64,7 @@ python3 -m pip install -r fetch/requirements.txt
 >
 > Cada vez que abras una terminal nueva, ejecuta `source .venv/bin/activate` antes de `python3 fetch/sync.py`.
 
-### 2b. Opciones personales en `.env` (opcional)
+### 3. Opciones personales en `.env` (opcional)
 
 Sin `.env` todo funciona con los datos de Suunto. Hace falta para la zona horaria, el plan de TrainingPeaks o el Entrenador IA (Gemini). Copia la plantilla y edita la copia:
 
@@ -85,7 +76,19 @@ Cada opción está explicada en el propio fichero; quita el `#` de las que uses 
 
 ---
 
-### 3A. Ruta A — Iniciar sesión en Suunto (solo la primera vez)
+## Ruta A — Automática (cuenta de Suunto)
+
+### A1. Instalar suuntool
+
+Solo sirve para iniciar sesión en Suunto una vez: [github.com/tajchert/suuntool](https://github.com/tajchert/suuntool)
+
+- Mac / Linux con Homebrew: `brew install --cask tajchert/tap/suuntool`
+- Con Go instalado: `go install github.com/tajchert/suuntool@latest`
+- Windows: no tiene binarios oficiales. Instala [Go](https://go.dev/dl/) (instalador para Windows), abre una PowerShell **nueva** y ejecuta `go install github.com/tajchert/suuntool@latest`. Queda en `%USERPROFILE%\go\bin\suuntool.exe`; añade esa carpeta al PATH o ejecútalo con la ruta completa. Alternativa: WSL (Ubuntu). Usa PowerShell o Windows Terminal (en Git Bash el login puede fallar con «stdin is not a TTY»).
+
+Compruébalo con `suuntool version`.
+
+### A2. Iniciar sesión en Suunto (solo la primera vez)
 
 ```bash
 suuntool login --email tu@email.com
@@ -99,9 +102,11 @@ Comprueba que todo va bien:
 suuntool doctor
 ```
 
-> `suuntool` solo admite email + contraseña. Si entras en la app de Suunto con Facebook u otro acceso social, crea primero una contraseña de Suunto (en la app: Ajustes → Cuenta → Cambiar contraseña; te llega un enlace por email). No está comprobado que eso baste en cuentas creadas con acceso social; si no funciona, usa la Ruta B.
+> `suuntool` solo admite email + contraseña. Si entras en la app de Suunto con Facebook u otro acceso social, crea primero una contraseña de Suunto (en la app: Ajustes → Cuenta → Cambiar contraseña; te llega un enlace por email). No está comprobado que eso baste en cuentas creadas con acceso social; si no funciona, usa la [Ruta B](#ruta-b--ficheros-fit).
 
-Después descarga tus actividades, desde la carpeta raíz del proyecto:
+### A3. Descargar tus actividades
+
+Desde la carpeta raíz del proyecto (para una primera prueba, solo las 20 últimas):
 
 ```bash
 python3 fetch/sync.py --limit 20
@@ -133,25 +138,7 @@ python3 fetch/sync.py --force
 
 > **Importante:** vuelve a ejecutar `python3 fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Suunto.
 
----
-
-### 3B. Ruta B — Usar ficheros FIT
-
-1. En la app de Suunto (móvil): Calendario → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT**. Envíatelo a tu ordenador.
-2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe).
-3. Desde la carpeta raíz del proyecto:
-
-```bash
-python3 fetch/sync.py --source fit
-```
-
-Opcional: en `.env` puedes poner `MAX_HR=190` (tu FC máxima) para que las zonas de FC se calculen con ella.
-
-> **¿Muchos entrenamientos?** Exportarlos de uno en uno es lento. Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; ver su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). Este proyecto lee ficheros `.fit`.
-
----
-
-### 4. Comprobar que los datos son correctos (opcional)
+### A4. Comprobar que los datos son correctos (opcional)
 
 ```bash
 python3 fetch/validate_output.py
@@ -159,9 +146,7 @@ python3 fetch/validate_output.py
 
 Debe terminar con `0 errores`.
 
----
-
-### 5. Instalar dependencias de la app web
+### A5. Instalar dependencias de la app web
 
 En la carpeta raíz del proyecto:
 
@@ -171,9 +156,7 @@ npm install
 
 Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
 
----
-
-### 6. Abrir la app
+### A6. Abrir la app
 
 ```bash
 npm run dev
@@ -185,16 +168,12 @@ Verás algo como:
   ➜  Local:   http://localhost:5173/
 ```
 
-Abre ese enlace en el navegador (Chrome, Firefox, Safari…).
+Abre ese enlace en el navegador (Chrome, Firefox, Safari…). Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
 
-Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
-
----
-
-## Resumen rápido (cuando ya lo hayas hecho una vez)
+### Resumen rápido de la Ruta A (cuando ya lo hayas hecho una vez)
 
 ```bash
-# 1. Sincronizar datos nuevos de Suunto (o todo de una vez en Windows: .\actualizar.ps1)
+# 1. Sincronizar datos nuevos de Suunto
 python3 fetch/sync.py
 
 # 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
@@ -205,6 +184,70 @@ npm run dev
 ```
 
 Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
+
+En Windows, `.\actualizar.ps1` hace el paso 1 y el 1b de una vez y valida los datos. Con la app abierta (`npm run dev`) también puedes actualizar con el **botón de recargar** que hay junto a SUUNTO/STATS, arriba en el menú.
+
+---
+
+## Ruta B — Ficheros FIT
+
+### B1. Exportar tus entrenamientos
+
+1. En la app de Suunto (móvil): Calendario → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT**. Envíatelo a tu ordenador.
+2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe).
+
+> **¿Muchos entrenamientos?** Exportarlos de uno en uno es lento. Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; ver su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). Este proyecto lee ficheros `.fit`.
+
+### B2. Leer los ficheros
+
+Desde la carpeta raíz del proyecto:
+
+```bash
+python3 fetch/sync.py --source fit
+```
+
+Opcional: en `.env` puedes poner `MAX_HR=190` (tu FC máxima) para que las zonas de FC se calculen con ella.
+
+### B3. Comprobar que los datos son correctos (opcional)
+
+```bash
+python3 fetch/validate_output.py
+```
+
+Debe terminar con `0 errores`.
+
+### B4. Instalar dependencias de la app web
+
+En la carpeta raíz del proyecto:
+
+```bash
+npm install
+```
+
+Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
+
+### B5. Abrir la app
+
+```bash
+npm run dev
+```
+
+Abre en el navegador el enlace que aparece (normalmente [http://localhost:5173](http://localhost:5173)). Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
+
+### Resumen rápido de la Ruta B (cuando ya lo hayas hecho una vez)
+
+```bash
+# 1. Copia los .fit nuevos a fetch/fit/ y léelos
+python3 fetch/sync.py --source fit
+
+# 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
+python3 fetch/tp_sync.py
+
+# 2. Arrancar la app
+npm run dev
+```
+
+> El botón de recargar de la app y `.\actualizar.ps1` usan la Ruta A (cuenta de Suunto); con ficheros FIT, actualiza con los comandos de arriba.
 
 ---
 
@@ -236,19 +279,19 @@ Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS
 
 ## Problemas frecuentes
 
-### "ERROR: No hay sesión de Suunto"
+### "ERROR: No hay sesión de Suunto" (Ruta A)
 
 Aún no has iniciado sesión. Ejecuta `suuntool login --email tu@email.com` y repite la sincronización.
 
-### "Sesión de Suunto no válida o caducada"
+### "Sesión de Suunto no válida o caducada" (Ruta A)
 
 La clave de sesión ya no vale. Repite `suuntool login --email tu@email.com`.
 
-### Pide el login y la contraseña es correcta
+### Pide el login y la contraseña es correcta (Ruta A)
 
 Prueba `suuntool doctor`. Si el login falla pero la contraseña es correcta, es posible que Suunto haya cambiado algo en su app y haga falta actualizar `suuntool` (`brew upgrade --cask suuntool` o `go install github.com/tajchert/suuntool@latest`).
 
-### Faltan actividades, o la ruta / los parciales salen vacíos
+### Faltan actividades, o la ruta / los parciales salen vacíos (Ruta A)
 
 Ejecuta `python3 fetch/sync.py --dump latest`. Guarda en `fetch/debug/` lo que devuelve Suunto para tu último entrenamiento; con eso se puede ver qué campo ha cambiado. Para pedir ayuda comparte **solo** el fichero `*.redacted.json` (sin coordenadas ni usuario): los demás ficheros de esa carpeta contienen tu ruta GPS.
 
@@ -256,7 +299,7 @@ Ejecuta `python3 fetch/sync.py --dump latest`. Guarda en `fetch/debug/` lo que d
 
 Pon tu zona horaria en `.env`: `SUUNTO_TIMEZONE=Europe/Madrid`.
 
-### "No hay ficheros .fit"
+### "No hay ficheros .fit" (Ruta B)
 
 Copia tus `.fit` en `fetch/fit/` (Ruta B) o ejecuta la sincronización sin `--source fit` (Ruta A).
 
@@ -272,7 +315,7 @@ python3 fetch/sync.py
 
 Instala Node.js desde [nodejs.org](https://nodejs.org) y vuelve a abrir la terminal.
 
-### La sincronización va muy lenta
+### La sincronización va muy lenta (Ruta A)
 
 Es normal: hay una pausa entre peticiones para no saturar el servidor de Suunto. Para una prueba rápida usa `--limit 20` o `--no-gpx`. Si ves errores 429, sube la pausa con `SUUNTO_PAUSE=1.5` en `.env`.
 
