@@ -73,6 +73,16 @@ python3 -m pip install -r fetch/requirements.txt
 >
 > Cada vez que abras una terminal nueva, ejecuta `source .venv/bin/activate` antes de `python3 fetch/sync.py`.
 
+### 2b. Opciones personales en `.env` (opcional)
+
+Sin `.env` todo funciona con los datos de Suunto. Hace falta para la zona horaria, el plan de TrainingPeaks o el Entrenador IA (Gemini). Copia la plantilla y edita la copia:
+
+```bash
+cp .env.example .env                  # Windows (PowerShell): Copy-Item .env.example .env
+```
+
+Cada opción está explicada en el propio fichero; quita el `#` de las que uses y pon tus valores. `.env` está en `.gitignore` y **nunca se sube a GitHub**: no pongas claves en `.env.example`.
+
 ---
 
 ### 3A. Ruta A — Iniciar sesión en Suunto (solo la primera vez)
@@ -308,7 +318,7 @@ Estos archivos contienen datos personales o credenciales. El `.gitignore` ya los
 
 | Archivo / carpeta | Qué contiene | Riesgo |
 | --- | --- | --- |
-| `.env` | Opciones personales (y la clave de sesión si la pusiste ahí) | Acceso a tu cuenta |
+| `.env` | Opciones personales, cookie de TrainingPeaks, clave de Gemini (y la de sesión de Suunto si la pusiste ahí) | Acceso a tus cuentas |
 | `~/.config/suuntool/session.json` (en tu home) | Clave de sesión de Suunto | Acceso a tu cuenta sin contraseña |
 | `public/data/` | Actividades, estadísticas y rutas GPS | Ubicación exacta, salud, hábitos |
 | `dist/data/` | Copia de los datos al hacer `npm run build` | Igual que arriba |
@@ -321,7 +331,7 @@ Estos archivos contienen datos personales o credenciales. El `.gitignore` ya los
 
 **Seguro para publicar:**
 
-- `.env.example` (solo tiene placeholders)
+- `.env.example` (solo tiene valores de ejemplo)
 - Todo el código en `src/` y `fetch/` (salvo las carpetas `fetch/debug/` y `fetch/fit/`)
 
 **Antes de hacer `git push`**, comprueba que no se cuelen datos:
