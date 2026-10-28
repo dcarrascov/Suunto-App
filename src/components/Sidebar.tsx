@@ -1,20 +1,24 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import {
+  Activity, BrainCircuit, CalendarDays, ClipboardList, Gauge, HeartPulse, History,
+  LayoutDashboard, Medal, Menu, Settings, TrendingUp, Trophy, X,
+} from 'lucide-react'
 import { useActivityStore } from '../stores/activityStore'
 
 const NAV = [
-  { to: '/', label: 'Resumen' },
-  { to: '/calendar', label: 'Calendario' },
-  { to: '/activities', label: 'Actividades' },
-  { to: '/plan', label: 'Plan' },
-  { to: '/races', label: 'Competiciones' },
-  { to: '/ia', label: 'Entrenador IA' },
-  { to: '/fitness', label: 'Forma' },
-  { to: '/zones', label: 'Zonas' },
-  { to: '/performance', label: 'Rendimiento' },
-  { to: '/records', label: 'Récords' },
-  { to: '/history', label: 'Historial' },
-  { to: '/settings', label: 'Ajustes' },
+  { to: '/', label: 'Resumen', icon: LayoutDashboard },
+  { to: '/calendar', label: 'Calendario', icon: CalendarDays },
+  { to: '/activities', label: 'Actividades', icon: Activity },
+  { to: '/plan', label: 'Plan', icon: ClipboardList },
+  { to: '/races', label: 'Competiciones', icon: Medal },
+  { to: '/ia', label: 'Entrenador IA', icon: BrainCircuit },
+  { to: '/fitness', label: 'Forma', icon: TrendingUp },
+  { to: '/zones', label: 'Zonas', icon: HeartPulse },
+  { to: '/performance', label: 'Rendimiento', icon: Gauge },
+  { to: '/records', label: 'Récords', icon: Trophy },
+  { to: '/history', label: 'Historial', icon: History },
+  { to: '/settings', label: 'Ajustes', icon: Settings },
 ]
 
 export default function Sidebar() {
@@ -38,27 +42,32 @@ export default function Sidebar() {
           aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={open}
         >
-          {open ? '✕' : '☰'}
+          {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
       {/* Nav */}
       <nav className={`${open ? 'block' : 'hidden'} md:block flex-1 pb-4`}>
-        {NAV.map(({ to, label }) => (
+        {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             onClick={() => setOpen(false)}
             className={({ isActive }) =>
-              `block py-2 text-sm transition-colors border-l-2 ${
+              `flex items-center gap-2.5 py-2 text-sm transition-colors border-l-2 ${
                 isActive
                   ? 'border-accent pl-[22px] text-white font-medium'
                   : 'border-transparent pl-[22px] text-slate-500 hover:text-slate-200'
               }`
             }
           >
-            {label}
+            {({ isActive }) => (
+              <>
+                <Icon size={16} strokeWidth={1.75} className={isActive ? 'text-accent' : ''} aria-hidden />
+                {label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
