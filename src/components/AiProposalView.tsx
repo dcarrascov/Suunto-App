@@ -101,7 +101,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
       )}
 
       {onDelete && (
-        <button onClick={onDelete} className="mt-3 text-xs text-slate-500 hover:text-red-300">Borrar propuesta</button>
+        <button onClick={onDelete} className="mt-3 px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-red-400 hover:text-red-300">Borrar propuesta</button>
       )}
     </div>
   )
