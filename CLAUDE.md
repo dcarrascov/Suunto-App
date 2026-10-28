@@ -29,6 +29,7 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
     `bestEfforts`, `bestEffortsSource`, `hrZoneSeconds` (Z1..Z5 del reloj), `decoupling` (%). Así la web no carga 1400 detalles.
 - `server/gemini.ts`: plugin de Vite (`vite.config.ts`) con la ruta `/api/gemini` en `npm run dev` y `npm run preview`.
   Lee `GEMINI_API_KEY` / `GEMINI_MODEL` del .env en cada petición; el navegador nunca ve la clave. Detalles en «Hecho».
+- `server/sync.ts`: plugin de Vite con la ruta `/api/sync` (botón de recargar → `actualizar.ps1`).
 
 ## Convenciones
 - **Fechas siempre en hora local.** `startTime` es ISO local sin zona. Nunca usar `toISOString()` para sacar un día:
@@ -39,7 +40,8 @@ Idioma del proyecto (UI, comentarios, commits): **español**. El usuario trabaja
   (`text-accent`/`bg-accent`, texto negro encima), esquinas casi rectas. Sin degradados, brillos ni emojis.
   En `index.css` se redefinen las escalas `slate` (grises) y `blue` (= lima), así que `text-blue-400` ya es lima.
   Dashboard con rejilla `.g-grid` / `.g-cell` / `.g-label`. Colores con significado (zonas, avisos) se mantienen.
-- Actualizar todo: `.\actualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`).
+- Actualizar todo: `.\actualizar.ps1` (sync + tp_sync si hay cookie + validación; `-Completo`, `-SinPlan`), o el
+  botón de recargar de la app (modo normal).
 - Comprobar antes de commit: `npx tsc -b`, `npm test` (vitest) y `py fetch\validate_output.py`.
 - **Git** (remoto `Suunto-App` en GitHub, repositorio público):
   - Rama principal `main`. Correcciones en `fix`; cada funcionalidad nueva en su rama `feature/<nombre>` creada desde
@@ -83,6 +85,15 @@ Plan de TrainingPeaks desde marzo de 2026 (~180 sesiones planificadas). FC máxi
   «Hoy toca», Forma y Competiciones (predicción a la distancia del evento). IA: la semana de una carrera se
   anuncia como «SEMANA DE COMPETICIÓN» (también la previa y el objetivo de temporada), tipo `competicion`, y se
   le pasan las semanas de competición anteriores del entrenador como ejemplo.
+- Entrenos propios en el Calendario («+» en cada día; pulsar uno para editar o eliminar): `utils/customWorkouts.ts`,
+  `stores/customWorkoutStore.ts` (localStorage `suunto-entrenos`), `CustomWorkoutDialog`. Solo se ven en el
+  Calendario: no van a TrainingPeaks ni cuentan en Plan, forma prevista o IA.
+- Iconos de Lucide (`lucide-react`) en el menú lateral, uno por sección.
+- Botón de recargar junto a SUUNTO/STATS: `server/sync.ts` (plugin de Vite, `POST /api/sync` + `GET /api/sync/status`,
+  solo localhost, una a la vez) lanza `actualizar.ps1`; `stores/syncStore.ts` sigue el progreso y al terminar
+  `reloadData()` relee los JSON. `SyncBar`: corredor (SVG propio) hasta la bandera. Reparto: lista de Suunto 0–40 %
+  por tiempo, actividades 40–80 % por el contador `[i/n]`, TrainingPeaks 80–95 %, validación 95–100 %.
+  Al navegador solo le llega paso y porcentaje, nunca la salida del script. Vite no vigila `public/data/` ni `fetch/`.
 
 - Forma prevista (`projectFitness` + `useFitnessProjection`) con el TSS planificado; Competiciones (`utils/races.ts`):
   día siguiente a «Activación precompetición» → la carrera más rápida ≥ 3 km; marcar/desmarcar en el Detalle

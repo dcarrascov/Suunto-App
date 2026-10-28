@@ -30,6 +30,7 @@ interface ActivityState {
   loadActivities: () => Promise<void>
   loadStats: () => Promise<void>
   loadPlan: () => Promise<void>
+  reloadData: () => Promise<void>
   updateSettings: (s: Partial<UserSettings>) => void
   loadDetail: (id: number) => Promise<ActivityDetail | null>
 }
@@ -78,6 +79,30 @@ export const useActivityStore = create<ActivityState>()(
         } catch {
           // el plan es opcional
         }
+      },
+
+      // Tras actualizar desde el botón: vuelve a leer los JSON sin pasar por la pantalla de carga
+      reloadData: async () => {
+        const read = async <T,>(url: string): Promise<T | null> => {
+          try {
+            const res = await fetch(url, { cache: 'no-store' })
+            return res.ok ? await res.json() as T : null
+          } catch {
+            return null
+          }
+        }
+        const [activities, stats, plan] = await Promise.all([
+          read<ActivitySummary[]>('/data/activities.json'),
+          read<GlobalStats>('/data/stats.json'),
+          read<TrainingPlan>('/data/plan.json'),
+        ])
+        activities?.sort((a, b) => b.startTime.localeCompare(a.startTime))
+        set(state => ({
+          activities: activities ?? state.activities,
+          stats: stats ?? state.stats,
+          plan: Array.isArray(plan?.workouts) ? plan : state.plan,
+          detailCache: {},
+        }))
       },
 
       updateSettings: (s) => {

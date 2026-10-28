@@ -129,3 +129,10 @@ body {
 }
 .route-pin--start span { background: #16a34a; }
 .route-pin--end span { background: #0f172a; font-size: 13px; }
+
+/* Corredor de la barra de actualizar (SyncBar): alterna dos posturas de piernas y brazos */
+@keyframes runner-a { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+@keyframes runner-b { 0%, 49% { opacity: 0 } 50%, 100% { opacity: 1 } }
+.runner-a { animation: runner-a 0.36s steps(1) infinite; }
+.runner-b { animation: runner-b 0.36s steps(1) infinite; }
+@media (prefers-reduced-motion: reduce) { .runner-a, .runner-b { animation: none; } .runner-b { opacity: 0; } }
