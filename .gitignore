@@ -18,6 +18,12 @@ dist-ssr
 .env.*.local
 !.env.example
 
+# Claude Code (instrucciones y ajustes locales) y diseños de prueba: solo en este ordenador
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+disenos/
+
 # Datos personales descargados de Suunto
 public/data/
 public/data/**
