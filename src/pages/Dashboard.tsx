@@ -10,6 +10,8 @@ import { useWeekComparison } from '../hooks/useWeekComparison'
 import { useTrainingStreak } from '../hooks/useTrainingStreak'
 import { useRunningVolume } from '../hooks/usePerformanceData'
 import TodayPlan from '../components/TodayPlan'
+import SettingsHints from '../components/SettingsHints'
+import ShoeAlert from '../components/ShoeAlert'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 // ─── Loading / Empty states ───────────────────────────────────────────────────
@@ -120,6 +122,9 @@ export default function Dashboard() {
           {stats?.syncedAt && ` · sincronizado el ${new Date(stats.syncedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
         </span>
       </div>
+
+      <SettingsHints />
+      <ShoeAlert />
 
       <div className="g-grid">
         {/* Forma */}

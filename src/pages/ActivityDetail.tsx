@@ -8,6 +8,7 @@ import ActivityMap from '../components/ActivityMap'
 import MetricCard from '../components/MetricCard'
 import ActivityStats from '../components/ActivityStats'
 import BestEfforts from '../components/BestEfforts'
+import ShoePicker from '../components/ShoePicker'
 import { isRaceActivity } from '../utils/races'
 import type { ActivitySummary } from '../types/suunto'
 
@@ -91,7 +92,10 @@ export default function ActivityDetailPage() {
             {formatDate(act.startTime)} · {sportLabel(act.sport)}
           </div>
         </div>
-        <RaceToggle act={summary ?? act} />
+        <div className="flex flex-wrap items-center gap-3">
+          <ShoePicker act={summary ?? act} />
+          <RaceToggle act={summary ?? act} />
+        </div>
       </div>
 
       {/* Map */}

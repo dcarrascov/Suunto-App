@@ -16,6 +16,7 @@ import Plan from './pages/Plan'
 import Races from './pages/Races'
 import AiCoach from './pages/AiCoach'
 import CalendarPage from './pages/CalendarPage'
+import Shoes from './pages/Shoes'
 
 export default function App() {
   const loadActivities = useActivityStore(s => s.loadActivities)
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/ia" element={<AiCoach />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/performance" element={<PerformanceAnalysis />} />
+            <Route path="/shoes" element={<Shoes />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
