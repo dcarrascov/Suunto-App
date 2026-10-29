@@ -158,6 +158,7 @@ export interface UserSettings {
   ftpDate?: string
   raceIds?: number[]      // actividades marcadas a mano como competición
   notRaceIds?: number[]   // actividades que la detección automática toma por competición y no lo son
+  dismissedHints?: Record<string, number>  // avisos de ajustes descartados: clave → valor propuesto (ver settingsCheck.ts)
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
