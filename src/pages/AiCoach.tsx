@@ -32,18 +32,29 @@ function Working({ text }: { text: string }) {
   return <span className="text-xs text-slate-400 animate-pulse">{text}</span>
 }
 
-/** Aviso cuando no se puede usar Gemini: sin servidor o sin clave. */
+/** Aviso cuando no se puede usar la IA: sin servidor o sin lo necesario en .env. */
 function SetupNotice({ status }: { status: GeminiStatus | null | undefined }) {
   if (status === undefined) return null
   if (status === null) {
     return (
       <div className="g-cell border border-line mb-6 text-sm text-slate-300">
-        <div className="g-label mb-2">Gemini no disponible</div>
-        Abre la app con <code className="text-slate-100">npm run dev</code>: la conexión con Gemini la hace ese servidor.
+        <div className="g-label mb-2">IA no disponible</div>
+        Abre la app con <code className="text-slate-100">npm run dev</code>: la conexión con la IA la hace ese servidor.
       </div>
     )
   }
   if (status.configured) return null
+  if (status.provider && status.provider !== 'gemini') {
+    return (
+      <div className="g-cell border border-amber-800/60 mb-6 text-sm text-slate-300 space-y-2">
+        <div className="g-label">Falta configurar la IA ({status.label})</div>
+        <p>
+          Añade <code className="text-slate-100">{status.missing}</code> al fichero <code className="text-slate-100">.env</code>
+          {' '}(los ejemplos están en <code>.env.example</code>). No hace falta reiniciar.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="g-cell border border-amber-800/60 mb-6 text-sm text-slate-300 space-y-2">
       <div className="g-label">Falta tu clave de Gemini</div>
@@ -54,6 +65,7 @@ function SetupNotice({ status }: { status: GeminiStatus | null | undefined }) {
       <pre className="bg-slate-900 px-3 py-2 text-xs text-slate-200">GEMINI_API_KEY=pega_aquí_tu_clave</pre>
       <p className="text-xs text-slate-500">
         No hace falta reiniciar: la app la lee al momento. Es como una contraseña: no la compartas.
+        ¿Prefieres otra IA (OpenAI, Mistral, Claude o una local con Ollama)? Mira <code>AI_PROVIDER</code> en <code>.env.example</code>.
       </p>
     </div>
   )
@@ -136,7 +148,7 @@ export default function AiCoach() {
     await run('week', async () => {
       const answer = await askGemini(weekPrompt(data, week, profile?.text ?? null), true)
       const r = parseProposal(answer.text, week)
-      if (!r.ok) throw new Error(`No he podido leer la respuesta de Gemini (${answer.model}): ${r.error} Vuelve a generarla.`)
+      if (!r.ok) throw new Error(`No he podido leer la respuesta de la IA (${answer.model}): ${r.error} Vuelve a generarla.`)
       saveProposal({ ...r.proposal, model: answer.model })
     })
   }
@@ -153,7 +165,7 @@ export default function AiCoach() {
         <h1 className="text-xl font-semibold text-slate-100">Entrenador IA</h1>
         {status?.configured && (
           <span className="text-xs text-slate-500" title={status.fallbacks?.length ? `Si falla varias veces: ${status.fallbacks.join(', ')}` : undefined}>
-            Conectado a Gemini · {status.model}
+            Conectado a {status.label ?? 'Gemini'} · {status.model}
           </span>
         )}
       </div>
@@ -178,12 +190,12 @@ export default function AiCoach() {
         {mode === 'coach' ? (
           <>
             <p>La IA imita a tu entrenador, no lo sustituye: él decide con cosas que no están en los datos. Úsalo como referencia.</p>
-            <p>A Gemini se envían tus datos de entrenamiento resumidos y las sesiones de tu entrenador, nunca rutas GPS.</p>
+            <p>A la IA se envían tus datos de entrenamiento resumidos y las sesiones de tu entrenador, nunca rutas GPS.</p>
           </>
         ) : (
           <>
             <p>Es un plan general: escucha a tu cuerpo y, si hay dolor o lesión, consulta a un profesional.</p>
-            <p>A Gemini se envían tus datos de entrenamiento resumidos (sin el plan de tu entrenador), nunca rutas GPS.</p>
+            <p>A la IA se envían tus datos de entrenamiento resumidos (sin el plan de tu entrenador), nunca rutas GPS.</p>
           </>
         )}
       </div>
@@ -207,7 +219,7 @@ export default function AiCoach() {
           ) : (
             <>
               <p className="text-sm text-slate-400">
-                Gemini analiza todas las sesiones de tu entrenador ({workouts.filter(w => w.hasPlan).length}) con sus descripciones
+                La IA analiza todas las sesiones de tu entrenador ({workouts.filter(w => w.hasPlan).length}) con sus descripciones
                 y escribe cómo planifica. Se usa al generar semanas. Repítelo de vez en cuando para que tenga en cuenta las nuevas.
               </p>
               <div className="flex flex-wrap items-center gap-3">
@@ -287,7 +299,7 @@ export default function AiCoach() {
           <div className="flex flex-wrap items-center gap-3">
             <button onClick={ask} disabled={!ready || !question.trim()} className={PRIMARY}>Preguntar</button>
             <span className="text-xs text-slate-600">Ctrl + Intro</span>
-            {busy === 'question' && <Working text="Gemini está pensando… (si está saturado, la app reintenta sola)" />}
+            {busy === 'question' && <Working text="La IA está pensando… (si está saturada, la app reintenta sola)" />}
             {error?.where === 'question' && <span className="text-xs text-red-300">{error.text}</span>}
           </div>
           {answers.map((x, i) => (

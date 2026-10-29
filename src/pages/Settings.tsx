@@ -149,7 +149,7 @@ export default function Settings() {
         {/* Avisos para el Entrenador IA */}
         <div className="g-cell col-span-12 lg:col-span-6 2xl:col-span-12 space-y-3">
           <div className="g-label">Entrenador IA</div>
-          <p className="text-xs text-slate-500">Avisos sobre tus datos que se le dan a Gemini para que no saque conclusiones equivocadas.</p>
+          <p className="text-xs text-slate-500">Avisos sobre tus datos que se le dan a la IA para que no saque conclusiones equivocadas.</p>
           <Toggle
             checked={!!settings.hrUnreliable}
             onChange={v => set('hrUnreliable', v)}

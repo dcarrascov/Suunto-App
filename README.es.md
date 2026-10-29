@@ -21,7 +21,7 @@ Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes t�
 | **Actividades** y **Detalle** | Lista con filtros; en cada actividad, mapa coloreado por ritmo, parciales, zonas, mejores tramos y las zapatillas que usaste |
 | **Plan** | El plan de tu entrenador en TrainingPeaks (opcional) con lo hecho y lo pendiente, y la **revisión de la semana con IA** |
 | **Competiciones** | Tus carreras, la forma con la que llegaste y la predicción para la próxima |
-| **Entrenador IA** | Con Gemini (gratis, opcional): pregúntale por tu entrenamiento y genera semanas **como tu entrenador** o **sin entrenador** para un objetivo (5K, 10K, media, maratón o ninguno); pásalas a tu Calendario |
+| **Entrenador IA** | Con Gemini (gratis, opcional; o con OpenAI, Mistral, Claude, una IA local con Ollama… ver [Elegir la IA](#elegir-la-ia)): pregúntale por tu entrenamiento y genera semanas **como tu entrenador** o **sin entrenador** para un objetivo (5K, 10K, media, maratón o ninguno); pásalas a tu Calendario |
 | **Forma, Zonas, Rendimiento, Récords, Historial** | CTL/ATL/TSB con previsión, 80/20, eficiencia, desacoplamiento, récords con predicción y totales por año |
 | **Zapatillas** | Km por par con etiquetas (rodaje, competición…) y aviso al acercarse al límite |
 | **Importar FIT** | Sube ficheros `.fit` desde el navegador (arrastrándolos); con cuenta de Suunto se suman a ella sin repetir sesiones |
@@ -304,6 +304,20 @@ En el menú lateral, entra en **Ajustes** para configurar:
 - Copia de seguridad: exporta e importa todo lo que la app guarda en tu navegador
 
 Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS y fitness. Si no cuadran con tus datos, el Resumen te lo avisa.
+
+---
+
+## Elegir la IA
+
+El Entrenador IA usa **Gemini** por defecto (`GEMINI_API_KEY` en `.env`; clave gratis de Google AI Studio). Para usar otra, pon `AI_PROVIDER` en `.env` (ejemplos en `.env.example`):
+
+| `AI_PROVIDER` | Sirve para | Qué poner |
+| --- | --- | --- |
+| `gemini` (por defecto) | Google Gemini | `GEMINI_API_KEY` y, si quieres, `GEMINI_MODEL` |
+| `openai` | Cualquier servicio con el formato de OpenAI: OpenAI, Mistral, Groq, DeepSeek, OpenRouter… o una IA en tu ordenador con **Ollama** / **LM Studio** (sin clave; tus datos no salen de tu equipo) | `AI_BASE_URL`, `AI_MODEL` y `AI_API_KEY` (no hace falta con localhost) |
+| `anthropic` | Claude | `AI_API_KEY` (de console.anthropic.com) y, si quieres, `AI_MODEL` (por defecto `claude-opus-5-5`) |
+
+Las claves se quedan en el servidor de la app y nunca llegan al navegador. No hace falta reiniciar: la app lee `.env` en cada petición.
 
 ---
 

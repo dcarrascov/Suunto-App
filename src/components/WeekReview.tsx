@@ -8,7 +8,7 @@ import { plannedForWeek, weekReviewPrompt } from '../utils/aiPrompt'
 import { toLocalISODate } from '../utils/date'
 import { askGemini } from '../utils/gemini'
 
-/** Quita el Markdown que a veces pone Gemini (negritas y títulos) para mostrarlo como texto. */
+/** Quita el Markdown que a veces pone la IA (negritas y títulos) para mostrarlo como texto. */
 const plainText = (t: string) => t.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s*/gm, '').replace(/^\s*[*-]\s+/gm, '• ')
 
 /** Primera frase con contenido (sin los títulos «1. Cumplimiento»…), para la línea plegada. */
@@ -62,7 +62,7 @@ export default function WeekReview({ weekStart }: { weekStart: string }) {
           className={`px-3 py-1.5 text-xs ${review ? 'border border-slate-600 text-slate-300 hover:border-slate-400' : 'bg-accent text-black font-medium hover:brightness-110'} disabled:opacity-40`}>
           {review ? 'Volver a revisar' : 'Revisar con IA'}
         </button>
-        {busy && <span className="text-xs text-slate-400 animate-pulse">Gemini está revisando la semana…</span>}
+        {busy && <span className="text-xs text-slate-400 animate-pulse">La IA está revisando la semana…</span>}
         {error && <span className="text-xs text-red-300">{error}</span>}
       </div>
       {review ? (
@@ -86,7 +86,7 @@ export default function WeekReview({ weekStart }: { weekStart: string }) {
       ) : (
         <p className="text-xs text-slate-500">
           Compara lo planificado (tu entrenador, la IA o tus entrenos propios) con lo que hiciste y te da consejos para la
-          siguiente. Gasta una petición de Gemini.
+          siguiente. Gasta una petición de la IA.
         </p>
       )}
     </div>

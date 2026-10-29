@@ -1,9 +1,12 @@
-// Ruta /api/gemini del servidor de Vite (npm run dev / npm run preview).
-// La clave GEMINI_API_KEY se lee del .env en el servidor y nunca llega al navegador ni al repositorio.
+// Ruta /api/gemini del servidor de Vite (npm run dev / npm run preview): la IA del Entrenador IA.
+// Por defecto Gemini; con AI_PROVIDER en .env, cualquier servicio con el formato de OpenAI (openai.ts) o Claude
+// (anthropic.ts). Las claves se leen del .env en el servidor y nunca llegan al navegador ni al repositorio.
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { loadEnv } from 'vite'
 import type { Connect, Plugin } from 'vite'
+import { callClaude, CLAUDE_DEFAULT_MODEL } from './anthropic.ts'
+import { callOpenAi, isLocalBase, OPENAI_DEFAULT_BASE } from './openai.ts'
 
 export const DEFAULT_MODEL = 'gemini-3.8-flash'
 // Si el principal falla varias veces, se prueba con estos (de mejor a más ligero; modelos estables de la documentación)
@@ -76,14 +79,17 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
  * petición rechazada) se devuelven al momento.
  */
 export async function callWithFallback(
-  opts: { apiKey: string; models: string[]; prompt: string; json?: boolean },
+  opts: { apiKey: string; models: string[]; prompt: string; json?: boolean; call?: (model: string) => Promise<string> },
   wait: (ms: number) => Promise<void> = sleep,
 ): Promise<GeminiResult> {
   let last: GeminiError | null = null
   for (const [i, model] of opts.models.entries()) {
     for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt++) {
       try {
-        const text = await callGemini({ apiKey: opts.apiKey, model, prompt: opts.prompt, json: opts.json })
+        // `call` = otro proveedor (OpenAI, Claude); sin él, Gemini
+        const text = opts.call
+          ? await opts.call(model)
+          : await callGemini({ apiKey: opts.apiKey, model, prompt: opts.prompt, json: opts.json })
         return { text, model, fellBack: i > 0 }
       } catch (e) {
         if (!(e instanceof GeminiError)) throw e
@@ -95,7 +101,7 @@ export async function callWithFallback(
     }
   }
   const tried = opts.models.join(', ')
-  throw new GeminiError(`${last?.message ?? 'Gemini no ha respondido.'} (probados: ${tried})`, last?.status ?? 503)
+  throw new GeminiError(`${last?.message ?? 'La IA no ha respondido.'} (probados: ${tried})`, last?.status ?? 503)
 }
 
 /** Llama a models.generateContent. Con `json`, pide la respuesta directamente en JSON. */
@@ -138,7 +144,61 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-/** Middleware: GET /api/gemini/status (¿hay clave?) y POST /api/gemini ({prompt, json} → {text}). */
+export type Provider = 'gemini' | 'openai' | 'anthropic'
+
+/** Qué IA usar según el .env: proveedor, modelos (el primero es el principal) y cómo llamarla. */
+export interface AiConfig {
+  provider: Provider | null       // null = AI_PROVIDER no reconocido
+  label: string                   // para mostrar en la app («Gemini», «Claude», «api.mistral.ai», «IA local»)
+  models: string[]
+  missing: string | null          // qué falta en .env para poder usarla
+  call: (model: string, prompt: string, json: boolean) => Promise<string>
+}
+
+const list = (v: string | undefined) => (v ?? '').split(',').map(x => x.trim()).filter(Boolean)
+
+export function aiConfig(env: Record<string, string>): AiConfig {
+  const provider = env.AI_PROVIDER?.trim().toLowerCase() || 'gemini'
+  if (provider === 'openai') {
+    const base = env.AI_BASE_URL?.trim() || OPENAI_DEFAULT_BASE
+    const apiKey = env.AI_API_KEY?.trim() ?? ''
+    const model = env.AI_MODEL?.trim() ?? ''
+    const local = isLocalBase(base)
+    let host = base
+    try { host = new URL(base).hostname } catch { /* se deja tal cual */ }
+    return {
+      provider, label: local ? 'IA local' : host,
+      models: model ? [model, ...list(env.AI_FALLBACK_MODELS).filter(m => m !== model)] : [],
+      missing: !model ? 'AI_MODEL' : !apiKey && !local ? 'AI_API_KEY' : null,
+      call: (m, prompt, json) => callOpenAi({ baseUrl: base, apiKey, model: m, prompt, json }),
+    }
+  }
+  if (provider === 'anthropic') {
+    const apiKey = env.AI_API_KEY?.trim() || env.ANTHROPIC_API_KEY?.trim() || ''
+    const model = env.AI_MODEL?.trim() || CLAUDE_DEFAULT_MODEL
+    return {
+      provider, label: 'Claude',
+      models: [model, ...list(env.AI_FALLBACK_MODELS).filter(m => m !== model)],
+      missing: apiKey ? null : 'AI_API_KEY',
+      call: (m, prompt) => callClaude({ apiKey, model: m, prompt }),
+    }
+  }
+  if (provider === 'gemini') {
+    const apiKey = env.GEMINI_API_KEY?.trim() ?? ''
+    return {
+      provider, label: 'Gemini',
+      models: modelChain(env.GEMINI_MODEL?.trim() || DEFAULT_MODEL),
+      missing: apiKey ? null : 'GEMINI_API_KEY',
+      call: (m, prompt, json) => callGemini({ apiKey, model: m, prompt, json }),
+    }
+  }
+  return {
+    provider: null, label: provider, models: [], missing: 'AI_PROVIDER (gemini, openai o anthropic)',
+    call: async () => { throw new GeminiError('AI_PROVIDER no es gemini, openai ni anthropic.', 400) },
+  }
+}
+
+/** Middleware: GET /api/gemini/status (¿está configurada?) y POST /api/gemini ({prompt, json} → {text}). */
 export function geminiMiddleware(getEnv: () => Record<string, string>): Connect.NextHandleFunction {
   return (req, res, next) => {
     const url = req.url?.split('?')[0]
@@ -146,25 +206,27 @@ export function geminiMiddleware(getEnv: () => Record<string, string>): Connect.
     // solo desde este ordenador: aunque el servidor se abra a la red (--host), nadie más gasta tu clave
     if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
 
-    const env = getEnv()
-    const apiKey = env.GEMINI_API_KEY?.trim()
-    const model = env.GEMINI_MODEL?.trim() || DEFAULT_MODEL
-    const models = modelChain(model)
-    if (url === '/api/gemini/status') return send(res, 200, { configured: !!apiKey, model, fallbacks: models.slice(1) })
+    const cfg = aiConfig(getEnv())
+    const [model = '', ...fallbacks] = cfg.models
+    if (url === '/api/gemini/status') {
+      return send(res, 200, { configured: !cfg.missing, model, fallbacks, provider: cfg.provider ?? 'desconocido', label: cfg.label, missing: cfg.missing })
+    }
     if (req.method !== 'POST') return send(res, 405, { error: 'Usa POST.' })
-    if (!apiKey) return send(res, 400, { error: 'Falta GEMINI_API_KEY en el fichero .env.' })
+    if (cfg.missing) return send(res, 400, { error: `Falta ${cfg.missing} en el fichero .env.` })
 
     readBody(req)
       .then(raw => {
         const body = JSON.parse(raw) as { prompt?: unknown; json?: unknown }
         if (typeof body.prompt !== 'string' || !body.prompt.trim()) throw new GeminiError('Falta el texto de la petición.', 400)
-        return callWithFallback({ apiKey, models, prompt: body.prompt, json: body.json === true })
+        const prompt = body.prompt
+        const json = body.json === true
+        return callWithFallback({ apiKey: '', models: cfg.models, prompt, json, call: m => cfg.call(m, prompt, json) })
       })
       .then(result => send(res, 200, result))
       .catch((e: unknown) => {
         if (e instanceof GeminiError) return send(res, e.status, { error: e.message })
         if (e instanceof SyntaxError) return send(res, 400, { error: 'Petición mal formada.' })
-        send(res, 500, { error: 'Error inesperado al llamar a Gemini.' })
+        send(res, 500, { error: 'Error inesperado al llamar a la IA.' })
       })
   }
 }

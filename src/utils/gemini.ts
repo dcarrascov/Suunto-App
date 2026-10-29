@@ -1,10 +1,13 @@
-// Cliente de la ruta /api/gemini del servidor de Vite (server/gemini.ts).
-// El navegador nunca ve la clave: solo manda el texto y recibe la respuesta.
+// Cliente de la ruta /api/gemini del servidor de Vite (server/gemini.ts): la IA que haya en .env (Gemini por
+// defecto; o un servicio con el formato de OpenAI, o Claude, con AI_PROVIDER). El navegador nunca ve la clave.
 
 export interface GeminiStatus {
-  configured: boolean   // hay GEMINI_API_KEY en .env
+  configured: boolean   // está todo lo necesario en .env
   model: string         // modelo principal
-  fallbacks?: string[]  // inferiores que se prueban si el principal falla varias veces
+  fallbacks?: string[]  // los que se prueban si el principal falla varias veces
+  provider?: 'gemini' | 'openai' | 'anthropic' | 'desconocido'
+  label?: string        // nombre para mostrar: «Gemini», «Claude», «api.mistral.ai», «IA local»
+  missing?: string | null  // qué falta en .env (p. ej. GEMINI_API_KEY)
 }
 
 export interface GeminiAnswer {
@@ -25,8 +28,8 @@ export async function geminiStatus(): Promise<GeminiStatus | null> {
 }
 
 /**
- * Manda el texto a Gemini y devuelve su respuesta. Con `json`, Gemini responde directamente en JSON.
- * El servidor reintenta si Gemini está saturado y, si no hay manera, usa un modelo inferior.
+ * Manda el texto a la IA y devuelve su respuesta. Con `json`, se le pide la respuesta en JSON.
+ * El servidor reintenta si está saturada y, si no hay manera, prueba los modelos de reserva.
  */
 export async function askGemini(prompt: string, json = false): Promise<GeminiAnswer> {
   let res: Response
@@ -40,6 +43,6 @@ export async function askGemini(prompt: string, json = false): Promise<GeminiAns
     throw new Error('No se pudo contactar con el servidor de la app. ¿Está abierto `npm run dev`?')
   }
   const data = await res.json().catch(() => ({})) as Partial<GeminiAnswer> & { error?: string }
-  if (!res.ok || typeof data.text !== 'string') throw new Error(data.error ?? `Error ${res.status} al llamar a Gemini.`)
+  if (!res.ok || typeof data.text !== 'string') throw new Error(data.error ?? `Error ${res.status} al llamar a la IA.`)
   return { text: data.text, model: data.model ?? '', fellBack: data.fellBack === true }
 }
