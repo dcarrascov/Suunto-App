@@ -71,8 +71,79 @@ export default function CalendarPage() {
     .filter(a => a.sport === 'running' && parseLocalDate(a.startTime).getMonth() === cursor.month && parseLocalDate(a.startTime).getFullYear() === cursor.year)
     .reduce((s, a) => s + a.distance, 0)
 
+  // Lo de un día (competiciones, actividades, plan sin hacer y entrenos propios): igual en la cuadrícula y en la agenda
+  const dayItems = (day: string) => {
+    const acts = byDay.get(day) ?? []
+    const planned = plannedByDay.get(day) ?? []
+    const own = customOfDay.get(day) ?? []
+    return (
+      <>
+        {(eventsOfDay.get(day) ?? []).map(e => (
+          <Link
+            key={`ev-${e.id}`}
+            to="/races"
+            className="block text-[11px] leading-tight font-semibold bg-accent/15 border-l-2 border-accent text-accent px-1 py-0.5 truncate"
+            title={eventLabel(e)}
+          >
+            {e.name}
+          </Link>
+        ))}
+        {acts.map(a => (
+          <Link
+            key={a.id}
+            to={`/activity/${a.id}`}
+            className="flex items-center gap-1.5 text-[11px] leading-tight hover:bg-[#1f1f24] px-1 py-0.5"
+            title={`${a.title} · ${formatDuration(a.duration)}`}
+          >
+            <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(a.sport) }} />
+            <span className="text-slate-200">{a.distance > 0 ? `${a.distance.toFixed(1).replace('.', ',')} km` : formatDuration(a.duration)}</span>
+            {a.distance > 0 && <span className="text-slate-500">{formatDuration(a.duration)}</span>}
+          </Link>
+        ))}
+        {planned.map(w => (
+          <Link
+            key={w.id}
+            to="/plan"
+            className="block text-[11px] leading-tight border border-dashed border-slate-600 text-slate-400 px-1 py-0.5 truncate hover:text-white"
+            title={`Planificado: ${w.title}`}
+          >
+            {w.title}
+          </Link>
+        ))}
+        {own.map(w => (
+          <button
+            key={w.id}
+            onClick={() => setDialog({ id: w.id, form: toForm(w) })}
+            className="w-full flex items-center gap-1.5 text-left text-[11px] leading-tight border border-slate-500 bg-[#1b1b1f] text-slate-200 px-1 py-0.5 hover:border-accent"
+            title={[`${w.source === 'ia' ? 'Propuesta IA' : 'Propio'}: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
+          >
+            <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(w.sport) }} />
+            {w.source === 'ia' && <span className="text-[9px] font-semibold text-accent shrink-0">IA</span>}
+            <span className="truncate">{w.title}</span>
+          </button>
+        ))}
+      </>
+    )
+  }
+  const dayBadges = (day: string) => (
+    <>
+      {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
+      {eventsOfDay.get(day)?.some(e => e.priority) && (
+        <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
+      )}
+      <button
+        onClick={() => setDialog({ id: null, form: { ...EMPTY_FORM, date: day } })}
+        className="w-4 h-4 leading-none text-sm text-slate-400 hover:text-black hover:bg-accent lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100"
+        aria-label={`Añadir entreno el ${day}`}
+        title="Añadir entreno propio"
+      >
+        +
+      </button>
+    </>
+  )
+
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       <div className="flex flex-wrap gap-3 items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-slate-100 first-letter:uppercase">{monthName}</h1>
@@ -90,7 +161,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="hidden lg:block overflow-x-auto">
         <div className="min-w-[760px] grid grid-cols-[repeat(7,minmax(0,1fr))_4.5rem] gap-px bg-line border border-line">
           {WEEKDAYS.map(d => <div key={d} className="bg-[#0f0f11] px-2 py-1.5 g-label">{d}</div>)}
           <div className="bg-[#0f0f11] px-2 py-1.5 g-label text-right">Km</div>
@@ -101,73 +172,16 @@ export default function CalendarPage() {
             return [
               ...days.map(day => {
                 const inMonth = parseLocalDate(day).getMonth() === cursor.month
-                const acts = byDay.get(day) ?? []
-                const planned = plannedByDay.get(day) ?? []
-                const own = customOfDay.get(day) ?? []
                 return (
                   <div key={day} className={`group bg-cell min-h-[104px] p-1.5 ${inMonth ? '' : 'opacity-35'} ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
                     <div className="flex items-center justify-between">
                       <span className={`text-xs ${day === today ? 'text-accent font-semibold' : 'text-slate-500'}`}>{parseLocalDate(day).getDate()}</span>
                       <div className="flex items-center gap-1">
-                        {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
-                        {eventsOfDay.get(day)?.some(e => e.priority) && (
-                          <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
-                        )}
-                        <button
-                          onClick={() => setDialog({ id: null, form: { ...EMPTY_FORM, date: day } })}
-                          className="w-4 h-4 leading-none text-sm text-slate-400 hover:text-black hover:bg-accent md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
-                          aria-label={`Añadir entreno el ${day}`}
-                          title="Añadir entreno propio"
-                        >
-                          +
-                        </button>
+                        {dayBadges(day)}
                       </div>
                     </div>
                     <div className="mt-1 space-y-1">
-                      {(eventsOfDay.get(day) ?? []).map(e => (
-                        <Link
-                          key={`ev-${e.id}`}
-                          to="/races"
-                          className="block text-[11px] leading-tight font-semibold bg-accent/15 border-l-2 border-accent text-accent px-1 py-0.5 truncate"
-                          title={eventLabel(e)}
-                        >
-                          {e.name}
-                        </Link>
-                      ))}
-                      {acts.map(a => (
-                        <Link
-                          key={a.id}
-                          to={`/activity/${a.id}`}
-                          className="flex items-center gap-1.5 text-[11px] leading-tight hover:bg-[#1f1f24] px-1 py-0.5"
-                          title={`${a.title} · ${formatDuration(a.duration)}`}
-                        >
-                          <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(a.sport) }} />
-                          <span className="text-slate-200">{a.distance > 0 ? `${a.distance.toFixed(1).replace('.', ',')} km` : formatDuration(a.duration)}</span>
-                          {a.distance > 0 && <span className="text-slate-500">{formatDuration(a.duration)}</span>}
-                        </Link>
-                      ))}
-                      {planned.map(w => (
-                        <Link
-                          key={w.id}
-                          to="/plan"
-                          className="block text-[11px] leading-tight border border-dashed border-slate-600 text-slate-400 px-1 py-0.5 truncate hover:text-white"
-                          title={`Planificado: ${w.title}`}
-                        >
-                          {w.title}
-                        </Link>
-                      ))}
-                      {own.map(w => (
-                        <button
-                          key={w.id}
-                          onClick={() => setDialog({ id: w.id, form: toForm(w) })}
-                          className="w-full flex items-center gap-1.5 text-left text-[11px] leading-tight border border-slate-500 bg-[#1b1b1f] text-slate-200 px-1 py-0.5 hover:border-accent"
-                          title={[`${w.source === 'ia' ? 'Propuesta IA' : 'Propio'}: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
-                        >
-                          <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(w.sport) }} />
-                          {w.source === 'ia' && <span className="text-[9px] font-semibold text-accent shrink-0">IA</span>}
-                          <span className="truncate">{w.title}</span>
-                        </button>
-                      ))}
+                      {dayItems(day)}
                     </div>
                   </div>
                 )
@@ -178,6 +192,39 @@ export default function CalendarPage() {
             ]
           })}
         </div>
+      </div>
+
+      {/* Móvil y tablet: agenda por días (la cuadrícula no cabe) */}
+      <div className="lg:hidden border border-line divide-y divide-line">
+        {weeks.map(week => {
+          const days = Array.from({ length: 7 }, (_, i) => addDays(week, i)).filter(d => parseLocalDate(d).getMonth() === cursor.month)
+          const weekKm = days.flatMap(d => byDay.get(d) ?? []).filter(a => a.sport === 'running').reduce((s, a) => s + a.distance, 0)
+          return (
+            <div key={week}>
+              <div className="flex justify-between bg-[#0f0f11] px-3 py-1.5 g-label">
+                <span>Semana del {parseLocalDate(week).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
+                <span>{weekKm > 0 ? `${Math.round(weekKm)} km` : '–'}</span>
+              </div>
+              {days.map(day => {
+                const d = parseLocalDate(day)
+                const empty = !byDay.has(day) && !plannedByDay.has(day) && !customOfDay.has(day) && !eventsOfDay.has(day)
+                return (
+                  <div key={day} className={`flex gap-3 px-3 py-2 bg-cell border-t border-line ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
+                    <div className={`w-11 shrink-0 text-xs ${day === today ? 'text-accent font-semibold' : 'text-slate-500'}`}>
+                      <div className="uppercase">{WEEKDAYS[(d.getDay() + 6) % 7]}</div>
+                      <div className="text-base text-slate-200">{d.getDate()}</div>
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1 pt-0.5">
+                      {dayItems(day)}
+                      {empty && <div className="text-xs text-slate-600">—</div>}
+                    </div>
+                    <div className="flex items-start gap-1 pt-0.5">{dayBadges(day)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
 
       <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500">

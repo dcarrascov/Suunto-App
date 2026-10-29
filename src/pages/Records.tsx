@@ -87,7 +87,7 @@ export default function Records() {
   const hasApprox = Object.values(personalRecords).some(prs => prs.some(pr => pr.approx))
 
   return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div className="page">
       <h1 className="text-xl font-bold text-slate-100 mb-1">Récords Personales</h1>
       <p className="text-sm text-slate-500 mb-6">Mejor tramo de cada distancia dentro de tus actividades</p>
 

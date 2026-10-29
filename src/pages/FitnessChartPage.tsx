@@ -47,7 +47,7 @@ export default function FitnessChartPage() {
   const end = projection.at(-1)
 
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       <div className="flex flex-wrap gap-3 items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-slate-100">Forma</h1>
@@ -142,7 +142,7 @@ export default function FitnessChartPage() {
               )}
               {nextRaceDate && nextRaceDate > today && (
                 <ReferenceLine x={nextRaceDate} stroke="#c5f23c" strokeDasharray="2 3"
-                  label={{ value: nextRaceName ?? 'competición', fill: '#c5f23c', fontSize: 10, position: 'insideTopLeft' }} />
+                  label={{ value: nextRaceName ?? 'competición', fill: '#c5f23c', fontSize: 10, position: 'insideTopRight' }} />
               )}
               <Line type="monotone" dataKey="ctl" name="Fitness (CTL)" stroke="#c5f23c" dot={false} strokeWidth={2} connectNulls={false} />
               <Line type="monotone" dataKey="atl" name="Fatiga (ATL)" stroke="#a3a3a8" dot={false} strokeWidth={1.5} connectNulls={false} />

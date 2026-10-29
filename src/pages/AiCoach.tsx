@@ -148,7 +148,7 @@ export default function AiCoach() {
   }
 
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-100">Entrenador IA</h1>
         {status?.configured && (
