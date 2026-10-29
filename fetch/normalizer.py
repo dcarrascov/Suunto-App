@@ -439,11 +439,16 @@ def _secs(v, total_time):
     return v / 1000 if total_time and v > total_time * 1.5 else v
 
 
-def best_window_speed(dist_pts, window_s: float):
-    """Mayor velocidad media (m/s) en cualquier tramo de `window_s` s, sobre muestras [(t_s, dist_m)] acumuladas."""
+def best_window_speed(dist_pts, window_s: float, max_speed: float | None = None):
+    """
+    Mayor velocidad media (m/s) en cualquier tramo de `window_s` s, sobre muestras [(t_s, dist_m)] acumuladas.
+    Con `max_speed`, no cuenta lo recorrido entre dos muestras más rápido que eso (coche/moto o saltos del GPS).
+    """
     pts = sorted((t, d) for t, d in dist_pts if t is not None and d is not None)
     if len(pts) < 2 or pts[-1][0] - pts[0][0] < window_s:
         return None
+    if max_speed:
+        pts = list(zip(*_cumulative_without_jumps(pts, max_speed)))
     ts = [p[0] for p in pts]
 
     def dist_at(t):
@@ -470,7 +475,8 @@ EFFORT_DISTANCES = {
 # Velocidad máxima creíble (m/s): un tramo más rápido es un salto del GPS y se descarta
 EFFORT_MAX_SPEED = {"running": 6.5, "cycling": 25.0}  # 2:34 /km · 90 km/h
 # Sube cuando cambie el cálculo con muestras: sync.py vuelve a pedir las actividades afectadas
-EFFORTS_VERSION = 2
+# (2: mejores tramos sin trozos demasiado rápidos · 3: también los ritmos máximos de 30 s a 5 min)
+EFFORTS_VERSION = 3
 
 
 def _cumulative_without_jumps(pts, max_speed: float):
@@ -654,9 +660,10 @@ def detail_to_summary(detail: dict) -> dict:
     return {k: detail.get(k) for k in SUMMARY_FROM_DETAIL}
 
 
-def sample_extra(dist_pts, hr, alts) -> dict:
+def sample_extra(dist_pts, hr, alts, sport: str | None = None) -> dict:
     """Extras que se calculan a partir de las muestras (sirven para la nube y para FIT)."""
-    out = {k: _pace(best_window_speed(dist_pts, w)) for k, w in PEAK_WINDOWS.items()}
+    cap = EFFORT_MAX_SPEED.get(sport or "")
+    out = {k: _pace(best_window_speed(dist_pts, w, cap)) for k, w in PEAK_WINDOWS.items()}
     out["minHR"] = round(min(v for _, v in hr)) if hr else None
     if alts:
         out["minAltitude"] = round(min(h for _, h in alts), 1)
@@ -685,6 +692,8 @@ def build_extra(w: dict, summary: dict, samples: dict | None = None) -> dict:
     cad = w.get("cadence") if isinstance(w.get("cadence"), dict) else {}
 
     max_speed = _num(w.get("maxSpeed"))  # m/s
+    if max_speed and max_speed > EFFORT_MAX_SPEED.get(sport, float("inf")):
+        max_speed = None  # la del reloj no es creíble (coche/moto o salto del GPS): no se muestra
     avg_speed = _num(w.get("avgSpeed"))
     if not avg_speed and total_time:
         avg_speed = (_num(w.get("totalDistance"), 0.0) or 0.0) / total_time
@@ -762,6 +771,6 @@ def normalize_detail(summary: dict, w: dict, data: dict | None) -> dict:
         split_m = 5000.0 if summary["sport"] == "cycling" else 1000.0
         laps = auto_splits(dist_pts, hr, alts, split_m) or laps
     detail["laps"] = laps
-    detail["extra"] = build_extra(w, summary, sample_extra(dist_pts, hr, alts))
+    detail["extra"] = build_extra(w, summary, sample_extra(dist_pts, hr, alts, summary["sport"]))
     detail["decoupling"] = decoupling_from_samples(dist_pts, hr) or decoupling_from_laps(laps)
     return set_best_efforts(detail, dist_pts)
