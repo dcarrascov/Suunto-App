@@ -91,11 +91,14 @@ describe('textos para Gemini', () => {
     expect(p).toContain('SERIES SECRETAS')        // es anterior a la semana pedida
     expect(p).not.toContain('TIRADA FUTURA')
   })
-  it('nunca incluye rutas GPS y sí avisa del pulso poco fiable', () => {
+  it('nunca incluye rutas GPS; los avisos de pulso y de sesiones partidas solo si están activados en Ajustes', () => {
     const q = questionPrompt(data(), '¿Cómo voy?')
     expect(q).not.toMatch(/gpxCoords|routePace|\[\s*-?\d+\.\d{4,},/)
-    expect(q).toContain('pulso es de muñeca')
     expect(q).toContain('¿Cómo voy?')
+    expect(q).not.toContain('pulso es de muñeca')
+    const withHints = questionPrompt({ ...data(), settings: { ...DEFAULT_SETTINGS, hrUnreliable: true, splitSessions: true } }, '¿Cómo voy?')
+    expect(withHints).toContain('pulso es de muñeca')
+    expect(withHints).toContain('grabar por separado')
   })
   it('el análisis del entrenador lleva sus descripciones literales', () => {
     expect(coachProfilePrompt(data().workouts)).toContain('OBJETIVO: base aeróbica.')

@@ -159,6 +159,9 @@ export interface UserSettings {
   raceIds?: number[]      // actividades marcadas a mano como competición
   notRaceIds?: number[]   // actividades que la detección automática toma por competición y no lo son
   dismissedHints?: Record<string, number>  // avisos de ajustes descartados: clave → valor propuesto (ver settingsCheck.ts)
+  // Avisos para el Entrenador IA (desactivados por defecto; ver «Entrenador IA» en Ajustes)
+  hrUnreliable?: boolean   // pulso de muñeca poco fiable (sobre todo en competición): no planificar ni juzgar por pulso
+  splitSessions?: boolean  // graba por separado calentamiento, parte principal y vuelta a la calma
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {

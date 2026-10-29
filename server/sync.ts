@@ -1,4 +1,5 @@
-// Ruta /api/sync del servidor de Vite (npm run dev / npm run preview): lanza actualizar.ps1 y dice cómo va.
+// Ruta /api/sync del servidor de Vite (npm run dev / npm run preview): lanza el script de actualización
+// (actualizar.ps1 en Windows, actualizar.sh en Mac/Linux) y dice cómo va.
 // Al navegador solo le llegan el paso y el porcentaje, nunca la salida del script.
 
 import { spawn } from 'node:child_process'
@@ -36,7 +37,17 @@ const SUUNTO_END = 80
 const PLAN_END = 95
 const LIST_SECONDS = 20   // ritmo al que avanza mientras Suunto manda la lista (suele tardar ~30 s)
 
-/** Actualiza el estado con una línea de la salida de actualizar.ps1. */
+/** Programa y argumentos para lanzar la actualización en cada sistema. */
+export function updateCommand(platform: NodeJS.Platform, root: string): { cmd: string; args: string[] } {
+  if (platform === 'win32') {
+    return { cmd: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'actualizar.ps1')] }
+  }
+  return { cmd: 'bash', args: [join(root, 'actualizar.sh')] }
+}
+
+const SCRIPT_HINT = 'Ejecuta el script en la terminal para ver el motivo (.\\actualizar.ps1 en Windows, ./actualizar.sh en Mac/Linux).'
+
+/** Actualiza el estado con una línea de la salida del script de actualización. */
 export function applyLine(s: SyncState, raw: string): SyncState {
   const line = raw.trim()
   const step = /^== (.+) ==$/.exec(line)?.[1]
@@ -75,9 +86,9 @@ export function finish(s: SyncState, code: number | null, now: number): SyncStat
   const seconds = s.startedAt != null ?Math.round((now - s.startedAt) / 1000) : null
   if (code === 0) return { ...s, running: false, step: 'fin', percent: 100, ok: true, error: null, seconds }
   const error = s.step === 'validacion'
-    ? 'La validación ha encontrado errores en los datos. Ejecuta .\\actualizar.ps1 en la terminal para verlos.'
+    ? `La validación ha encontrado errores en los datos. ${SCRIPT_HINT}`
     : s.step === 'suunto'
-      ? 'Ha fallado la sincronización de Suunto (¿sesión de suuntool caducada o sin internet?). Ejecuta .\\actualizar.ps1 en la terminal para ver el motivo.'
+      ? `Ha fallado la sincronización de Suunto (¿sesión de suuntool caducada o sin internet?). ${SCRIPT_HINT}`
       : `El script ha terminado con error (código ${code ?? '?'}).`
   return { ...s, running: false, ok: false, error, seconds }
 }
@@ -89,8 +100,8 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-/** Middleware: POST /api/sync (lanza actualizar.ps1) y GET /api/sync/status (cómo va). */
-export function syncMiddleware(root: () => string): Connect.NextHandleFunction {
+/** Middleware: POST /api/sync (lanza el script) y GET /api/sync/status (cómo va). En la demo no actualiza nada. */
+export function syncMiddleware(root: () => string, demo: () => boolean = () => false): Connect.NextHandleFunction {
   let state: SyncState = IDLE
   return (req, res, next) => {
     const url = req.url?.split('?')[0]
@@ -98,14 +109,14 @@ export function syncMiddleware(root: () => string): Connect.NextHandleFunction {
     if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
     if (url === '/api/sync/status') return send(res, 200, withListProgress(state, Date.now()))
     if (req.method !== 'POST') return send(res, 405, { error: 'Usa POST.' })
+    if (demo()) return send(res, 403, { error: 'En la demo no se actualizan datos: son inventados (fetch/make_demo.py).' })
     if (state.running) return send(res, 409, state)   // ya hay una en marcha
 
     state = { ...IDLE, running: true, startedAt: Date.now() }
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(root(), 'actualizar.ps1')],
-      { cwd: root(), windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' } },
-    )
+    const { cmd, args } = updateCommand(process.platform, root())
+    const child = spawn(cmd, args, {
+      cwd: root(), windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+    })
     let pending = ''
     const onData = (chunk: Buffer) => {
       pending += chunk.toString('utf8')
@@ -117,7 +128,7 @@ export function syncMiddleware(root: () => string): Connect.NextHandleFunction {
     child.stdout.on('data', onData)
     child.stderr.on('data', onData)
     child.on('error', () => {
-      state = { ...state, running: false, ok: false, error: 'No se ha podido lanzar PowerShell.' }
+      state = { ...state, running: false, ok: false, error: `No se ha podido lanzar ${cmd}.` }
     })
     child.on('close', code => {
       if (pending) state = applyLine(state, pending)
@@ -130,16 +141,18 @@ export function syncMiddleware(root: () => string): Connect.NextHandleFunction {
 /** Plugin de Vite: añade la ruta en `npm run dev` y en `npm run preview`. */
 export function syncPlugin(): Plugin {
   let root = process.cwd()
+  let demo = false
   return {
     name: 'suunto-sync',
     configResolved(config) {
       root = config.root
+      demo = config.mode === 'demo'
     },
     configureServer(server) {
-      server.middlewares.use(syncMiddleware(() => root))
+      server.middlewares.use(syncMiddleware(() => root, () => demo))
     },
     configurePreviewServer(server) {
-      server.middlewares.use(syncMiddleware(() => root))
+      server.middlewares.use(syncMiddleware(() => root, () => demo))
     },
   }
 }

@@ -1,8 +1,11 @@
 # TrainingPeaks: ver el plan de tu entrenador
 
+[English](GUIDE_TRAININGPEAKS.md) · **Español**
+
 La página **Plan** de la app muestra los entrenos que te envía tu entrenador en TrainingPeaks:
 lo que te toca esta semana, el historial de semanas anteriores y cuánto cumpliste de cada sesión
-(emparejada con tu actividad de Suunto del mismo día). El Dashboard enseña además **Hoy toca**.
+(emparejada con tu actividad de Suunto del mismo día). El Resumen enseña además **Hoy toca**, y las
+competiciones de tu calendario de TrainingPeaks salen en **Calendario**, **Competiciones** y el Entrenador IA.
 
 > **Aviso.** TrainingPeaks no da su API oficial para uso personal, así que se usa la misma API
 > interna que usa su web, con tu sesión. Solo se **leen** datos (nunca se cambia nada), pero puede
@@ -30,16 +33,19 @@ otro sitio que no sea tu fichero `.env` (que no se sube a git).
 
 La primera vez, todo el historial (desde tu primera actividad de Suunto):
 
-```powershell
-py fetch\tp_sync.py --full
+```bash
+python3 fetch/tp_sync.py --full       # Windows: py fetch\tp_sync.py --full
 ```
 
 Después, cada vez que quieras actualizar (vuelve a pedir de 3 semanas atrás a 6 adelante, que es
-lo que tu entrenador puede haber cambiado):
+lo que tu entrenador puede haber cambiado, y las competiciones de los próximos 12 meses):
 
-```powershell
-py fetch\tp_sync.py
+```bash
+python3 fetch/tp_sync.py              # Windows: py fetch\tp_sync.py
 ```
+
+`.\actualizar.ps1` (Windows), `./actualizar.sh` (Mac/Linux) y el botón de recargar de la app también lo hacen
+solos cuando `TP_AUTH_COOKIE` está en `.env`.
 
 Los datos se guardan en `public/data/plan.json` (está en `.gitignore`). Recarga la app y abre **Plan**.
 
@@ -50,12 +56,13 @@ Los datos se guardan en `public/data/plan.json` (está en `.gitignore`). Recarga
 | `Falta TP_AUTH_COOKIE` | Sigue el paso 1. |
 | `La cookie ... ha caducado` | La sesión dura unas semanas: repite el paso 1 con una cookie nueva. |
 | `No encuentro tu id de atleta` | Añade `TP_ATHLETE_ID=tu_numero` al `.env`. Para verlo: en app.trainingpeaks.com abre el Calendario, pulsa F12 → pestaña **Network**, recarga (F5) y filtra por `athletes`; el número tras `/athletes/` en `tpapi.trainingpeaks.com/fitness/v6/athletes/1234567/...` es tu id. |
-| Las duraciones o distancias salen raras | Ejecuta `py fetch\tp_sync.py --dump` y revisa `fetch/debug/tp_workouts.json` (contiene tus datos: no lo compartas). |
+| Las duraciones o distancias salen raras | Ejecuta `python3 fetch/tp_sync.py --dump` y revisa `fetch/debug/tp_workouts.json` (contiene tus datos: no lo compartas). |
 
 ## Qué se ve en la app
 
 - **Esta semana:** cada día con su entreno: título, duración, distancia, ritmo y TSS planificados,
   la descripción y los comentarios del entrenador, y si ya lo hiciste (con enlace a la actividad).
 - **Estados:** ✓ Hecho (con % de lo planificado), ✗ No hecho (día pasado sin actividad), Hoy, Próximo, Descanso.
+- **Competiciones:** los eventos de tu calendario de TrainingPeaks, con nombre, prioridad (A/B/C) y distancia, el día de la carrera.
 - **Historial:** semanas anteriores con sesiones hechas, % de cumplimiento, tiempo y distancia
   frente a lo planificado. Pulsa una semana para ver sus entrenos.

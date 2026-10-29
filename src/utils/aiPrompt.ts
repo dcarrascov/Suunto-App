@@ -45,6 +45,10 @@ function plannedLine(w: PlannedWorkout): string {
   return `${w.title}${parts.length ? ` (${parts.join(', ')})` : ''}`
 }
 
+// Avisos sobre los datos del usuario, solo si los activa en Ajustes → Entrenador IA
+const HR_UNRELIABLE = 'Aviso sobre los datos: su pulso es de muñeca y no es fiable (en competición suele salir anormalmente bajo): no saques conclusiones del pulso, sobre todo en carreras.'
+const SPLIT_SESSIONS = 'Suele grabar por separado el calentamiento, la parte principal y la vuelta a la calma: varias actividades seguidas del mismo día son una sola sesión, no interrupciones.'
+
 /** Bloque con tu situación actual: forma, semanas recientes, competiciones, récords y plan cercano. */
 export function athleteContext(d: AthleteData): string {
   const today = d.today ?? toLocalISODate(new Date())
@@ -56,9 +60,11 @@ export function athleteContext(d: AthleteData): string {
   const lines: string[] = []
 
   lines.push('## Atleta')
-  lines.push(`Hoy es ${dayName(today)} ${today}. Corredor (≈97 % de las actividades son carrera a pie).`)
+  const runShare = d.activities.length ? Math.round(runs.length / d.activities.length * 100) : null
+  lines.push(`Hoy es ${dayName(today)} ${today}.${runShare != null ? ` El ${runShare} % de sus actividades son carrera a pie.` : ''}`)
   lines.push(`Ajustes: FC máxima ${d.settings.maxHR} ppm${d.stats?.userMaxHR && d.stats.userMaxHR !== d.settings.maxHR ? ` (Suunto estima ${d.stats.userMaxHR})` : ''}, FC umbral ${d.settings.lthrRunning} ppm, ritmo umbral ${formatPace(d.settings.thresholdPace)}.`)
-  lines.push('Aviso sobre los datos: el pulso es de muñeca y en competición sale anormalmente bajo (≈145 ppm a 3:30/km), así que no saques conclusiones del pulso en carreras. Las zonas del reloj están configuradas bajas.')
+  if (d.settings.hrUnreliable) lines.push(HR_UNRELIABLE)
+  if (d.settings.splitSessions) lines.push(SPLIT_SESSIONS)
 
   if (cur) {
     lines.push('', '## Forma (modelo CTL/ATL/TSB)')
@@ -451,7 +457,9 @@ export function freeWeekPrompt(full: AthleteData, weekStart: string, goal: FreeG
     '  ritmo umbral / 10 km; media maratón → tempo y bloques largos a ritmo de media; maratón → tirada larga con bloques a ritmo',
     '  de maratón; sin objetivo → variedad (fartlek, cuestas, tempo corto, rectas).',
     '- Tirada larga: como mucho el 30 % del tiempo semanal (35 % en maratón); que no supere en más de 15 min la más larga reciente.',
-    '- Planifica por TIEMPO y por ritmo o RPE, nunca por pulso: su pulso de muñeca no es fiable.',
+    full.settings.hrUnreliable
+      ? '- Planifica por TIEMPO y por ritmo o RPE, nunca por pulso: su pulso de muñeca no es fiable.'
+      : '- Planifica por TIEMPO y por ritmo o RPE; el pulso, solo como referencia secundaria.',
     '- Semana de la carrera: baja el volumen un 40-50 %, mantén algo de ritmo corto, activación suave el día antes y la carrera',
     '  ese día. Afinado: baja el volumen progresivamente y conserva la intensidad.',
     '- Si empieza a correr: alterna correr y andar (p. ej. 1 min corriendo / 2 andando) y sube poco a poco.',
@@ -530,9 +538,9 @@ export function weekReviewPrompt(d: AthleteData, weekStart: string, planned: Pla
     '2. Lo que salió bien.',
     '3. A vigilar (carga, descanso, intensidad).',
     '4. Para la semana siguiente (2-3 consejos concretos).',
-    'Sé concreto y apóyate en los datos. No saques conclusiones del pulso en carreras: su pulso de muñeca no es fiable.',
-    'Suele grabar por separado el calentamiento, la parte principal y la vuelta a la calma: varias actividades seguidas',
-    'del mismo día son una sola sesión, no interrupciones. Habla de tú y no te presentes como su entrenador.',
+    'Sé concreto y apóyate en los datos. Habla de tú y no te presentes como su entrenador.',
+    d.settings.hrUnreliable ? HR_UNRELIABLE : '',
+    d.settings.splitSessions ? SPLIT_SESSIONS : '',
     'Texto plano, sin Markdown (sin asteriscos ni almohadillas): cada sección empieza con su número y título en una línea.',
     planned.kind === 'coach' ? 'Tiene entrenador: no le contradigas; si algo preocupa, que lo hable con él.' : '',
     '',

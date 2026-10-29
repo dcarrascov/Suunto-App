@@ -133,7 +133,7 @@ export default function Settings() {
         </div>
 
         {/* Ciclismo */}
-        <div className="g-cell col-span-12 2xl:col-span-4 space-y-6">
+        <div className="g-cell col-span-12 lg:col-span-6 2xl:col-span-4 space-y-6">
           <div className="g-label">Ciclismo</div>
           <Field
             label="FTP (Functional Threshold Power)"
@@ -146,12 +146,42 @@ export default function Settings() {
           />
         </div>
 
+        {/* Avisos para el Entrenador IA */}
+        <div className="g-cell col-span-12 lg:col-span-6 2xl:col-span-12 space-y-3">
+          <div className="g-label">Entrenador IA</div>
+          <p className="text-xs text-slate-500">Avisos sobre tus datos que se le dan a Gemini para que no saque conclusiones equivocadas.</p>
+          <Toggle
+            checked={!!settings.hrUnreliable}
+            onChange={v => set('hrUnreliable', v)}
+            label="Mi pulso de muñeca no es fiable"
+            hint="Sobre todo en competición (sale demasiado bajo). La IA planifica por tiempo y ritmo y no juzga por el pulso."
+          />
+          <Toggle
+            checked={!!settings.splitSessions}
+            onChange={v => set('splitSessions', v)}
+            label="Grabo por separado calentamiento, parte principal y vuelta a la calma"
+            hint="Varias actividades seguidas del mismo día cuentan como una sola sesión, no como interrupciones."
+          />
+        </div>
+
         {/* Copia de seguridad */}
         <div className="g-cell col-span-12">
           <BackupSection />
         </div>
       </div>
     </div>
+  )
+}
+
+function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint: string }) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="mt-0.5 accent-blue-500 w-4 h-4 shrink-0" />
+      <span>
+        <span className="block text-sm text-slate-300">{label}</span>
+        <span className="block text-xs text-slate-600 mt-0.5">{hint}</span>
+      </span>
+    </label>
   )
 }
 

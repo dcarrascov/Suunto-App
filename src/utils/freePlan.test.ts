@@ -69,7 +69,8 @@ describe('plan sin entrenador: texto para Gemini', () => {
     expect(p).toContain('tirada larga preferida el domingo')
     expect(p).toContain('media 65 min')
     expect(p).toContain('Zonas de ritmo')
-    expect(p).toContain('nunca por pulso')
+    expect(p).toContain('el pulso, solo como referencia secundaria')
+    expect(freeWeekPrompt({ ...data(runs), settings: { ...DEFAULT_SETTINGS, hrUnreliable: true } }, '2026-11-02', goal())).toContain('nunca por pulso')
     expect(p).not.toContain('SERIES SECRETAS DEL COACH')
   })
   it('sin datos: usa el nivel y pide RPE', () => {

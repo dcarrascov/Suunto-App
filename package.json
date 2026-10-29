@@ -1,10 +1,13 @@
 {
   "name": "suunto-stats",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Panel personal de entrenamiento con tus datos de Suunto, el plan de TrainingPeaks y un entrenador IA con Gemini",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "demo": "vite --mode demo",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
