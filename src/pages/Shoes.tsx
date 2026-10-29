@@ -122,7 +122,7 @@ export default function Shoes() {
   }
 
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-semibold text-slate-100">Zapatillas</h1>
         <button className={PRIMARY} onClick={openNew}>Añadir zapatillas</button>
@@ -133,9 +133,9 @@ export default function Shoes() {
       </p>
 
       {showForm && (
-        <form onSubmit={save} className="g-cell border border-slate-700 mb-6 space-y-3 max-w-3xl">
+        <form onSubmit={save} className="g-cell border border-slate-700 mb-6 space-y-3">
           <div className="g-label">{editing ? 'Editar zapatillas' : 'Nuevas zapatillas'}</div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label className="block text-xs text-slate-400">Nombre
               <input autoFocus className={`${FIELD} mt-1`} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Marca y modelo" />
             </label>
@@ -146,7 +146,7 @@ export default function Shoes() {
               </select>
             </label>
             {form.tagId === NEW_TAG && (
-              <label className="block text-xs text-slate-400 sm:col-span-2">Nombre de la etiqueta nueva
+              <label className="block text-xs text-slate-400 sm:col-span-2 xl:col-span-4">Nombre de la etiqueta nueva
                 <input className={`${FIELD} mt-1`} value={form.newTag} onChange={e => set('newTag', e.target.value)} placeholder="Trail, Pista…" />
               </label>
             )}
@@ -186,7 +186,7 @@ export default function Shoes() {
         </details>
       )}
 
-      <div className="g-cell border border-line max-w-3xl space-y-2">
+      <div className="g-cell border border-line space-y-2">
         <div className="g-label">Etiquetas</div>
         <div className="flex flex-wrap gap-2">
           {st.tags.map(t => (
