@@ -3,6 +3,7 @@ import { useActivityStore } from '../stores/activityStore'
 import { useAiStore } from '../stores/aiStore'
 import { useFitnessProjection } from '../hooks/useFitnessProjection'
 import AiProposalView from '../components/AiProposalView'
+import FreePlanner from '../components/FreePlanner'
 import { coachProfilePrompt, isBacktestWeek, questionPrompt, weekPrompt } from '../utils/aiPrompt'
 import type { AthleteData } from '../utils/aiPrompt'
 import { coachHasWeek, parseProposal } from '../utils/aiProposal'
@@ -64,7 +65,7 @@ export default function AiCoach() {
   const plan = useActivityStore(s => s.plan)
   const settings = useActivityStore(s => s.settings)
   const { history, projection } = useFitnessProjection()
-  const { profile, proposals, saveProfile, clearProfile, saveProposal, deleteProposal } = useAiStore()
+  const { profile, proposals, saveProfile, clearProfile, saveProposal, deleteProposal, freeProposals, deleteFreeProposal } = useAiStore()
 
   const [status, setStatus] = useState<GeminiStatus | null | undefined>(undefined)
   const [question, setQuestion] = useState('')
@@ -90,12 +91,16 @@ export default function AiCoach() {
   const [chosenWeek, setWeek] = useState<string | null>(null)
   const week = chosenWeek ?? defaultWeek
   const weekOptions = [-4, -3, -2, -1, 0, 1, 2, 3].map(n => shiftWeek(thisWeek, n))
+  // Pestaña: como tu entrenador (si hay plan de TrainingPeaks) o sin entrenador
+  const [chosenMode, setMode] = useState<'coach' | 'free' | null>(null)
+  const mode = chosenMode ?? (workouts.length > 0 ? 'coach' : 'free')
+  const hasData = activities.length > 0
 
   const data: AthleteData = useMemo(
     () => ({ activities, stats, workouts, events: plan?.events ?? [], settings, history, projection, today }),
     [activities, stats, workouts, plan, settings, history, projection, today],
   )
-  const savedProposals = Object.values(proposals).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+  const savedProposals = Object.values(mode === 'coach' ? proposals : freeProposals).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
   const backtest = isBacktestWeek(week, today)
   const ready = !!status?.configured && busy === null
 
@@ -137,11 +142,9 @@ export default function AiCoach() {
   }
 
   function removeProposal(weekStart: string) {
-    if (window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(weekStart)}?`)) deleteProposal(weekStart)
-  }
-
-  if (activities.length === 0) {
-    return <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">Sin datos. Ejecuta primero .\actualizar.ps1</div>
+    if (!window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(weekStart)}?`)) return
+    if (mode === 'coach') deleteProposal(weekStart)
+    else deleteFreeProposal(weekStart)
   }
 
   return (
@@ -155,12 +158,13 @@ export default function AiCoach() {
         )}
       </div>
       <p className="text-sm text-slate-500 mt-0.5 mb-4 max-w-3xl">
-        Pregunta sobre tu entrenamiento y genera semanas al estilo de tu entrenador. Lo que propone la IA se queda en
-        esta app: nunca se envía a TrainingPeaks.
+        Pregunta sobre tu entrenamiento y genera semanas al estilo de tu entrenador o, sin entrenador, para tu objetivo.
+        Lo que propone la IA se queda en esta app (y en tu Calendario si la pasas): nunca se envía a TrainingPeaks.
       </p>
       <div className="text-xs text-slate-500 border-l-2 border-slate-600 pl-3 mb-6 max-w-3xl space-y-1">
         <p>La IA imita a tu entrenador, no lo sustituye: él decide con cosas que no están en los datos. Úsalo como referencia.</p>
         <p>A Gemini se envían tus datos de entrenamiento resumidos y las sesiones de tu entrenador, nunca rutas GPS.</p>
+        <p>Sin entrenador, la IA propone un plan general: escucha a tu cuerpo y, si hay dolor o lesión, consulta a un profesional.</p>
       </div>
 
       <SetupNotice status={status} />
@@ -168,7 +172,8 @@ export default function AiCoach() {
       <div className="g-grid">
         {/* 1 · Preguntar */}
         <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
-          <div className="g-label">1 · Preguntar sobre tu entrenamiento</div>
+          <div className="g-label">Preguntar sobre tu entrenamiento</div>
+          {!hasData && <div className="text-xs text-slate-500">Sin actividades del reloj la IA solo puede responder en general (ejecuta .\actualizar.ps1).</div>}
           <textarea
             value={question}
             onChange={e => setQuestion(e.target.value)}
@@ -194,9 +199,35 @@ export default function AiCoach() {
           ))}
         </div>
 
-        {/* 2 · Perfil del entrenador */}
+        {/* Pestañas: como tu entrenador / sin entrenador */}
         <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
-          <div className="g-label">2 · Perfil de tu entrenador</div>
+          <div className="g-label">Generar semanas</div>
+          <div className="flex gap-0.5 bg-slate-800 p-0.5 w-fit" role="tablist">
+            {([['coach', 'Como tu entrenador'], ['free', 'Sin entrenador']] as const).map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+                className={`px-3 py-1.5 text-sm ${mode === k ? 'bg-accent text-black font-medium' : 'text-slate-300 hover:bg-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">
+            {mode === 'coach'
+              ? 'Analiza las sesiones de tu entrenador en TrainingPeaks y propone semanas como las haría él.'
+              : 'Sin entrenador: elige un objetivo (5K, 10K, media, maratón o ninguno) y la IA planifica a partir de tus entrenos.'}
+          </p>
+        </div>
+
+        {mode === 'free' && (
+          <div className="g-cell col-span-12 space-y-3">
+            <div className="g-label">Plan sin entrenador</div>
+            <FreePlanner data={data} enabled={ready} />
+          </div>
+        )}
+
+        {/* 2 · Perfil del entrenador */}
+        {mode === 'coach' && <>
+        <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
+          <div className="g-label">1 · Perfil de tu entrenador</div>
           {workouts.length === 0 ? (
             <div className="text-sm text-slate-500">Hace falta el plan de TrainingPeaks (.\actualizar.ps1 con la cookie).</div>
           ) : (
@@ -232,9 +263,12 @@ export default function AiCoach() {
 
         {/* 3 · Generar semana */}
         <div className="g-cell col-span-12 space-y-3">
-          <div className="g-label">3 · Generar una semana como tu entrenador</div>
+          <div className="g-label">2 · Generar una semana como tu entrenador</div>
           {workouts.length === 0 ? (
-            <div className="text-sm text-slate-500">Hace falta el plan de TrainingPeaks para que la IA aprenda su estilo.</div>
+            <div className="text-sm text-slate-500">
+              Hace falta el plan de TrainingPeaks para que la IA aprenda su estilo. Sin entrenador, usa la pestaña
+              <button onClick={() => setMode('free')} className="text-accent hover:underline ml-1">Sin entrenador</button>.
+            </div>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-3">
@@ -255,16 +289,17 @@ export default function AiCoach() {
                   ? 'Semana de prueba: solo se usan datos anteriores a ella y no el perfil guardado, para comparar de forma justa con lo que planificó tu entrenador.'
                   : profile
                     ? 'Se usa el perfil guardado de tu entrenador.'
-                    : 'Sin perfil guardado se usan las estadísticas del entrenador; con perfil sale más parecido (paso 2).'}
+                    : 'Sin perfil guardado se usan las estadísticas del entrenador; con perfil sale más parecido (paso 1).'}
               </div>
             </>
           )}
         </div>
+        </>}
       </div>
 
       {savedProposals.length > 0 && (
         <div className="mt-8 space-y-4">
-          <div className="g-label">Semanas generadas</div>
+          <div className="g-label">Semanas generadas · {mode === 'coach' ? 'como tu entrenador' : 'sin entrenador'}</div>
           {savedProposals.map(p => (
             <AiProposalView key={p.weekStart} proposal={p} onDelete={() => removeProposal(p.weekStart)} />
           ))}

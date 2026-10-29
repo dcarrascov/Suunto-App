@@ -161,9 +161,10 @@ export default function CalendarPage() {
                           key={w.id}
                           onClick={() => setDialog({ id: w.id, form: toForm(w) })}
                           className="w-full flex items-center gap-1.5 text-left text-[11px] leading-tight border border-slate-500 bg-[#1b1b1f] text-slate-200 px-1 py-0.5 hover:border-accent"
-                          title={[`Propio: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
+                          title={[`${w.source === 'ia' ? 'Propuesta IA' : 'Propio'}: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
                         >
                           <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(w.sport) }} />
+                          {w.source === 'ia' && <span className="text-[9px] font-semibold text-accent shrink-0">IA</span>}
                           <span className="truncate">{w.title}</span>
                         </button>
                       ))}
@@ -184,7 +185,7 @@ export default function CalendarPage() {
         <span><span className="inline-block w-0.5 h-3 align-middle mr-1.5" style={{ background: '#fb923c' }} />Bici</span>
         <span><span className="inline-block w-0.5 h-3 align-middle mr-1.5" style={{ background: '#60a5fa' }} />Natación</span>
         <span><span className="inline-block w-3 h-2.5 border border-dashed border-slate-600 align-middle mr-1.5" />Planificado, sin actividad</span>
-        <span><span className="inline-block w-3 h-2.5 border border-slate-500 bg-[#1b1b1f] align-middle mr-1.5" />Entreno propio (pulsa + en un día para crearlo)</span>
+        <span><span className="inline-block w-3 h-2.5 border border-slate-500 bg-[#1b1b1f] align-middle mr-1.5" />Entreno propio (pulsa + en un día para crearlo; «IA» = pasado desde el Entrenador IA)</span>
       </div>
 
       {dialog && (

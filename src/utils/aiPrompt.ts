@@ -2,7 +2,8 @@
 // Llevan tus datos ya resumidos; nunca rutas GPS.
 
 import type { ActivitySummary, FitnessPoint, GlobalStats, PlannedEvent, PlannedWorkout, UserSettings } from '../types/suunto'
-import { computePRs, formState, localWeekStart, predictRaces, sameHrEfficiency } from './calculations'
+import type { AiProposal, FreeGoal, FreeGoalDistance } from '../stores/aiStore'
+import { computePRs, formState, localWeekStart, paceZoneRanges, predictRaces, sameHrEfficiency } from './calculations'
 import { isoDateOffset, parseLocalDate, toLocalISODate } from './date'
 import { formatDuration, formatPace, formatRaceTime } from './formatters'
 import { eventLabel, findRaces, raceActivityIds, upcomingEvents } from './races'
@@ -316,5 +317,153 @@ export function weekPrompt(full: AthleteData, weekStart: string, profile: string
       '## Sus semanas de competición anteriores y la semana previa a cada una (literal)',
       coachHistory(d.workouts.filter(w => w.date < examplesFrom), d.events.filter(e => e.date < examplesFrom), undefined, extraWeeks),
     ] : []),
+  ].join('\n')
+}
+
+// ─── 4. Proponer una semana sin entrenador ───────────────────────────────────
+
+export const GOAL_LABEL: Record<FreeGoalDistance, string> = {
+  '5k': '5 km', '10k': '10 km', '21k': 'media maratón (21,1 km)', '42k': 'maratón (42,2 km)', none: 'sin carrera objetivo',
+}
+/** Semanas de afinado (taper) antes de la carrera según la distancia. */
+const TAPER_WEEKS: Record<FreeGoalDistance, number> = { '5k': 1, '10k': 1, '21k': 2, '42k': 3, none: 0 }
+
+/** Semanas desde `weekStart` hasta la semana de la carrera (0 = es la semana de la carrera; negativo = ya pasó). */
+export function weeksToRace(weekStart: string, raceDate: string | null): number | null {
+  if (!raceDate) return null
+  const raceWeek = parseLocalDate(localWeekStart(parseLocalDate(raceDate)))
+  return Math.round((raceWeek.getTime() - parseLocalDate(weekStart).getTime()) / (7 * 86_400_000))
+}
+
+/** Fase del plan para esa semana. */
+export function freePhase(goal: Pick<FreeGoal, 'distance' | 'raceDate'>, weekStart: string): string {
+  const left = goal.distance === 'none' ? null : weeksToRace(weekStart, goal.raceDate)
+  if (left == null) return goal.distance === 'none' ? 'desarrollo general: mejorar la forma sin carrera a la vista' : 'preparación del objetivo (sin fecha de carrera)'
+  if (left < 0) return 'después de la carrera: semana de recuperación y vuelta progresiva'
+  if (left === 0) return 'SEMANA DE LA CARRERA'
+  const taper = TAPER_WEEKS[goal.distance]
+  if (left <= taper) return `afinado (taper): faltan ${left} semana${left === 1 ? '' : 's'} para la carrera`
+  if (left <= taper + 6) return `específico: faltan ${left} semanas, trabajo al ritmo de la carrera`
+  return `base: faltan ${left} semanas, construir volumen aeróbico`
+}
+
+/** Tiempo medio semanal de carrera (min) y tirada más larga (min) de las 4 semanas completas antes de `weekStart`. */
+export function recentRunningLoad(activities: ActivitySummary[], weekStart: string): { avgMin: number; longestMin: number; weeks: number[] } {
+  const weeks: number[] = []
+  let longest = 0
+  for (let i = 4; i >= 1; i--) {
+    const start = addDays(weekStart, -7 * i)
+    const end = addDays(start, 6)
+    const wk = activities.filter(a => a.sport === 'running' && a.startTime.slice(0, 10) >= start && a.startTime.slice(0, 10) <= end)
+    weeks.push(Math.round(wk.reduce((t, a) => t + a.duration, 0) / 60))
+    longest = Math.max(longest, ...wk.map(a => a.duration / 60))
+  }
+  return { avgMin: Math.round(weeks.reduce((a, b) => a + b, 0) / 4), longestMin: Math.round(longest), weeks }
+}
+
+export const FREE_PROPOSAL_FORMAT = `{
+  "semana": "YYYY-MM-DD",
+  "explicacion": "2-4 frases: qué busca esta semana dentro del plan y por qué esta carga",
+  "entrenos": [
+    {
+      "fecha": "YYYY-MM-DD",
+      "tipo": "rodaje | progresivo | rectas | series | cuestas | cambios | activacion | competicion | fuerza | natacion | descanso",
+      "titulo": "corto y claro, p. ej. RODAJE 45' o SERIES 6x1000",
+      "descripcion": "OBJETIVO, ESTRUCTURA (calentamiento, parte principal con ritmos en min/km o RPE, vuelta a la calma) y OBSERVACIONES",
+      "duracion_min": 45,
+      "distancia_km": null,
+      "tss": 50
+    }
+  ]
+}`
+
+const LEVEL_LABEL: Record<NonNullable<FreeGoal['level']>, string> = {
+  nuevo: 'empieza a correr (no corre o corre muy poco)',
+  algo: 'corre algo, sin constancia',
+  habitual: 'corre habitualmente',
+}
+const WEEKDAY_LONG = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+
+/**
+ * Texto para proponer la semana `weekStart` SIN entrenador: con tus actividades de Suunto (si las hay) o, si no,
+ * con tu nivel, para el objetivo elegido. Lleva las semanas ya generadas de este plan para que la progresión siga.
+ */
+export function freeWeekPrompt(full: AthleteData, weekStart: string, goal: FreeGoal, previous: AiProposal[] = []): string {
+  const weekEnd = addDays(weekStart, 6)
+  const hasData = full.activities.some(a => a.sport === 'running')
+  // el plan del entrenador no se usa en este modo (las competiciones del calendario sí)
+  const d: AthleteData = { ...full, workouts: [] }
+  const left = goal.distance === 'none' ? null : weeksToRace(weekStart, goal.raceDate)
+  const raceThisWeek = left === 0 && goal.raceDate
+  const load = recentRunningLoad(full.activities, weekStart)
+  const prev = previous.filter(p => p.weekStart < weekStart).sort((a, b) => a.weekStart.localeCompare(b.weekStart)).slice(-3)
+  const lastPrev = prev.at(-1)
+  const lastMin = lastPrev ? Math.round(lastPrev.workouts.reduce((t, w) => t + (w.durationMin ?? 0), 0)) : null
+
+  const goalLines = [
+    '## Objetivo',
+    `- Objetivo: ${GOAL_LABEL[goal.distance]}${goal.raceName ? ` («${goal.raceName}»)` : ''}${goal.raceDate && goal.distance !== 'none' ? `, el ${dayName(goal.raceDate)} ${goal.raceDate}` : ''}.`,
+    `- Fase de esta semana: ${freePhase(goal, weekStart)}.`,
+    `- Días que puede entrenar: ${goal.daysPerWeek} por semana${goal.longRunDay != null ? `; tirada larga preferida el ${WEEKDAY_LONG[goal.longRunDay]}` : ''}.`,
+  ]
+  if (raceThisWeek) goalLines.push(`- La carrera es el ${dayName(goal.raceDate!)} ${goal.raceDate}: ese día "tipo": "competicion" con el nombre de la carrera como título.`)
+
+  const athlete: string[] = []
+  if (hasData) {
+    athlete.push(athleteContext(d), '')
+    athlete.push('## Carga real reciente (carrera)')
+    athlete.push(`Tiempo por semana en las 4 semanas anteriores: ${load.weeks.join(', ')} min (media ${load.avgMin} min). Salida más larga: ${load.longestMin} min.`)
+    const zones = paceZoneRanges(full.settings.thresholdPace)
+    athlete.push(`Zonas de ritmo con su ritmo umbral (${formatPace(full.settings.thresholdPace)}): ${zones.map(z => `Z${z.def.zone} ${z.def.name} ${z.fast ? formatPace(z.fast) : '…'}–${z.slow ? formatPace(z.slow) : '…'}`).join(' · ')}.`)
+    athlete.push('Si el ritmo umbral no cuadra con sus marcas y su predicción, fíate más de las marcas recientes.')
+  } else {
+    athlete.push('## Atleta (sin datos de reloj)')
+    athlete.push(`Nivel: ${goal.level ? LEVEL_LABEL[goal.level] : 'no indicado'}.${goal.hoursPerWeek ? ` Corre unas ${goal.hoursPerWeek} h a la semana.` : ''}`)
+    athlete.push('No hay ritmos medidos: indica la intensidad con RPE (1-10) y sensaciones («puedes hablar», «te cuesta hablar»).')
+  }
+
+  const prevLines: string[] = []
+  if (prev.length) {
+    prevLines.push('## Semanas anteriores de este mismo plan (las propusiste tú; continúa la progresión)')
+    for (const p of prev) {
+      const min = Math.round(p.workouts.reduce((t, w) => t + (w.durationMin ?? 0), 0))
+      prevLines.push(`### Semana del ${p.weekStart} · ${min} min`)
+      for (const w of p.workouts.filter(x => x.type !== 'descanso')) {
+        prevLines.push(`- ${dayName(w.date)}: ${w.title} (${SESSION_LABEL[w.type]}${w.durationMin ? `, ${Math.round(w.durationMin)} min` : ''})`)
+      }
+    }
+  }
+
+  const base = lastMin ?? (hasData ? load.avgMin : null)
+  return [
+    'Eres un entrenador de atletismo con experiencia en carreras de fondo. Este corredor entrena SIN entrenador y',
+    `quiere que le propongas la semana del ${weekStart} (lunes) al ${weekEnd} (domingo) dentro de un plan hacia su objetivo,`,
+    hasData ? 'adaptada a su nivel real (te paso sus datos del reloj) y pensada para que mejore.' : 'a partir de su nivel declarado (no hay datos del reloj).',
+    '',
+    'Reglas:',
+    `- Exactamente ${goal.daysPerWeek} días con sesión de carrera (o ${goal.daysPerWeek - 1} de carrera y uno de fuerza si lo ves útil); el resto "tipo": "descanso". Incluye los 7 días.`,
+    `- Progresión prudente: el tiempo total no debe superar en más de un 10 % ${base != null ? `${base} min (${lastPrev ? 'la semana anterior de este plan' : 'su media real de las últimas 4 semanas'})` : 'lo que sea razonable para su nivel'}.`,
+    '  Cada 3-4 semanas, una de descarga (−20 a −30 % de tiempo), salvo en el afinado.',
+    '- Distribución 80/20: al menos el 80 % del tiempo suave (Z1-Z2 o RPE 3-4); una sesión de calidad por semana (dos solo si',
+    '  entrena 5 o más días, corre habitualmente y no es semana de descarga ni de afinado).',
+    '- Calidad según el objetivo: 5 km → series cortas (200-1000 m) a ritmo de 5 km o más rápido; 10 km → series de 1-2 km a',
+    '  ritmo umbral / 10 km; media maratón → tempo y bloques largos a ritmo de media; maratón → tirada larga con bloques a ritmo',
+    '  de maratón; sin objetivo → variedad (fartlek, cuestas, tempo corto, rectas).',
+    '- Tirada larga: como mucho el 30 % del tiempo semanal (35 % en maratón); que no supere en más de 15 min la más larga reciente.',
+    '- Planifica por TIEMPO y por ritmo o RPE, nunca por pulso: su pulso de muñeca no es fiable.',
+    '- Semana de la carrera: baja el volumen un 40-50 %, mantén algo de ritmo corto, activación suave el día antes y la carrera',
+    '  ese día. Afinado: baja el volumen progresivamente y conserva la intensidad.',
+    '- Si empieza a correr: alterna correr y andar (p. ej. 1 min corriendo / 2 andando) y sube poco a poco.',
+    '- Indica siempre "duracion_min" y "tss" (estimado); "distancia_km" solo si aporta (si no, null).',
+    '- Es una propuesta orientativa; si hay dolor o lesión, que consulte a un profesional.',
+    '',
+    'Responde solo con un objeto JSON con exactamente este formato (sin texto antes ni después):',
+    FREE_PROPOSAL_FORMAT,
+    '',
+    ...goalLines,
+    '',
+    ...athlete,
+    '',
+    ...prevLines,
   ].join('\n')
 }
