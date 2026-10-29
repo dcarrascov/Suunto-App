@@ -38,7 +38,7 @@ for _stream in (sys.stdout, sys.stderr):  # evita errores con consolas de codifi
 OUT_DIR = ROOT / "public" / "data"
 PAUSE = float(os.getenv("SUUNTO_PAUSE", "0.6"))  # segundos entre actividades (límite de ritmo)
 DEBUG_DIR = Path(__file__).resolve().parent / "debug"
-DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "routePace", "extra", "partial")  # claves que no van en el resumen
+DETAIL_ONLY = ("laps", "hrZones", "gpxCoords", "routePace", "extra", "partial", "bestEffortsVersion")  # claves que no van en el resumen
 
 
 def save_json(path: Path, data):
@@ -279,7 +279,7 @@ def main():
     save_json(OUT_DIR / "activities.json", [e["summary"] for e in entries])
     print(f"Guardados {len(entries)} resúmenes → public/data/activities.json")
 
-    from normalizer import SUMMARY_FROM_DETAIL, build_extra, detail_to_summary, normalize_summary
+    from normalizer import SUMMARY_FROM_DETAIL, build_extra, detail_to_summary, needs_efforts_refresh, normalize_summary
     from suunto_client import SuuntoAuthError  # solo para capturar el error de sesión
     print(f"\nProcesando el detalle de {len(entries)} actividades...")
     updated = 0
@@ -290,7 +290,10 @@ def main():
 
         if path.exists() and not args.force:
             cached = json.loads(path.read_text(encoding="utf-8"))
-            if not (cached.get("partial") and not args.no_gpx):
+            # sin descargar de nuevo, salvo las incompletas y las que tienen mejores tramos de una versión
+            # anterior con trozos demasiado rápidos (coche/moto o saltos del GPS): se vuelven a pedir sus muestras
+            refetch = not args.no_gpx and (cached.get("partial") or needs_efforts_refresh(cached))
+            if not refetch:
                 raw, changed = e.get("raw"), False
                 if raw is not None and "extra" not in cached:
                     # detalle guardado con una versión anterior: se completa con los datos nuevos que

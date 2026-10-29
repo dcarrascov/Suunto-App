@@ -469,6 +469,28 @@ EFFORT_DISTANCES = {
 }
 # Velocidad máxima creíble (m/s): un tramo más rápido es un salto del GPS y se descarta
 EFFORT_MAX_SPEED = {"running": 6.5, "cycling": 25.0}  # 2:34 /km · 90 km/h
+# Sube cuando cambie el cálculo con muestras: sync.py vuelve a pedir las actividades afectadas
+EFFORTS_VERSION = 2
+
+
+def _cumulative_without_jumps(pts, max_speed: float):
+    """
+    Distancia acumulada no decreciente (ignora retrocesos del GPS) en la que no cuenta lo recorrido entre dos
+    muestras a más de `max_speed`: saltos del GPS o trozos en coche/moto con el reloj en marcha. El tiempo sí
+    sigue corriendo, así que un tramo que los incluya sale más lento, nunca más rápido.
+    """
+    ts, ds = [pts[0][0]], [0.0]
+    prev_t, prev_d, total = pts[0][0], pts[0][1], 0.0
+    for t, d in pts[1:]:
+        step = d - prev_d
+        if step > 0 and (t <= prev_t or step / (t - prev_t) <= max_speed):
+            total += step
+        if d > prev_d:
+            prev_d = d
+        prev_t = t
+        ts.append(t)
+        ds.append(total)
+    return ts, ds
 
 
 def best_efforts_from_samples(dist_pts, sport: str) -> dict | None:
@@ -481,12 +503,8 @@ def best_efforts_from_samples(dist_pts, sport: str) -> dict | None:
     pts = sorted((t, d) for t, d in dist_pts if t is not None and d is not None)
     if not targets or len(pts) < 2:
         return None
-    ts, ds, top = [], [], 0.0
-    for t, d in pts:  # distancia acumulada no decreciente (ignora retrocesos del GPS)
-        top = max(top, d)
-        ts.append(t)
-        ds.append(top)
     max_speed = EFFORT_MAX_SPEED[sport]
+    ts, ds = _cumulative_without_jumps(pts, max_speed)
     out = {}
     for target in targets:
         if ds[-1] - ds[0] < target:
@@ -549,7 +567,26 @@ def set_best_efforts(detail: dict, dist_pts=None) -> dict:
         efforts = best_efforts_from_laps(detail.get("laps"), detail["sport"])
         source = "laps" if efforts else None
     detail["bestEfforts"], detail["bestEffortsSource"] = efforts, source
+    if source == "samples":
+        detail["bestEffortsVersion"] = EFFORTS_VERSION
+    else:
+        detail.pop("bestEffortsVersion", None)
     return detail
+
+
+def needs_efforts_refresh(detail: dict) -> bool:
+    """
+    Detalle guardado cuyos mejores tramos (con muestras) se calcularon con una versión anterior y que puede
+    tener trozos demasiado rápidos (velocidad máxima del reloj por encima de la creíble): hay que volver a
+    pedir sus muestras. Las demás no cambian con el cálculo nuevo.
+    """
+    sport = detail.get("sport")
+    if sport not in EFFORT_MAX_SPEED or detail.get("bestEffortsSource") != "samples":
+        return False
+    if detail.get("bestEffortsVersion") == EFFORTS_VERSION:
+        return False
+    max_kmh = (detail.get("extra") or {}).get("maxSpeed") or 0
+    return max_kmh > EFFORT_MAX_SPEED[sport] * 3.6
 
 
 # Claves que se calculan en el detalle y se copian al resumen (para no cargar 1400 detalles en la web)

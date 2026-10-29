@@ -82,6 +82,7 @@ export interface ActivityExtra {
 }
 
 export interface ActivityDetail extends ActivitySummary {
+  bestEffortsVersion?: number  // versión del cálculo con muestras (EFFORTS_VERSION en normalizer.py)
   extra?: ActivityExtra | null
   laps: Lap[]
   hrZones: HRZone[]
