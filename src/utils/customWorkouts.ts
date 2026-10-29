@@ -1,4 +1,5 @@
 import type { Sport } from '../types/suunto'
+import type { AiProposal } from '../stores/aiStore'
 
 // Entrenos que crea el usuario en el Calendario. Se guardan solo en este navegador
 // (stores/customWorkoutStore.ts); nunca se envían a TrainingPeaks ni se mezclan con el plan del entrenador.
@@ -11,6 +12,8 @@ export interface CustomWorkout {
   durationMin: number | null
   distanceKm: number | null
   description: string
+  source?: 'ia'              // copiado de una propuesta de la IA («Pasar al calendario»)
+  proposalKey?: string       // de qué propuesta (ver proposalKey): para sustituirla o quitarla de golpe
 }
 
 /** Lo que escribe el usuario en la ventana (los números llegan como texto). */
@@ -75,4 +78,30 @@ export function customSummary(w: Pick<CustomWorkout, 'durationMin' | 'distanceKm
     w.durationMin != null ? `${w.durationMin} min` : null,
     w.distanceKm != null ? `${w.distanceKm.toLocaleString('es-ES')} km` : null,
   ].filter(Boolean).join(' · ')
+}
+
+// ─── Propuestas de la IA → Calendario ────────────────────────────────────────
+
+/** Clave de una propuesta: modo («coach» = como tu entrenador, «free» = sin entrenador) y lunes de la semana. */
+export function proposalKey(p: Pick<AiProposal, 'weekStart' | 'mode'>): string {
+  return `${p.mode ?? 'coach'}:${p.weekStart}`
+}
+
+const SPORT_OF_TYPE: Partial<Record<string, Sport>> = { natacion: 'swimming', fuerza: 'other' }
+
+/** Sesiones de la propuesta como entrenos propios del Calendario (los días de descanso no se copian). */
+export function proposalToCustom(p: AiProposal): Omit<CustomWorkout, 'id'>[] {
+  const key = proposalKey(p)
+  return p.workouts
+    .filter(w => w.type !== 'descanso')
+    .map(w => ({
+      date: w.date,
+      sport: SPORT_OF_TYPE[w.type] ?? 'running',
+      title: w.title,
+      durationMin: w.durationMin != null ? Math.round(w.durationMin) : null,
+      distanceKm: w.distanceKm != null ? Math.round(w.distanceKm * 100) / 100 : null,
+      description: w.description,
+      source: 'ia' as const,
+      proposalKey: key,
+    }))
 }

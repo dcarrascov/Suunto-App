@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useActivityStore } from '../stores/activityStore'
 import type { AiProposal } from '../stores/aiStore'
+import { useCustomWorkoutStore } from '../stores/customWorkoutStore'
+import { proposalKey, proposalToCustom } from '../utils/customWorkouts'
 import { coachHasWeek, compareWeek } from '../utils/aiProposal'
 import { SESSION_LABEL } from '../utils/coach'
 import { formatDuration } from '../utils/formatters'
@@ -16,12 +18,20 @@ function dayLabel(iso: string): string {
   return parseLocalDate(iso).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
-/** Propuesta de semana de la IA (marcada como tal) y, si ya existe, su parecido con la del entrenador. */
+/**
+ * Propuesta de semana de la IA (marcada como tal): se puede pasar al Calendario y, en el modo «como tu entrenador»,
+ * se compara con la semana que él planifique.
+ */
 export default function AiProposalView({ proposal, onDelete }: { proposal: AiProposal; onDelete?: () => void }) {
   const plan = useActivityStore(s => s.plan)
   const [open, setOpen] = useState<string | null>(null)
+  const key = proposalKey(proposal)
+  const inCalendar = useCustomWorkoutStore(s => s.workouts.filter(w => w.proposalKey === key).length)
+  const replaceProposal = useCustomWorkoutStore(s => s.replaceProposal)
+  const removeFromCalendar = useCustomWorkoutStore(s => s.removeProposal)
+  const free = proposal.mode === 'free'
   const workouts = plan?.workouts ?? []
-  const comparable = coachHasWeek(workouts, proposal.weekStart)
+  const comparable = !free && coachHasWeek(workouts, proposal.weekStart)
   const events = plan?.events ?? []
   const cmp = comparable ? compareWeek(proposal, workouts, events) : null
   const weekRaces = events.filter(e => e.date >= proposal.weekStart && e.date <= proposal.workouts.reduce((m, w) => (w.date > m ? w.date : m), proposal.weekStart))
@@ -33,11 +43,11 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">PROPUESTA IA</span>
+            <span className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">PROPUESTA IA{free ? ' · SIN ENTRENADOR' : ''}</span>
             <span className="text-sm text-slate-200">Semana del {parseLocalDate(proposal.weekStart).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {formatDuration(totalMin * 60)} · {Math.round(totalTss)} TSS · generada el {proposal.createdAt}{proposal.model ? ` con ${proposal.model}` : ''} · no es el plan de tu entrenador
+            {formatDuration(totalMin * 60)} · {Math.round(totalTss)} TSS · generada el {proposal.createdAt}{proposal.model ? ` con ${proposal.model}` : ''}{free ? '' : ' · no es el plan de tu entrenador'}
           </div>
         </div>
         {cmp ? (
@@ -45,7 +55,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
             <div className="text-2xl font-semibold" style={{ color: cmp.total >= 75 ? '#c5f23c' : cmp.total >= 50 ? '#fbbf24' : '#f87171' }}>{cmp.total} %</div>
             <div className="text-[11px] text-slate-500">parecido con tu entrenador</div>
           </div>
-        ) : (
+        ) : !free && (
           <div className="text-xs text-slate-500 max-w-48 text-right">Se comparará cuando tu entrenador planifique esta semana</div>
         )}
       </div>
@@ -100,9 +110,31 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
         </div>
       )}
 
-      {onDelete && (
-        <button onClick={onDelete} className="mt-3 px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-red-400 hover:text-red-300">Borrar propuesta</button>
-      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => {
+            if (inCalendar && !window.confirm('Esta semana ya está en el Calendario. ¿Sustituir esas sesiones (también las que hayas editado)?')) return
+            replaceProposal(key, proposalToCustom(proposal))
+          }}
+          className="px-3 py-1.5 text-xs font-medium bg-accent text-black hover:brightness-110"
+        >
+          {inCalendar ? 'Volver a pasar al calendario' : 'Pasar al calendario'}
+        </button>
+        {inCalendar > 0 && (
+          <>
+            <button
+              onClick={() => { if (window.confirm(`¿Quitar del Calendario las ${inCalendar} sesiones de esta propuesta?`)) removeFromCalendar(key) }}
+              className="px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-red-400 hover:text-red-300"
+            >
+              Quitar del calendario
+            </button>
+            <span className="text-xs text-slate-500">{inCalendar} sesiones en el Calendario (editables allí)</span>
+          </>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} className="px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-red-400 hover:text-red-300">Borrar propuesta</button>
+        )}
+      </div>
     </div>
   )
 }

@@ -152,6 +152,8 @@ export default function Plan() {
   const [week, setWeek] = useState(thisWeek)
   const aiProposal = useAiStore(s => s.proposals[week])
   const deleteProposal = useAiStore(s => s.deleteProposal)
+  const freeProposal = useAiStore(s => s.freeProposals[week])
+  const deleteFreeProposal = useAiStore(s => s.deleteFreeProposal)
   const eventsOfDay = useMemo(() => eventsByDate(plan?.events ?? []), [plan])
   const [historyShown, setHistoryShown] = useState(HISTORY_PAGE)
   const pageRef = useRef<HTMLDivElement>(null)
@@ -221,6 +223,17 @@ export default function Plan() {
           <AiProposalView
             proposal={aiProposal}
             onDelete={() => { if (window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(week)}?`)) deleteProposal(week) }}
+          />
+        </details>
+      )}
+      {freeProposal && (
+        <details className="mb-6">
+          <summary className="text-xs text-slate-400 cursor-pointer hover:text-white mb-2">
+            Hay una semana de la IA sin entrenador · <Link to="/ia" className="text-accent">Entrenador IA</Link>
+          </summary>
+          <AiProposalView
+            proposal={freeProposal}
+            onDelete={() => { if (window.confirm(`¿Borrar la semana sin entrenador del ${weekLabel(week)}?`)) deleteFreeProposal(week) }}
           />
         </details>
       )}
