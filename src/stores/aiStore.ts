@@ -46,6 +46,7 @@ interface AiState {
   proposals: Record<string, AiProposal>                // como tu entrenador, por lunes de la semana
   freeProposals: Record<string, AiProposal>            // sin entrenador, por lunes de la semana
   freeGoal: FreeGoal
+  reviews: Record<string, WeekReview>                  // revisión de la semana hecha, por lunes
   saveProfile: (text: string, model?: string) => void
   clearProfile: () => void
   saveProposal: (p: AiProposal) => void
@@ -53,6 +54,14 @@ interface AiState {
   saveFreeProposal: (p: AiProposal) => void
   deleteFreeProposal: (weekStart: string) => void
   setFreeGoal: (g: Partial<FreeGoal>) => void
+  saveReview: (weekStart: string, r: WeekReview) => void
+  deleteReview: (weekStart: string) => void
+}
+
+export interface WeekReview {
+  text: string
+  savedAt: string
+  model?: string
 }
 
 export const useAiStore = create<AiState>()(
@@ -62,6 +71,7 @@ export const useAiStore = create<AiState>()(
       proposals: {},
       freeProposals: {},
       freeGoal: DEFAULT_FREE_GOAL,
+      reviews: {},
       saveProfile: (text, model) => set({ profile: { text: text.trim(), savedAt: new Date().toLocaleString('es-ES'), model } }),
       clearProfile: () => set({ profile: null }),
       saveProposal: (p) => set(s => ({ proposals: { ...s.proposals, [p.weekStart]: p } })),
@@ -77,13 +87,19 @@ export const useAiStore = create<AiState>()(
         return { freeProposals: rest }
       }),
       setFreeGoal: (g) => set(s => ({ freeGoal: { ...s.freeGoal, ...g } })),
+      saveReview: (weekStart, r) => set(s => ({ reviews: { ...s.reviews, [weekStart]: r } })),
+      deleteReview: (weekStart) => set(s => {
+        const rest = { ...s.reviews }
+        delete rest[weekStart]
+        return { reviews: rest }
+      }),
     }),
     {
       name: 'suunto-ai',
       // lo guardado con versiones anteriores no tiene el modo «sin entrenador»
       merge: (saved, current) => {
         const s = (saved ?? {}) as Partial<AiState>
-        return { ...current, ...s, freeProposals: s.freeProposals ?? {}, freeGoal: { ...DEFAULT_FREE_GOAL, ...s.freeGoal } }
+        return { ...current, ...s, freeProposals: s.freeProposals ?? {}, reviews: s.reviews ?? {}, freeGoal: { ...DEFAULT_FREE_GOAL, ...s.freeGoal } }
       },
     },
   ),

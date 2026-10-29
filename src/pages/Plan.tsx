@@ -10,6 +10,7 @@ import type { PlanItem, PlanStatus, PlanWeek } from '../utils/plan'
 import { useAiStore } from '../stores/aiStore'
 import AiProposalView from '../components/AiProposalView'
 import RaceBanner from '../components/RaceBanner'
+import WeekReview from '../components/WeekReview'
 import { eventsByDate } from '../utils/races'
 
 // Color de la barrita lateral de cada entreno según el deporte
@@ -213,6 +214,8 @@ export default function Plan() {
       </div>
 
       <WeekSummary week={current} />
+
+      <WeekReview weekStart={week} />
 
       {/* Propuesta de la IA para esta semana (si la hay): aparte del plan del entrenador */}
       {aiProposal && (

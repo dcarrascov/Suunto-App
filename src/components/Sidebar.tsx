@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  Activity, BrainCircuit, CalendarDays, ClipboardList, Gauge, HeartPulse, History,
+  Activity, BrainCircuit, CalendarDays, ClipboardList, Footprints, Gauge, HeartPulse, History,
   LayoutDashboard, Medal, Menu, RefreshCw, Settings, TrendingUp, Trophy, X,
 } from 'lucide-react'
 import { useActivityStore } from '../stores/activityStore'
@@ -19,6 +19,7 @@ const NAV = [
   { to: '/performance', label: 'Rendimiento', icon: Gauge },
   { to: '/records', label: 'Récords', icon: Trophy },
   { to: '/history', label: 'Historial', icon: History },
+  { to: '/shoes', label: 'Zapatillas', icon: Footprints },
   { to: '/settings', label: 'Ajustes', icon: Settings },
 ]
 

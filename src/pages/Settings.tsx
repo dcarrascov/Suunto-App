@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { LTHR_OFFSET, estimateThresholdPace, lthrFor, paceZoneRanges } from '../utils/calculations'
 import { isoDateOffset } from '../utils/date'
 import { formatPace } from '../utils/formatters'
+import BackupSection from '../components/BackupSection'
 
 export default function Settings() {
   const settings = useActivityStore(s => s.settings)
@@ -137,6 +138,7 @@ export default function Settings() {
         <p>Los ajustes se guardan localmente en tu navegador (localStorage).</p>
         <p>Cambiarlos afecta retroactivamente a todos los cálculos de CTL/ATL/TSB y zonas.</p>
       </div>
+      <BackupSection />
     </div>
   )
 }
