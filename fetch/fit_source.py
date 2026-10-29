@@ -177,7 +177,7 @@ def parse_fit(path: Path, max_hr: int = 185) -> tuple[dict, dict]:
     # Datos extra (los que un FIT permite calcular)
     max_speed = _positive(first.get("enhanced_max_speed"), first.get("max_speed"))
     extra = {k: None for k in EXTRA_KEYS}
-    extra.update(sample_extra(dist_pts, hr, alts))
+    extra.update(sample_extra(dist_pts, hr, alts, sport))
     extra.update({
         "maxSpeed": round(max_speed * 3.6, 1) if max_speed else None,
         "maxPace": _pace(max_speed),
