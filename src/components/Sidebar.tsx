@@ -2,25 +2,52 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Activity, BrainCircuit, CalendarDays, ClipboardList, Footprints, Gauge, HeartPulse, History,
-  LayoutDashboard, Medal, Menu, RefreshCw, Settings, TrendingUp, Trophy, X,
+  LayoutDashboard, Medal, Menu, RefreshCw, Settings, TrendingUp, Trophy, Upload, X,
 } from 'lucide-react'
 import { useActivityStore } from '../stores/activityStore'
 import { useSyncStore } from '../stores/syncStore'
 
+// Menú por categorías (la primera, sin título)
 const NAV = [
-  { to: '/', label: 'Resumen', icon: LayoutDashboard },
-  { to: '/calendar', label: 'Calendario', icon: CalendarDays },
-  { to: '/activities', label: 'Actividades', icon: Activity },
-  { to: '/plan', label: 'Plan', icon: ClipboardList },
-  { to: '/races', label: 'Competiciones', icon: Medal },
-  { to: '/ia', label: 'Entrenador IA', icon: BrainCircuit },
-  { to: '/fitness', label: 'Forma', icon: TrendingUp },
-  { to: '/zones', label: 'Zonas', icon: HeartPulse },
-  { to: '/performance', label: 'Rendimiento', icon: Gauge },
-  { to: '/records', label: 'Récords', icon: Trophy },
-  { to: '/history', label: 'Historial', icon: History },
-  { to: '/shoes', label: 'Zapatillas', icon: Footprints },
-  { to: '/settings', label: 'Ajustes', icon: Settings },
+  {
+    title: null,
+    items: [
+      { to: '/', label: 'Resumen', icon: LayoutDashboard },
+      { to: '/calendar', label: 'Calendario', icon: CalendarDays },
+    ],
+  },
+  {
+    title: 'Entrenamiento',
+    items: [
+      { to: '/activities', label: 'Actividades', icon: Activity },
+      { to: '/races', label: 'Competiciones', icon: Medal },
+    ],
+  },
+  {
+    title: 'Coach',
+    items: [
+      { to: '/plan', label: 'Plan', icon: ClipboardList },
+      { to: '/ia', label: 'Entrenador IA', icon: BrainCircuit },
+    ],
+  },
+  {
+    title: 'Análisis',
+    items: [
+      { to: '/fitness', label: 'Forma', icon: TrendingUp },
+      { to: '/zones', label: 'Zonas', icon: HeartPulse },
+      { to: '/performance', label: 'Rendimiento', icon: Gauge },
+      { to: '/records', label: 'Récords', icon: Trophy },
+      { to: '/history', label: 'Historial', icon: History },
+    ],
+  },
+  {
+    title: 'Equipo y datos',
+    items: [
+      { to: '/shoes', label: 'Zapatillas', icon: Footprints },
+      { to: '/import', label: 'Importar FIT', icon: Upload },
+      { to: '/settings', label: 'Ajustes', icon: Settings },
+    ],
+  },
 ]
 
 export default function Sidebar() {
@@ -62,27 +89,32 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className={`${open ? 'block' : 'hidden'} md:block flex-1 pb-4`}>
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            onClick={() => setOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 py-2 text-sm transition-colors border-l-2 ${
-                isActive
-                  ? 'border-accent pl-[22px] text-white font-medium'
-                  : 'border-transparent pl-[22px] text-slate-500 hover:text-slate-200'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon size={16} strokeWidth={1.75} className={isActive ? 'text-accent' : ''} aria-hidden />
-                {label}
-              </>
-            )}
-          </NavLink>
+        {NAV.map(group => (
+          <div key={group.title ?? 'inicio'} className={group.title ? 'mt-4' : ''}>
+            {group.title && <div className="g-label px-6 pb-1">{group.title}</div>}
+            {group.items.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 py-2 text-sm transition-colors border-l-2 ${
+                    isActive
+                      ? 'border-accent pl-[22px] text-white font-medium'
+                      : 'border-transparent pl-[22px] text-slate-500 hover:text-slate-200'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon size={16} strokeWidth={1.75} className={isActive ? 'text-accent' : ''} aria-hidden />
+                    {label}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
     </aside>

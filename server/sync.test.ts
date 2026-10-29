@@ -36,5 +36,7 @@ describe('progreso de actualizar.ps1', () => {
     expect(updateCommand('win32', 'C:/app').args.at(-1)).toMatch(/actualizar\.ps1$/)
     expect(updateCommand('darwin', '/app')).toMatchObject({ cmd: 'bash' })
     expect(updateCommand('linux', '/app').args[0]).toMatch(/actualizar\.sh$/)
+    expect(updateCommand('win32', 'C:/app', 'fit').args.at(-1)).toBe('-SoloFit')
+    expect(updateCommand('linux', '/app', 'fit').args.at(-1)).toBe('--solo-fit')
   })
 })

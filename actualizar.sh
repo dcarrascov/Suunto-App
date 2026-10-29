@@ -8,6 +8,7 @@
 #   ./actualizar.sh              # lo normal (incremental)
 #   ./actualizar.sh --completo   # vuelve a descargar todo de Suunto (--force) y todo el plan (--full)
 #   ./actualizar.sh --sin-plan   # solo Suunto
+#   ./actualizar.sh --solo-fit   # sin cuenta de Suunto: solo los .fit de fetch/fit (Ruta B)
 # Si usas un entorno virtual, actívalo antes (source .venv/bin/activate).
 # Las líneas «== … ==» las lee el botón de recargar de la app (server/sync.ts): no cambiarlas.
 
@@ -16,10 +17,12 @@ export PYTHONIOENCODING=utf-8
 
 COMPLETO=0
 SIN_PLAN=0
+SOLO_FIT=0
 for arg in "$@"; do
   case "$arg" in
     --completo) COMPLETO=1 ;;
     --sin-plan) SIN_PLAN=1 ;;
+    --solo-fit) SOLO_FIT=1 ;;
     *) echo "Opción desconocida: $arg" >&2; exit 2 ;;
   esac
 done
@@ -33,8 +36,10 @@ fi
 paso() { echo ""; echo "== $1 =="; }
 inicio=$(date +%s)
 
-paso 'Suunto'
-if [ "$COMPLETO" = 1 ]; then "$PY" fetch/sync.py --force; else "$PY" fetch/sync.py; fi || {
+sync_args=()
+if [ "$SOLO_FIT" = 1 ]; then paso 'Suunto (ficheros FIT)'; sync_args+=(--source fit); else paso 'Suunto'; fi
+if [ "$COMPLETO" = 1 ]; then sync_args+=(--force); fi
+"$PY" fetch/sync.py "${sync_args[@]}" || {
   code=$?
   echo 'La sincronización de Suunto ha fallado; no sigo.'
   exit "$code"
