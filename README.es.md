@@ -24,6 +24,7 @@ Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes t�
 | **Entrenador IA** | Con Gemini (gratis, opcional): pregúntale por tu entrenamiento y genera semanas **como tu entrenador** o **sin entrenador** para un objetivo (5K, 10K, media, maratón o ninguno); pásalas a tu Calendario |
 | **Forma, Zonas, Rendimiento, Récords, Historial** | CTL/ATL/TSB con previsión, 80/20, eficiencia, desacoplamiento, récords con predicción y totales por año |
 | **Zapatillas** | Km por par con etiquetas (rodaje, competición…) y aviso al acercarse al límite |
+| **Importar FIT** | Sube ficheros `.fit` desde el navegador (arrastrándolos); con cuenta de Suunto se suman a ella sin repetir sesiones |
 | **Ajustes** | Umbrales, avisos para la IA y **copia de seguridad** de lo que guardas en el navegador |
 
 | Calendario | Plan | Competiciones |
@@ -176,6 +177,8 @@ python3 fetch/sync.py --force
 ```
 
 > **Importante:** vuelve a ejecutar `python3 fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Suunto.
+>
+> **También ficheros FIT:** los `.fit` que haya en `fetch/fit/` (por ejemplo, de otro reloj o subidos desde **Importar FIT**) se suman a tus actividades de Suunto; las sesiones que ya estén en Suunto se detectan (inicio a menos de 2 min y duración parecida) y no se repiten. Con `--no-fit` no se leen.
 
 ### A4. Comprobar que los datos son correctos (opcional)
 
@@ -233,7 +236,7 @@ Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
 ### B1. Exportar tus entrenamientos
 
 1. En la app de Suunto (móvil): Calendario → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT**. Envíatelo a tu ordenador.
-2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe).
+2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe), o súbelos después desde la página **Importar FIT** de la app y pulsa «Procesar».
 
 > **¿Muchos entrenamientos?** Exportarlos de uno en uno es lento. Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; ver su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). Este proyecto lee ficheros `.fit`.
 

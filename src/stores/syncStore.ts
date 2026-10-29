@@ -19,7 +19,7 @@ export interface SyncStatus {
 
 interface SyncStore {
   status: SyncStatus | null     // null = barra oculta
-  start: () => Promise<void>
+  start: (mode?: 'normal' | 'fit') => Promise<void>   // fit = sin cuenta de Suunto: solo los .fit
   resume: () => Promise<void>   // al abrir la app, por si ya había una en marcha
   dismiss: () => void
 }
@@ -61,11 +61,11 @@ export const useSyncStore = create<SyncStore>()((set, get) => {
 
   return {
     status: null,
-    start: async () => {
+    start: async (mode = 'normal') => {
       if (get().status?.running) return
       set({ status: { ...EMPTY, running: true } })
       try {
-        const res = await fetch('/api/sync', { method: 'POST' })
+        const res = await fetch(mode === 'fit' ? '/api/sync?mode=fit' : '/api/sync', { method: 'POST' })
         if (res.status === 404) throw new Error('El botón solo funciona con «npm run dev» o «npm run preview».')
         const body = await res.json() as SyncStatus & { error?: string }
         if (res.status !== 202 && res.status !== 409) throw new Error(body.error ?? `Error ${res.status}`)

@@ -37,12 +37,15 @@ const SUUNTO_END = 80
 const PLAN_END = 95
 const LIST_SECONDS = 20   // ritmo al que avanza mientras Suunto manda la lista (suele tardar ~30 s)
 
-/** Programa y argumentos para lanzar la actualización en cada sistema. */
-export function updateCommand(platform: NodeJS.Platform, root: string): { cmd: string; args: string[] } {
+/** Programa y argumentos para lanzar la actualización en cada sistema. `fit` = sin cuenta de Suunto (solo .fit). */
+export function updateCommand(platform: NodeJS.Platform, root: string, mode: 'normal' | 'fit' = 'normal'): { cmd: string; args: string[] } {
   if (platform === 'win32') {
-    return { cmd: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'actualizar.ps1')] }
+    return {
+      cmd: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'actualizar.ps1'), ...(mode === 'fit' ? ['-SoloFit'] : [])],
+    }
   }
-  return { cmd: 'bash', args: [join(root, 'actualizar.sh')] }
+  return { cmd: 'bash', args: [join(root, 'actualizar.sh'), ...(mode === 'fit' ? ['--solo-fit'] : [])] }
 }
 
 const SCRIPT_HINT = 'Ejecuta el script en la terminal para ver el motivo (.\\actualizar.ps1 en Windows, ./actualizar.sh en Mac/Linux).'
@@ -104,7 +107,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
 export function syncMiddleware(root: () => string, demo: () => boolean = () => false): Connect.NextHandleFunction {
   let state: SyncState = IDLE
   return (req, res, next) => {
-    const url = req.url?.split('?')[0]
+    const [url, query = ''] = (req.url ?? '').split('?')
     if (url !== '/api/sync' && url !== '/api/sync/status') return next()
     if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
     if (url === '/api/sync/status') return send(res, 200, withListProgress(state, Date.now()))
@@ -113,7 +116,8 @@ export function syncMiddleware(root: () => string, demo: () => boolean = () => f
     if (state.running) return send(res, 409, state)   // ya hay una en marcha
 
     state = { ...IDLE, running: true, startedAt: Date.now() }
-    const { cmd, args } = updateCommand(process.platform, root())
+    const mode = new URLSearchParams(query).get('mode') === 'fit' ? 'fit' : 'normal'
+    const { cmd, args } = updateCommand(process.platform, root(), mode)
     const child = spawn(cmd, args, {
       cwd: root(), windowsHide: true, env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
     })

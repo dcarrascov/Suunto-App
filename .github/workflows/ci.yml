@@ -33,5 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Python compila
         run: python -m py_compile fetch/*.py
+      - name: Tests de Python
+        run: python -m unittest discover -s fetch -p "test_*.py"
       - name: Script de Mac/Linux
         run: bash -n actualizar.sh

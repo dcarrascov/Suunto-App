@@ -8,10 +8,12 @@ Uso (desde la carpeta raíz del proyecto):
     python3 fetch/sync.py --since 2024-01-01    # solo desde una fecha
     python3 fetch/sync.py --no-gpx              # más rápido: sin ruta GPS ni parciales
     python3 fetch/sync.py --force               # vuelve a descargar los detalles ya guardados
-    python3 fetch/sync.py --source fit          # lee los .fit de la carpeta fetch/fit/
+    python3 fetch/sync.py --source fit          # solo los .fit de la carpeta fetch/fit/ (sin cuenta de Suunto)
+    python3 fetch/sync.py --no-fit              # nube sin sumar los .fit de fetch/fit/
     python3 fetch/sync.py --dump latest         # guarda las respuestas crudas para depurar
 
 Fuente "nube": la sesión la crea `suuntool login` (ver la guía); aquí no hay contraseñas.
+Con la nube se suman también los .fit de fetch/fit/ que no estén ya en Suunto (otro reloj, actividades sueltas).
 Salida: public/data/activities.json + activity_{id}.json + stats.json
 """
 from __future__ import annotations
@@ -130,28 +132,56 @@ def collect_cloud(args):
 
 # ── Fuente: ficheros FIT ────────────────────────────────────────────────────
 
-def collect_fit(args):
+FIT_INDEX = OUT_DIR / "fit_index.json"  # resúmenes de los .fit ya leídos: no se vuelven a leer si no cambian
+
+
+def collect_fit(args, required: bool = True):
+    """
+    Actividades de los .fit de fetch/fit/. Los ya leídos salen del índice (mismo tamaño y fecha) y su detalle solo
+    se vuelve a leer si hace falta. Con required=False (suma a la nube) no hay error si la carpeta está vacía.
+    """
     from fit_source import parse_fit
 
     fit_dir = Path(args.fit_dir) if args.fit_dir else Path(__file__).resolve().parent / "fit"
-    files = sorted(p for p in fit_dir.rglob("*") if p.suffix.lower() == ".fit")
+    files = sorted(p for p in fit_dir.rglob("*") if p.suffix.lower() == ".fit") if fit_dir.exists() else []
     if not files:
-        sys.exit(f"ERROR: no hay ficheros .fit en {fit_dir} (copia ahí los que exportes de la app)")
+        if required:
+            sys.exit(f"ERROR: no hay ficheros .fit en {fit_dir} (copia ahí los que exportes de la app)")
+        return [], {}
     max_hr = int(os.getenv("MAX_HR", "185"))
+    try:
+        index = json.loads(FIT_INDEX.read_text(encoding="utf-8")) if FIT_INDEX.exists() else {}
+    except ValueError:
+        index = {}
     print(f"Leyendo {len(files)} ficheros FIT de {fit_dir} (FC máxima para zonas: {max_hr})...")
 
-    entries, seen = [], set()
+    def loader(path, summary):
+        def load():
+            s, d = parse_fit(path, max_hr)
+            s["id"] = d["id"] = summary["id"]  # conserva el id (puede haberse desplazado)
+            return s, d
+        return load
+
+    entries, seen, new_index = [], set(), {}
     for path in files:
-        try:
-            summary, detail = parse_fit(path, max_hr)
-        except Exception as e:
-            print(f"  AVISO: {path.name} omitido: {e}")
-            continue
+        key = path.relative_to(fit_dir).as_posix()
+        stat = path.stat()
+        cached = index.get(key)
+        if cached and cached.get("size") == stat.st_size and cached.get("mtime") == int(stat.st_mtime):
+            summary = cached["summary"]
+        else:
+            try:
+                summary, _ = parse_fit(path, max_hr)
+            except Exception as e:
+                print(f"  AVISO: {path.name} omitido: {e}")
+                continue
+        new_index[key] = {"size": stat.st_size, "mtime": int(stat.st_mtime), "summary": dict(summary)}
         if summary["id"] in seen:
             print(f"  AVISO: {path.name} es un duplicado (misma hora de inicio); lo omito")
             continue
         seen.add(summary["id"])
-        entries.append({"summary": summary, "load": lambda s=summary, d=detail: (s, d), "network": False})
+        entries.append({"summary": summary, "load": loader(path, summary), "network": False})
+    save_json(FIT_INDEX, new_index)
     return entries, {}
 
 
@@ -252,6 +282,7 @@ def main():
     parser.add_argument("--since", type=str, default=None, help="solo desde esta fecha (YYYY-MM-DD)")
     parser.add_argument("--no-gpx", action="store_true", help="sin ruta GPS ni parciales (más rápido; solo nube)")
     parser.add_argument("--force", action="store_true", help="vuelve a descargar los detalles ya guardados")
+    parser.add_argument("--no-fit", action="store_true", help="con la nube, no sumar los .fit de fetch/fit/")
     parser.add_argument("--dump", metavar="KEY|latest", default=None,
                         help="guarda en fetch/debug las respuestas crudas de un entrenamiento y sale")
     args = parser.parse_args()
@@ -262,6 +293,15 @@ def main():
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     entries, meta = collect_fit(args) if args.source == "fit" else collect_cloud(args)
+    if args.source == "cloud" and not args.no_fit:
+        # los .fit de fetch/fit/ se suman a lo de Suunto, sin repetir las sesiones que ya están en la nube
+        from merge import drop_duplicates
+        fit_entries, _ = collect_fit(args, required=False)
+        if fit_entries:
+            kept, repeated = drop_duplicates([e["summary"] for e in entries], [e["summary"] for e in fit_entries])
+            kept_ids = {id(s) for s in kept}
+            entries += [e for e in fit_entries if id(e["summary"]) in kept_ids]
+            print(f"Ficheros FIT: {len(kept)} actividades añadidas, {repeated} ya estaban en Suunto")
 
     # ids únicos y estables (derivados de la hora de inicio)
     used = set()

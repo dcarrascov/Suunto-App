@@ -49,6 +49,8 @@ export interface ActivitySummary {
   // Swimming only
   swolf?: number | null
   avgStrokesPerLength?: number | null
+  suuntoKey?: string | null   // de la cuenta de Suunto (Ruta A)
+  sourceFile?: string | null  // de un fichero .fit de fetch/fit/ (Ruta B o FIT sumados a la cuenta)
 }
 
 // Datos extra de la pantalla de detalle. Todos opcionales: si el reloj no los envía valen null.

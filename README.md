@@ -26,6 +26,7 @@ Your data is downloaded from your Suunto account (or from FIT files you export y
 | **Entrenador IA** (AI Coach) | With Gemini (free, optional): ask about your training and generate weeks **like your coach** or **without a coach** for a goal (5K, 10K, half, marathon or none); send them to your Calendar |
 | **Forma, Zonas, Rendimiento, Récords, Historial** (Form, Zones, Performance, Records, History) | CTL/ATL/TSB with projection, 80/20, efficiency, decoupling, records with predictions and yearly totals |
 | **Zapatillas** (Shoes) | Km per pair with tags (easy run, race…) and a warning as they near their limit |
+| **Importar FIT** (Import FIT) | Upload `.fit` files from the browser (drag and drop); with a Suunto account they are added to it without duplicating sessions |
 | **Ajustes** (Settings) | Thresholds, hints for the AI and a **backup** of what you store in the browser |
 
 | Calendar | Plan | Races |
@@ -178,6 +179,8 @@ python3 fetch/sync.py --force
 ```
 
 > **Important:** run `python3 fetch/sync.py` again whenever you want to add new workouts. Activities already downloaded are not requested from Suunto again.
+>
+> **FIT files too:** any `.fit` in `fetch/fit/` (for example from another watch, or uploaded from **Importar FIT**) is added to your Suunto activities; sessions already in Suunto are detected (start within 2 min and similar duration) and not repeated. Use `--no-fit` to skip them.
 
 ### A4. Check that the data is correct (optional)
 
@@ -235,7 +238,7 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 ### B1. Export your workouts
 
 1. In the Suunto app (phone): Calendar → choose the workout → three-dot menu (top right) → **export as FIT**. Send it to your computer.
-2. Copy the `.fit` files to the `fetch/fit/` folder (create it if it does not exist).
+2. Copy the `.fit` files to the `fetch/fit/` folder (create it if it does not exist), or upload them later from the app's **Importar FIT** (Import FIT) page and press «Procesar» (process).
 
 > **Lots of workouts?** Exporting them one by one is slow. If you live in the EU, the Data Act gives you the right to ask Suunto for your data for free and in formats such as FIT, GPX or JSON (through the app, Sports Tracker or by writing to Suunto; see their [official notice](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). This project reads `.fit` files.
 

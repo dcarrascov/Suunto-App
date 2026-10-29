@@ -90,6 +90,7 @@ export default function ActivityDetailPage() {
           <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
           <div className="text-sm text-slate-500 mt-0.5">
             {formatDate(act.startTime)} · {sportLabel(act.sport)}
+            {act.sourceFile && <span className="ml-2 text-[10px] font-semibold border border-slate-600 text-slate-400 px-1.5 py-0.5">FIT · {act.sourceFile}</span>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
