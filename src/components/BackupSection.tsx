@@ -34,8 +34,8 @@ export default function BackupSection() {
   }
 
   return (
-    <div className="border-t border-line pt-6 mt-10 space-y-3">
-      <h2 className="text-base font-semibold text-slate-100">Copia de seguridad</h2>
+    <div className="space-y-3">
+      <div className="g-label">Copia de seguridad</div>
       <p className="text-xs text-slate-500">
         Lo que guardas en la app vive solo en este navegador: {Object.values(BACKUP_KEYS).join('; ').toLowerCase()}.
         Si borras los datos del navegador o cambias de ordenador, se pierde. Descarga una copia de vez en cuando.
