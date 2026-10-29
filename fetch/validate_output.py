@@ -4,6 +4,7 @@ Comprueba que public/data/ cumple el contrato que espera el frontend
 (src/types/suunto.ts). Úsalo después de sincronizar:
 
     python3 fetch/validate_output.py
+    python3 fetch/validate_output.py --data demo/data   # otra carpeta (p. ej. la demo)
 
 Sale con código 1 si encuentra errores (los avisos no son errores).
 """
@@ -196,6 +197,9 @@ def check_plan():
 
 
 def main():
+    global DATA
+    if "--data" in sys.argv:
+        DATA = Path(sys.argv[sys.argv.index("--data") + 1]).resolve()
     acts_path = DATA / "activities.json"
     if not acts_path.exists():
         sys.exit(f"No existe {acts_path}. Ejecuta primero: python3 fetch/sync.py")
