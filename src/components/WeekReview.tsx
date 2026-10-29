@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useActivityStore } from '../stores/activityStore'
 import { useAiStore } from '../stores/aiStore'
 import { useCustomWorkoutStore } from '../stores/customWorkoutStore'
@@ -9,6 +10,13 @@ import { askGemini } from '../utils/gemini'
 
 /** Quita el Markdown que a veces pone Gemini (negritas y títulos) para mostrarlo como texto. */
 const plainText = (t: string) => t.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s*/gm, '').replace(/^\s*[*-]\s+/gm, '• ')
+
+/** Primera frase con contenido (sin los títulos «1. Cumplimiento»…), para la línea plegada. */
+function firstSentence(t: string): string {
+  const line = plainText(t).split('\n').map(l => l.trim())
+    .find(l => l && !/^\d+\.\s*[^.]{0,40}$/.test(l) && !/^¡?hola/i.test(l)) ?? ''
+  return line.split(/(?<=\.)\s/)[0]
+}
 
 /** Plan → «Revisión IA» de una semana empezada o pasada: lo planificado frente a lo hecho, con consejos. */
 export default function WeekReview({ weekStart }: { weekStart: string }) {
@@ -21,6 +29,7 @@ export default function WeekReview({ weekStart }: { weekStart: string }) {
   const custom = useCustomWorkoutStore(s => s.workouts)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)   // plegada para que ocupe menos; se abre sola al generarla
 
   const today = toLocalISODate(new Date())
   if (weekStart > today) return null   // aún no ha empezado
@@ -37,6 +46,7 @@ export default function WeekReview({ weekStart }: { weekStart: string }) {
       const data = { activities, stats, workouts: plan?.workouts ?? [], events: plan?.events ?? [], settings, history, projection, today }
       const r = await askGemini(weekReviewPrompt(data, weekStart, planned))
       saveReview(weekStart, { text: r.text.trim(), savedAt: new Date().toLocaleString('es-ES'), model: r.model })
+      setOpen(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')
     } finally {
@@ -57,7 +67,16 @@ export default function WeekReview({ weekStart }: { weekStart: string }) {
       </div>
       {review ? (
         <>
-          <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">{plainText(review.text)}</div>
+          <button
+            onClick={() => setOpen(v => !v)}
+            aria-expanded={open}
+            className="w-full flex items-center gap-2 text-left text-xs text-slate-400 hover:text-white"
+          >
+            <ChevronRight size={14} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+            <span className="shrink-0">{open ? 'Ocultar la revisión' : 'Ver la revisión'}</span>
+            {!open && <span className="min-w-0 truncate text-slate-500">{firstSentence(review.text)}</span>}
+          </button>
+          {open && <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">{plainText(review.text)}</div>}
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
             <span>Guardada el {review.savedAt}{review.model ? ` con ${review.model}` : ''}</span>
             <button onClick={() => { if (window.confirm('¿Borrar la revisión de esta semana?')) deleteReview(weekStart) }}
