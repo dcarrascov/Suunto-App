@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyLine, finish, IDLE, withListProgress, type SyncState } from './sync.ts'
+import { applyLine, finish, IDLE, updateCommand, withListProgress, type SyncState } from './sync.ts'
 
 const run = (lines: string[], from: SyncState = { ...IDLE, running: true, startedAt: 0 }) => lines.reduce<SyncState>((s, l) => applyLine(s, l), from)
 
@@ -30,5 +30,11 @@ describe('progreso de actualizar.ps1', () => {
     expect(finish(s, 0, 42_000)).toMatchObject({ running: false, ok: true, percent: 100, step: 'fin', seconds: 42 })
     expect(finish(s, 1, 1000).error).toContain('validación')
     expect(finish(run(['== Suunto ==']), 1, 1000).error).toContain('Suunto')
+  })
+  it('en Windows lanza actualizar.ps1 con PowerShell; en Mac/Linux, actualizar.sh con bash', () => {
+    expect(updateCommand('win32', 'C:/app')).toMatchObject({ cmd: 'powershell.exe' })
+    expect(updateCommand('win32', 'C:/app').args.at(-1)).toMatch(/actualizar\.ps1$/)
+    expect(updateCommand('darwin', '/app')).toMatchObject({ cmd: 'bash' })
+    expect(updateCommand('linux', '/app').args[0]).toMatch(/actualizar\.sh$/)
   })
 })
