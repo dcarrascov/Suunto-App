@@ -54,8 +54,10 @@ export function formatRelativeTime(isoString: string): string {
   if (days === 1) return 'Ayer'
   if (days < 7) return `Hace ${days} días`
   if (days < 30) return `Hace ${Math.floor(days / 7)} sem.`
-  if (days < 365) return `Hace ${Math.floor(days / 30)} meses`
-  return `Hace ${Math.floor(days / 365)} años`
+  const months = Math.floor(days / 30)
+  if (days < 365) return `Hace ${months} ${months === 1 ? 'mes' : 'meses'}`
+  const years = Math.floor(days / 365)
+  return `Hace ${years} ${years === 1 ? 'año' : 'años'}`
 }
 
 export function sportLabel(sport: Sport): string {

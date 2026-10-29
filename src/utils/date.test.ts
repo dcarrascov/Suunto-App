@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { daysAgo, isoDateOffset, parseLocalDate, toLocalISODate } from './date'
-import { formatRaceTime } from './formatters'
+import { formatRaceTime, formatRelativeTime } from './formatters'
 
 afterEach(() => { vi.useRealTimers() })
 
@@ -30,5 +30,16 @@ describe('formatRaceTime', () => {
     expect(formatRaceTime(1085)).toBe('18:05')
     expect(formatRaceTime(4847)).toBe('1:20:47')
     expect(formatRaceTime(3600)).toBe('1:00:00')
+  })
+})
+
+describe('formatRelativeTime', () => {
+  it('singular y plural de meses y años', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 29, 12))
+    expect(formatRelativeTime('2026-09-20T10:00:00')).toBe('Hace 1 mes')
+    expect(formatRelativeTime('2026-07-20T10:00:00')).toBe('Hace 3 meses')
+    expect(formatRelativeTime('2025-07-20T10:00:00')).toBe('Hace 1 año')
+    expect(formatRelativeTime('2023-07-20T10:00:00')).toBe('Hace 3 años')
   })
 })
