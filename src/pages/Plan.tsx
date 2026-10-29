@@ -215,7 +215,7 @@ export default function Plan() {
 
       <WeekSummary week={current} />
 
-      <WeekReview weekStart={week} />
+      <WeekReview key={week} weekStart={week} />
 
       {/* Propuesta de la IA para esta semana (si la hay): aparte del plan del entrenador */}
       {aiProposal && (

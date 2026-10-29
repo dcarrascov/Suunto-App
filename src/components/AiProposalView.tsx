@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useActivityStore } from '../stores/activityStore'
 import type { AiProposal } from '../stores/aiStore'
 import { useCustomWorkoutStore } from '../stores/customWorkoutStore'
 import { proposalKey, proposalToCustom } from '../utils/customWorkouts'
 import { coachHasWeek, compareWeek } from '../utils/aiProposal'
-import { SESSION_LABEL } from '../utils/coach'
+import { SESSION_LABEL, weekdayIndex as weekdayOf } from '../utils/coach'
 import { formatDuration } from '../utils/formatters'
 import { parseLocalDate } from '../utils/date'
 
@@ -25,6 +26,7 @@ function dayLabel(iso: string): string {
 export default function AiProposalView({ proposal, onDelete }: { proposal: AiProposal; onDelete?: () => void }) {
   const plan = useActivityStore(s => s.plan)
   const [open, setOpen] = useState<string | null>(null)
+  const [showDays, setShowDays] = useState(false)   // los días van plegados para que ocupe menos
   const key = proposalKey(proposal)
   const inCalendar = useCustomWorkoutStore(s => s.workouts.filter(w => w.proposalKey === key).length)
   const replaceProposal = useCustomWorkoutStore(s => s.replaceProposal)
@@ -37,6 +39,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
   const weekRaces = events.filter(e => e.date >= proposal.weekStart && e.date <= proposal.workouts.reduce((m, w) => (w.date > m ? w.date : m), proposal.weekStart))
   const totalMin = proposal.workouts.reduce((s, w) => s + (w.durationMin ?? 0), 0)
   const totalTss = proposal.workouts.reduce((s, w) => s + (w.tss ?? 0), 0)
+  const sessions = proposal.workouts.filter(w => w.type !== 'descanso')
 
   return (
     <div className="border border-dashed border-slate-600 bg-[#121214] p-4">
@@ -65,7 +68,19 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
       )}
       {proposal.explanation && <p className="text-sm text-slate-400 mt-3">{proposal.explanation}</p>}
 
-      <div className="mt-3 divide-y divide-line border-t border-line">
+      <button
+        onClick={() => setShowDays(v => !v)}
+        aria-expanded={showDays}
+        className="mt-3 w-full flex items-center gap-2 border-t border-line pt-2 text-left text-xs text-slate-400 hover:text-white"
+      >
+        <ChevronRight size={14} className={`shrink-0 transition-transform ${showDays ? 'rotate-90' : ''}`} aria-hidden />
+        <span className="shrink-0">{showDays ? 'Ocultar los días' : 'Ver los días'} · {sessions.length} sesiones</span>
+        {!showDays && sessions.length > 0 && (
+          <span className="min-w-0 truncate text-slate-500">{sessions.map(w => `${DAYS[weekdayOf(w.date)]} ${w.title}`).join(' · ')}</span>
+        )}
+      </button>
+
+      {showDays && <div className="mt-2 divide-y divide-line border-t border-line">
         {proposal.workouts.map((w, i) => {
           const key = `${w.date}-${i}`
           return (
@@ -87,7 +102,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {cmp && (
         <div className="mt-4">

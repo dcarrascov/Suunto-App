@@ -157,66 +157,40 @@ export default function AiCoach() {
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-500 mt-0.5 mb-4 max-w-3xl">
-        Pregunta sobre tu entrenamiento y genera semanas al estilo de tu entrenador o, sin entrenador, para tu objetivo.
-        Lo que propone la IA se queda en esta app (y en tu Calendario si la pasas): nunca se envía a TrainingPeaks.
+
+      {/* Pestañas: como tu entrenador / sin entrenador */}
+      <div className="flex gap-0.5 bg-slate-800 p-0.5 w-fit mt-4" role="tablist">
+        {([['coach', 'Como tu entrenador'], ['free', 'Sin entrenador']] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+            className={`px-4 py-2 text-sm ${mode === k ? 'bg-accent text-black font-medium' : 'text-slate-300 hover:bg-slate-700'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-sm text-slate-500 mt-4 mb-4 max-w-3xl">
+        {mode === 'coach'
+          ? 'La IA analiza las sesiones de tu entrenador en TrainingPeaks y propone semanas como las haría él.'
+          : 'Elige un objetivo (5K, 10K, media, maratón o ninguno) y la IA planifica semana a semana a partir de tus entrenos o de tu nivel.'}
+        {' '}Lo que propone se queda en esta app (y en tu Calendario si la pasas): nunca se envía a TrainingPeaks.
       </p>
       <div className="text-xs text-slate-500 border-l-2 border-slate-600 pl-3 mb-6 max-w-3xl space-y-1">
-        <p>La IA imita a tu entrenador, no lo sustituye: él decide con cosas que no están en los datos. Úsalo como referencia.</p>
-        <p>A Gemini se envían tus datos de entrenamiento resumidos y las sesiones de tu entrenador, nunca rutas GPS.</p>
-        <p>Sin entrenador, la IA propone un plan general: escucha a tu cuerpo y, si hay dolor o lesión, consulta a un profesional.</p>
+        {mode === 'coach' ? (
+          <>
+            <p>La IA imita a tu entrenador, no lo sustituye: él decide con cosas que no están en los datos. Úsalo como referencia.</p>
+            <p>A Gemini se envían tus datos de entrenamiento resumidos y las sesiones de tu entrenador, nunca rutas GPS.</p>
+          </>
+        ) : (
+          <>
+            <p>Es un plan general: escucha a tu cuerpo y, si hay dolor o lesión, consulta a un profesional.</p>
+            <p>A Gemini se envían tus datos de entrenamiento resumidos (sin el plan de tu entrenador), nunca rutas GPS.</p>
+          </>
+        )}
       </div>
 
       <SetupNotice status={status} />
 
       <div className="g-grid">
-        {/* 1 · Preguntar */}
-        <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
-          <div className="g-label">Preguntar sobre tu entrenamiento</div>
-          {!hasData && <div className="text-xs text-slate-500">Sin actividades del reloj la IA solo puede responder en general (ejecuta .\actualizar.ps1).</div>}
-          <textarea
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ready && question.trim()) ask() }}
-            rows={3}
-            placeholder="Ej.: ¿Cómo llego a la carrera del domingo? ¿Estoy haciendo demasiado volumen? ¿Qué ritmo debería llevar en un 10 km?"
-            className={TEXTAREA}
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <button onClick={ask} disabled={!ready || !question.trim()} className={PRIMARY}>Preguntar</button>
-            <span className="text-xs text-slate-600">Ctrl + Intro</span>
-            {busy === 'question' && <Working text="Gemini está pensando… (si está saturado, la app reintenta sola)" />}
-            {error?.where === 'question' && <span className="text-xs text-red-300">{error.text}</span>}
-          </div>
-          {answers.map((x, i) => (
-            <div key={i} className="border-t border-line pt-3">
-              <div className="text-xs text-slate-500 mb-1">
-                {x.q}
-                {x.fellBack && <span className="text-amber-300/80"> · respondió {x.model} (el principal estaba saturado)</span>}
-              </div>
-              <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">{x.a}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Pestañas: como tu entrenador / sin entrenador */}
-        <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
-          <div className="g-label">Generar semanas</div>
-          <div className="flex gap-0.5 bg-slate-800 p-0.5 w-fit" role="tablist">
-            {([['coach', 'Como tu entrenador'], ['free', 'Sin entrenador']] as const).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
-                className={`px-3 py-1.5 text-sm ${mode === k ? 'bg-accent text-black font-medium' : 'text-slate-300 hover:bg-slate-700'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-slate-500">
-            {mode === 'coach'
-              ? 'Analiza las sesiones de tu entrenador en TrainingPeaks y propone semanas como las haría él.'
-              : 'Sin entrenador: elige un objetivo (5K, 10K, media, maratón o ninguno) y la IA planifica a partir de tus entrenos.'}
-          </p>
-        </div>
-
         {mode === 'free' && (
           <div className="g-cell col-span-12 space-y-3">
             <div className="g-label">Plan sin entrenador</div>
@@ -224,7 +198,7 @@ export default function AiCoach() {
           </div>
         )}
 
-        {/* 2 · Perfil del entrenador */}
+        {/* 1 · Perfil del entrenador */}
         {mode === 'coach' && <>
         <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
           <div className="g-label">1 · Perfil de tu entrenador</div>
@@ -261,8 +235,8 @@ export default function AiCoach() {
           )}
         </div>
 
-        {/* 3 · Generar semana */}
-        <div className="g-cell col-span-12 space-y-3">
+        {/* 2 · Generar semana */}
+        <div className="g-cell col-span-12 xl:col-span-6 space-y-3">
           <div className="g-label">2 · Generar una semana como tu entrenador</div>
           {workouts.length === 0 ? (
             <div className="text-sm text-slate-500">
@@ -297,6 +271,36 @@ export default function AiCoach() {
         </>}
       </div>
 
+      {/* Preguntar: común a las dos pestañas */}
+      <div className="g-grid mt-6">
+        <div className="g-cell col-span-12 space-y-3">
+          <div className="g-label">Preguntar sobre tu entrenamiento</div>
+          {!hasData && <div className="text-xs text-slate-500">Sin actividades del reloj la IA solo puede responder en general (ejecuta .\actualizar.ps1).</div>}
+          <textarea
+            value={question}
+            onChange={e => setQuestion(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ready && question.trim()) ask() }}
+            rows={3}
+            placeholder="Ej.: ¿Cómo llego a la carrera del domingo? ¿Estoy haciendo demasiado volumen? ¿Qué ritmo debería llevar en un 10 km?"
+            className={TEXTAREA}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={ask} disabled={!ready || !question.trim()} className={PRIMARY}>Preguntar</button>
+            <span className="text-xs text-slate-600">Ctrl + Intro</span>
+            {busy === 'question' && <Working text="Gemini está pensando… (si está saturado, la app reintenta sola)" />}
+            {error?.where === 'question' && <span className="text-xs text-red-300">{error.text}</span>}
+          </div>
+          {answers.map((x, i) => (
+            <div key={i} className="border-t border-line pt-3">
+              <div className="text-xs text-slate-500 mb-1">
+                {x.q}
+                {x.fellBack && <span className="text-amber-300/80"> · respondió {x.model} (el principal estaba saturado)</span>}
+              </div>
+              <div className="text-sm text-slate-200 whitespace-pre-line leading-relaxed">{x.a}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       {savedProposals.length > 0 && (
         <div className="mt-8 space-y-4">
           <div className="g-label">Semanas generadas · {mode === 'coach' ? 'como tu entrenador' : 'sin entrenador'}</div>
@@ -305,6 +309,7 @@ export default function AiCoach() {
           ))}
         </div>
       )}
+
     </div>
   )
 }
