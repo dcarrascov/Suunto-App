@@ -1,0 +1,37 @@
+# Comprobación automática en cada push y pull request: tipos, lint, tests, build y que el Python compile.
+# No usa datos ni claves: public/data/ y .env no están en el repositorio.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Tipos
+        run: npx tsc -b
+      - name: Lint
+        run: npx oxlint
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npx vite build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python compila
+        run: python -m py_compile fetch/*.py
+      - name: Script de Mac/Linux
+        run: bash -n actualizar.sh
