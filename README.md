@@ -1,399 +1,456 @@
 # Suunto Stats
 
-Panel personal para ver tus estadísticas de entrenamiento de Suunto: actividades, mapas, zonas de FC, fitness (CTL/ATL/TSB), récords y más.
+**English** · [Español](README.es.md)
 
-Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes tú) a archivos locales en tu ordenador. La app los lee desde ahí; no hay servidor en la nube ni base de datos.
+A personal dashboard for your Suunto training statistics: activities, maps, HR zones, fitness (CTL/ATL/TSB), records and more.
 
----
+Your data is downloaded from your Suunto account (or from FIT files you export yourself) into local files on your computer. The app reads them from there; there is no cloud server and no database.
 
-## Dos formas de traer tus datos
+> The app's interface is in **Spanish**. Section names below are given as they appear on screen, with a translation the first time.
 
-| | **Ruta A — Automática** | **Ruta B — Ficheros FIT** |
-| --- | --- | --- |
-| Cómo funciona | Lee tu cuenta de Suunto (la misma de la app del móvil) | Exportas tus entrenamientos como `.fit` desde la app y los copias a una carpeta |
-| Comodidad | Un solo comando, descarga todo el historial | Hay que exportar los entrenamientos de uno en uno |
-| Riesgo | **No es oficial**: Suunto no ofrece API para uso personal. Puede dejar de funcionar sin aviso y podría ir contra sus términos de uso | Ninguno: son tus propios ficheros |
-| Necesitas | La herramienta `suuntool` (solo para iniciar sesión) | Nada más |
+![Dashboard](docs/capturas/resumen.png)
 
-Elige una. Si cambias de una a otra, la lista de actividades se rehace con la fuente nueva (no se mezclan). El resto de la app es idéntico.
-
-Primero haz la **preparación común** y después sigue solo la sección de tu ruta: [Ruta A](#ruta-a--automática-cuenta-de-suunto) o [Ruta B](#ruta-b--ficheros-fit).
+> The screenshots come from the **demo**, with made-up data: you can try it yourself without a Suunto account (see [Try the demo](#try-the-demo-no-account-needed)).
 
 ---
 
-## Preparación común (las dos rutas)
+## What the app does
 
-### Qué necesitas
+| Section | What you get |
+| --- | --- |
+| **Resumen** (Dashboard) | Today's form, VO2max, «Hoy toca» (today's session), current week, km per week, latest activities and warnings (outdated settings, worn-out shoes) |
+| **Calendario** (Calendar) | Month with what you did, what was planned and your races; create, edit and delete your own workouts (shown as an agenda on mobile) |
+| **Actividades** (Activities) and **Detalle** (Detail) | Filterable list; for each activity, a map coloured by pace, laps, zones, best efforts and the shoes you wore |
+| **Plan** | Your coach's plan from TrainingPeaks (optional) with what is done and pending, and the **AI weekly review** |
+| **Competiciones** (Races) | Your races, the form you arrived with and the prediction for the next one |
+| **Entrenador IA** (AI Coach) | With Gemini (free, optional): ask about your training and generate weeks **like your coach** or **without a coach** for a goal (5K, 10K, half, marathon or none); send them to your Calendar |
+| **Forma, Zonas, Rendimiento, Récords, Historial** (Form, Zones, Performance, Records, History) | CTL/ATL/TSB with projection, 80/20, efficiency, decoupling, records with predictions and yearly totals |
+| **Zapatillas** (Shoes) | Km per pair with tags (easy run, race…) and a warning as they near their limit |
+| **Ajustes** (Settings) | Thresholds, hints for the AI and a **backup** of what you store in the browser |
 
-| Programa | Para qué sirve | Cómo comprobarlo |
+| Calendar | Plan | Races |
 | --- | --- | --- |
-| **Node.js** (v18 o superior) | Ejecutar la app web | `node --version` |
-| **Python** (v3.10 o superior) | Descargar y preparar los datos | `python3 --version` |
+| ![Calendar](docs/capturas/calendario.png) | ![Plan](docs/capturas/plan.png) | ![Races](docs/capturas/competiciones.png) |
 
-> **¿No tienes Node.js o Python?**
->
-> - Node.js: [https://nodejs.org](https://nodejs.org) → descarga la versión LTS.
-> - Python: [https://python.org/downloads](https://python.org/downloads) → en Mac/Linux suele venir instalado.
->
-> **En Windows**, donde pone `python3` usa `py`. Si PowerShell dice que la ejecución de scripts está deshabilitada (le pasa a `npm` y al entorno virtual), ejecuta una vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+---
 
-### 1. Descargar el proyecto
+## Try the demo (no account needed)
 
-Abre la carpeta del proyecto en la terminal:
+With Node.js installed (see [What you need](#what-you-need)), from the project folder:
 
 ```bash
-cd ruta/donde/está/suunto-stats
+npm install
+npm run demo
 ```
 
-### 2. Instalar dependencias de Python
+Open the link it prints. It uses the made-up data in `demo/data/` (a fictional runner, their plan and two races) and never touches yours. To bring the dates up to today: `python3 fetch/make_demo.py` (on Windows, `py fetch\make_demo.py`).
 
-Desde la carpeta raíz del proyecto:
+---
+
+## Two ways to bring in your data
+
+| | **Route A — Automatic** | **Route B — FIT files** |
+| --- | --- | --- |
+| How it works | Reads your Suunto account (the same one as the phone app) | You export your workouts as `.fit` from the app and copy them to a folder |
+| Convenience | One command downloads your whole history | Workouts have to be exported one by one |
+| Risk | **Unofficial**: Suunto offers no API for personal use. It may stop working without notice and could go against their terms of use | None: they are your own files |
+| You need | The `suuntool` tool (only to log in) | Nothing else |
+
+Pick one. If you switch from one to the other, the activity list is rebuilt from the new source (they are not mixed). The rest of the app is identical.
+
+First do the **common setup**, then follow only your route's section: [Route A](#route-a--automatic-suunto-account) or [Route B](#route-b--fit-files).
+
+---
+
+## Common setup (both routes)
+
+### What you need
+
+| Program | What it is for | How to check |
+| --- | --- | --- |
+| **Node.js** (v18 or later) | Run the web app | `node --version` |
+| **Python** (v3.10 or later) | Download and prepare the data | `python3 --version` |
+
+> **No Node.js or Python?**
+>
+> - Node.js: [https://nodejs.org](https://nodejs.org) → download the LTS version.
+> - Python: [https://python.org/downloads](https://python.org/downloads) → usually already installed on Mac/Linux.
+>
+> **On Windows**, use `py` wherever it says `python3`. If PowerShell says running scripts is disabled (it happens with `npm` and the virtual environment), run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+### 1. Get the project
+
+Open the project folder in the terminal:
+
+```bash
+cd path/to/suunto-stats
+```
+
+### 2. Install the Python dependencies
+
+From the project's root folder:
 
 ```bash
 python3 -m pip install -r fetch/requirements.txt
 ```
 
-> **Si `pip` dice «externally-managed-environment»** (pasa en Ubuntu/WSL y otras distribuciones recientes), crea un entorno virtual en la carpeta del proyecto y úsalo en todos los comandos de Python:
+> **If `pip` says «externally-managed-environment»** (it happens on Ubuntu/WSL and other recent distributions), create a virtual environment in the project folder and use it for every Python command:
 >
 > ```bash
-> sudo apt install python3-venv          # solo en Debian/Ubuntu, si falta
+> sudo apt install python3-venv          # Debian/Ubuntu only, if missing
 > python3 -m venv .venv
 > source .venv/bin/activate              # Windows (PowerShell): .venv\Scripts\Activate.ps1
 > python3 -m pip install -r fetch/requirements.txt
 > ```
 >
-> Cada vez que abras una terminal nueva, ejecuta `source .venv/bin/activate` antes de `python3 fetch/sync.py`.
+> Every time you open a new terminal, run `source .venv/bin/activate` before `python3 fetch/sync.py`.
 
-### 3. Opciones personales en `.env` (opcional)
+### 3. Personal options in `.env` (optional)
 
-Sin `.env` todo funciona con los datos de Suunto. Hace falta para la zona horaria, el plan de TrainingPeaks o el Entrenador IA (Gemini). Copia la plantilla y edita la copia:
+Without `.env` everything works with your Suunto data. You need it for the time zone, the TrainingPeaks plan or the AI Coach (Gemini). Copy the template and edit the copy:
 
 ```bash
 cp .env.example .env                  # Windows (PowerShell): Copy-Item .env.example .env
 ```
 
-Cada opción está explicada en el propio fichero; quita el `#` de las que uses y pon tus valores. `.env` está en `.gitignore` y **nunca se sube a GitHub**: no pongas claves en `.env.example`.
+Each option is explained in the file itself; remove the `#` from the ones you use and fill in your values. `.env` is in `.gitignore` and **is never uploaded to GitHub**: do not put keys in `.env.example`.
 
 ---
 
-## Ruta A — Automática (cuenta de Suunto)
+## Route A — Automatic (Suunto account)
 
-### A1. Instalar suuntool
+### A1. Install suuntool
 
-Solo sirve para iniciar sesión en Suunto una vez: [github.com/tajchert/suuntool](https://github.com/tajchert/suuntool)
+It is only used to log in to Suunto once: [github.com/tajchert/suuntool](https://github.com/tajchert/suuntool)
 
-- Mac / Linux con Homebrew: `brew install --cask tajchert/tap/suuntool`
-- Con Go instalado: `go install github.com/tajchert/suuntool@latest`
-- Windows: no tiene binarios oficiales. Instala [Go](https://go.dev/dl/) (instalador para Windows), abre una PowerShell **nueva** y ejecuta `go install github.com/tajchert/suuntool@latest`. Queda en `%USERPROFILE%\go\bin\suuntool.exe`; añade esa carpeta al PATH o ejecútalo con la ruta completa. Alternativa: WSL (Ubuntu). Usa PowerShell o Windows Terminal (en Git Bash el login puede fallar con «stdin is not a TTY»).
+- Mac / Linux with Homebrew: `brew install --cask tajchert/tap/suuntool`
+- With Go installed: `go install github.com/tajchert/suuntool@latest`
+- Windows: there are no official binaries. Install [Go](https://go.dev/dl/) (Windows installer), open a **new** PowerShell and run `go install github.com/tajchert/suuntool@latest`. It ends up in `%USERPROFILE%\go\bin\suuntool.exe`; add that folder to PATH or run it with the full path. Alternative: WSL (Ubuntu). Use PowerShell or Windows Terminal (in Git Bash the login may fail with «stdin is not a TTY»).
 
-Compruébalo con `suuntool version`.
+Check it with `suuntool version`.
 
-### A2. Iniciar sesión en Suunto (solo la primera vez)
+### A2. Log in to Suunto (first time only)
 
 ```bash
-suuntool login --email tu@email.com
+suuntool login --email you@example.com
 ```
 
-Te pedirá tu contraseña de Suunto (la de la app del móvil). **No se guarda ninguna contraseña en este proyecto**: `suuntool` guarda solo una clave de sesión en `~/.config/suuntool/session.json`.
+It will ask for your Suunto password (the one for the phone app). **No password is stored in this project**: `suuntool` only keeps a session key in `~/.config/suuntool/session.json`.
 
-Comprueba que todo va bien:
+Check that everything is fine:
 
 ```bash
 suuntool doctor
 ```
 
-> `suuntool` solo admite email + contraseña. Si entras en la app de Suunto con Facebook u otro acceso social, crea primero una contraseña de Suunto (en la app: Ajustes → Cuenta → Cambiar contraseña; te llega un enlace por email). No está comprobado que eso baste en cuentas creadas con acceso social; si no funciona, usa la [Ruta B](#ruta-b--ficheros-fit).
+> `suuntool` only supports email + password. If you sign in to the Suunto app with Facebook or another social login, first create a Suunto password (in the app: Settings → Account → Change password; you get a link by email). It has not been confirmed that this is enough for accounts created with a social login; if it does not work, use [Route B](#route-b--fit-files).
 
-### A3. Descargar tus actividades
+### A3. Download your activities
 
-Desde la carpeta raíz del proyecto (para una primera prueba, solo las 20 últimas):
+From the project's root folder (for a first test, only the 20 most recent):
 
 ```bash
 python3 fetch/sync.py --limit 20
 ```
 
-**Qué hace este comando:**
+**What this command does:**
 
-- Lee la lista de tus entrenamientos de Suunto
-- Descarga el detalle de cada uno (zonas de FC, parciales, ruta GPS)
-- Guarda todo en `public/data/` (archivos JSON)
+- Reads the list of your Suunto workouts
+- Downloads each one's detail (HR zones, laps, GPS route)
+- Saves everything in `public/data/` (JSON files)
 
-La primera vez puede tardar **varios minutos** si tienes muchas actividades. Verás el progreso en la terminal.
+The first time it may take **several minutes** if you have many activities. You will see the progress in the terminal.
 
-**Opciones útiles:**
+**Useful options:**
 
 ```bash
-# Todo el historial
+# Whole history
 python3 fetch/sync.py
 
-# Solo actividades desde una fecha
+# Only activities since a date
 python3 fetch/sync.py --since 2024-01-01
 
-# Más rápido, sin ruta GPS ni parciales
+# Faster, without GPS route or laps
 python3 fetch/sync.py --no-gpx
 
-# Volver a descargar lo ya guardado
+# Download again what is already saved
 python3 fetch/sync.py --force
 ```
 
-> **Importante:** vuelve a ejecutar `python3 fetch/sync.py` cuando quieras actualizar los datos con entrenamientos nuevos. Las actividades ya descargadas no se vuelven a pedir a Suunto.
+> **Important:** run `python3 fetch/sync.py` again whenever you want to add new workouts. Activities already downloaded are not requested from Suunto again.
 
-### A4. Comprobar que los datos son correctos (opcional)
+### A4. Check that the data is correct (optional)
 
 ```bash
 python3 fetch/validate_output.py
 ```
 
-Debe terminar con `0 errores`.
+It should end with `0 errores` (0 errors).
 
-### A5. Instalar dependencias de la app web
+### A5. Install the web app dependencies
 
-En la carpeta raíz del proyecto:
+In the project's root folder:
 
 ```bash
 npm install
 ```
 
-Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
+You only need to do this **once** (or when the project's dependencies change).
 
-### A6. Abrir la app
+### A6. Open the app
 
 ```bash
 npm run dev
 ```
 
-Verás algo como:
+You will see something like:
 
 ```
   ➜  Local:   http://localhost:5173/
 ```
 
-Abre ese enlace en el navegador (Chrome, Firefox, Safari…). Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
+Open that link in your browser (Chrome, Firefox, Safari…). To **close** the app, go back to the terminal and press `Ctrl + C`.
 
-### Resumen rápido de la Ruta A (cuando ya lo hayas hecho una vez)
+### Route A quick reference (once you have done it)
 
 ```bash
-# 1. Sincronizar datos nuevos de Suunto
+# 1. Sync new Suunto data
 python3 fetch/sync.py
 
-# 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
+# 1b. (Optional) Your coach's plan from TrainingPeaks — see GUIDE_TRAININGPEAKS.md
 python3 fetch/tp_sync.py
 
-# 2. Arrancar la app
+# 2. Start the app
 npm run dev
 ```
 
-Luego abre [http://localhost:5173](http://localhost:5173) en el navegador.
+Then open [http://localhost:5173](http://localhost:5173) in your browser.
 
-En Windows, `.\actualizar.ps1` hace el paso 1 y el 1b de una vez y valida los datos. Con la app abierta (`npm run dev`) también puedes actualizar con el **botón de recargar** que hay junto a SUUNTO/STATS, arriba en el menú.
+`.\actualizar.ps1` (Windows) or `./actualizar.sh` (Mac/Linux) does steps 1 and 1b at once and validates the data. With the app open (`npm run dev`) you can also update with the **refresh button** next to SUUNTO/STATS, at the top of the menu.
 
 ---
 
-## Ruta B — Ficheros FIT
+## Route B — FIT files
 
-### B1. Exportar tus entrenamientos
+### B1. Export your workouts
 
-1. En la app de Suunto (móvil): Calendario → elige el entrenamiento → menú de tres puntos (arriba a la derecha) → **exportar como FIT**. Envíatelo a tu ordenador.
-2. Copia los `.fit` a la carpeta `fetch/fit/` (créala si no existe).
+1. In the Suunto app (phone): Calendar → choose the workout → three-dot menu (top right) → **export as FIT**. Send it to your computer.
+2. Copy the `.fit` files to the `fetch/fit/` folder (create it if it does not exist).
 
-> **¿Muchos entrenamientos?** Exportarlos de uno en uno es lento. Si vives en la UE, el Reglamento de Datos te da derecho a pedir a Suunto tus datos gratis y en formatos como FIT, GPX o JSON (por la app, Sports Tracker o escribiendo a Suunto; ver su [aviso oficial](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). Este proyecto lee ficheros `.fit`.
+> **Lots of workouts?** Exporting them one by one is slow. If you live in the EU, the Data Act gives you the right to ask Suunto for your data for free and in formats such as FIT, GPX or JSON (through the app, Sports Tracker or by writing to Suunto; see their [official notice](https://www.suunto.com/legal-pages/suunto-eu-data-act-notice/)). This project reads `.fit` files.
 
-### B2. Leer los ficheros
+### B2. Read the files
 
-Desde la carpeta raíz del proyecto:
+From the project's root folder:
 
 ```bash
 python3 fetch/sync.py --source fit
 ```
 
-Opcional: en `.env` puedes poner `MAX_HR=190` (tu FC máxima) para que las zonas de FC se calculen con ella.
+Optional: in `.env` you can set `MAX_HR=190` (your max HR) so the HR zones are calculated with it.
 
-### B3. Comprobar que los datos son correctos (opcional)
+### B3. Check that the data is correct (optional)
 
 ```bash
 python3 fetch/validate_output.py
 ```
 
-Debe terminar con `0 errores`.
+It should end with `0 errores` (0 errors).
 
-### B4. Instalar dependencias de la app web
+### B4. Install the web app dependencies
 
-En la carpeta raíz del proyecto:
+In the project's root folder:
 
 ```bash
 npm install
 ```
 
-Solo hace falta hacerlo **una vez** (o cuando cambien las dependencias del proyecto).
+You only need to do this **once** (or when the project's dependencies change).
 
-### B5. Abrir la app
+### B5. Open the app
 
 ```bash
 npm run dev
 ```
 
-Abre en el navegador el enlace que aparece (normalmente [http://localhost:5173](http://localhost:5173)). Para **cerrar** la app, vuelve a la terminal y pulsa `Ctrl + C`.
+Open the link it prints in your browser (usually [http://localhost:5173](http://localhost:5173)). To **close** the app, go back to the terminal and press `Ctrl + C`.
 
-### Resumen rápido de la Ruta B (cuando ya lo hayas hecho una vez)
+### Route B quick reference (once you have done it)
 
 ```bash
-# 1. Copia los .fit nuevos a fetch/fit/ y léelos
+# 1. Copy the new .fit files to fetch/fit/ and read them
 python3 fetch/sync.py --source fit
 
-# 1b. (Opcional) Plan de tu entrenador en TrainingPeaks — ver GUIA_TRAININGPEAKS.md
+# 1b. (Optional) Your coach's plan from TrainingPeaks — see GUIDE_TRAININGPEAKS.md
 python3 fetch/tp_sync.py
 
-# 2. Arrancar la app
+# 2. Start the app
 npm run dev
 ```
 
-> El botón de recargar de la app y `.\actualizar.ps1` usan la Ruta A (cuenta de Suunto); con ficheros FIT, actualiza con los comandos de arriba.
+> The app's refresh button, `.\actualizar.ps1` and `./actualizar.sh` use Route A (Suunto account); with FIT files, update with the commands above.
 
 ---
 
-## Ajustes dentro de la app
+## Settings inside the app
 
-En el menú lateral, entra en **Ajustes** para configurar:
+In the side menu, open **Ajustes** (Settings) to configure:
 
-- FC máxima (al terminar la sincronización se te indica la que tienes en tu reloj Suunto)
-- FTP (ciclismo)
-- FC y ritmo en umbral (running)
+- Max HR (when the sync finishes it tells you the one your Suunto watch has)
+- Threshold HR and pace (running), with an estimate from your best efforts
+- FTP (cycling)
+- Hints for the AI Coach: «my wrist HR is not reliable» and «I record the warm-up separately»
+- Backup: export and import everything the app stores in your browser
 
-Estos valores se guardan en tu navegador y afectan a los cálculos de zonas, TSS y fitness.
+These values are stored in your browser and affect the zone, TSS and fitness calculations. If they do not match your data, the Dashboard warns you.
 
 ---
 
-## Qué datos de Suunto verás
+## Which Suunto data you will see
 
-| Dato | Detalle |
+| Data | Detail |
 | --- | --- |
-| Distancia, duración, desnivel, FC, calorías | Siempre |
-| TSS | El que calcula Suunto; si falta, la app lo estima con la FC |
-| VO2max | Suunto solo lo calcula en carreras y caminatas, así que habrá pocas mediciones |
-| Training Effect | Se muestra el aeróbico (PTE de Suunto, escala 1-5). El anaeróbico no viene en los datos de Suunto |
-| Zonas de FC | Las de tu reloj (tiempo real en cada zona) |
-| Parciales | Las vueltas de tu reloj; si no hay, se calculan automáticos (cada 1 km, o 5 km en bici) |
-| SWOLF / brazadas | No vienen en los datos |
+| Distance, duration, elevation, HR, calories | Always |
+| TSS | The one Suunto calculates; if missing, the app estimates it from HR |
+| VO2max | Suunto only calculates it on runs and walks, so there will be few readings |
+| Training Effect | The aerobic one is shown (Suunto's PTE, 1-5 scale). The anaerobic one is not in Suunto's data |
+| HR zones | Your watch's zones (real time in each zone) |
+| Laps | Your watch's laps; if there are none, automatic ones are calculated (every 1 km, or 5 km on the bike) |
+| SWOLF / strokes | Not in the data |
 
 ---
 
-## Problemas frecuentes
+## Common problems
 
-### "ERROR: No hay sesión de Suunto" (Ruta A)
+### "ERROR: No hay sesión de Suunto" — no Suunto session (Route A)
 
-Aún no has iniciado sesión. Ejecuta `suuntool login --email tu@email.com` y repite la sincronización.
+You have not logged in yet. Run `suuntool login --email you@example.com` and sync again.
 
-### "Sesión de Suunto no válida o caducada" (Ruta A)
+### "Sesión de Suunto no válida o caducada" — invalid or expired session (Route A)
 
-La clave de sesión ya no vale. Repite `suuntool login --email tu@email.com`.
+The session key is no longer valid. Run `suuntool login --email you@example.com` again.
 
-### Pide el login y la contraseña es correcta (Ruta A)
+### It asks for the login and the password is right (Route A)
 
-Prueba `suuntool doctor`. Si el login falla pero la contraseña es correcta, es posible que Suunto haya cambiado algo en su app y haga falta actualizar `suuntool` (`brew upgrade --cask suuntool` o `go install github.com/tajchert/suuntool@latest`).
+Try `suuntool doctor`. If the login fails but the password is correct, Suunto may have changed something in its app and `suuntool` may need updating (`brew upgrade --cask suuntool` or `go install github.com/tajchert/suuntool@latest`).
 
-### Faltan actividades, o la ruta / los parciales salen vacíos (Ruta A)
+### Activities are missing, or the route / laps are empty (Route A)
 
-Ejecuta `python3 fetch/sync.py --dump latest`. Guarda en `fetch/debug/` lo que devuelve Suunto para tu último entrenamiento; con eso se puede ver qué campo ha cambiado. Para pedir ayuda comparte **solo** el fichero `*.redacted.json` (sin coordenadas ni usuario): los demás ficheros de esa carpeta contienen tu ruta GPS.
+Run `python3 fetch/sync.py --dump latest`. It saves in `fetch/debug/` what Suunto returns for your latest workout; with that you can see which field changed. To ask for help, share **only** the `*.redacted.json` file (without coordinates or user): the other files in that folder contain your GPS route.
 
-### Las horas salen desplazadas
+### Times are shifted
 
-Pon tu zona horaria en `.env`: `SUUNTO_TIMEZONE=Europe/Madrid`.
+Set your time zone in `.env`: `SUUNTO_TIMEZONE=Europe/Madrid`.
 
-### "No hay ficheros .fit" (Ruta B)
+### "No hay ficheros .fit" — no .fit files (Route B)
 
-Copia tus `.fit` en `fetch/fit/` (Ruta B) o ejecuta la sincronización sin `--source fit` (Ruta A).
+Copy your `.fit` files to `fetch/fit/` (Route B) or run the sync without `--source fit` (Route A).
 
-### "No se encontró /data/activities.json" en la app
+### "No se encontró /data/activities.json" in the app
 
-Aún no has sincronizado datos. Ejecuta primero:
+You have not synced any data yet. Run first:
 
 ```bash
 python3 fetch/sync.py
 ```
 
-### La terminal dice que `node` o `npm` no existen
+### The terminal says `node` or `npm` do not exist
 
-Instala Node.js desde [nodejs.org](https://nodejs.org) y vuelve a abrir la terminal.
+Install Node.js from [nodejs.org](https://nodejs.org) and open the terminal again.
 
-### La sincronización va muy lenta (Ruta A)
+### The sync is very slow (Route A)
 
-Es normal: hay una pausa entre peticiones para no saturar el servidor de Suunto. Para una prueba rápida usa `--limit 20` o `--no-gpx`. Si ves errores 429, sube la pausa con `SUUNTO_PAUSE=1.5` en `.env`.
+That is normal: there is a pause between requests so as not to overload Suunto's server. For a quick test use `--limit 20` or `--no-gpx`. If you see 429 errors, raise the pause with `SUUNTO_PAUSE=1.5` in `.env`.
 
-### Puerto 5173 ya en uso
+### Port 5173 already in use
 
-Cierra otras ventanas de terminal donde tengas `npm run dev` corriendo, o Vite te propondrá otro puerto (por ejemplo 5174).
+Close other terminal windows where `npm run dev` is running, or Vite will offer another port (for example 5174).
 
 ---
 
-## Comandos extra (opcional)
+## Extra commands (optional)
 
-| Comando | Descripción |
+| Command | Description |
 | --- | --- |
-| `npm run build` | Genera una versión optimizada en la carpeta `dist/` |
-| `npm run preview` | Previsualiza la versión de producción (después de `build`) |
-| `npm run lint` | Revisa el código con el linter |
-| `python3 fetch/validate_output.py` | Comprueba que los datos descargados tienen el formato correcto |
+| `npm run build` | Builds an optimised version in the `dist/` folder |
+| `npm run preview` | Previews the production build (after `build`) |
+| `npm run lint` | Checks the code with the linter |
+| `npm test` | Runs the tests (vitest) |
+| `npm run demo` | Opens the app with the made-up data in `demo/data/` |
+| `python3 fetch/make_demo.py` | Regenerates the demo with dates up to today |
+| `python3 fetch/validate_output.py` | Checks that the downloaded data has the right format |
 
 ---
 
-## Estructura del proyecto (referencia)
+## Project structure (reference)
 
 ```
 suunto-stats/
-├── .env                      ← Opciones personales (opcional, no compartir)
+├── .env                      ← Personal options (optional, do not share)
+├── actualizar.ps1 / .sh      ← Updates everything at once (Windows / Mac-Linux)
+├── demo/data/                ← Made-up data for `npm run demo`
+├── server/                   ← Vite server routes (Gemini and the refresh button)
 ├── fetch/
-│   ├── sync.py               ← Script que descarga los datos
-│   ├── suunto_client.py      ← Ruta A: lectura de tu cuenta de Suunto
-│   ├── fit_source.py         ← Ruta B: lectura de ficheros FIT
-│   ├── normalizer.py         ← Convierte los datos al formato de la app
-│   ├── validate_output.py    ← Comprueba el formato de los datos
-│   ├── requirements.txt      ← Dependencias de Python
-│   └── fit/                  ← (Ruta B) tus ficheros .fit
-├── public/data/              ← Datos descargados (JSON)
-└── src/                      ← Código de la app web (React)
+│   ├── sync.py               ← Script that downloads the data
+│   ├── suunto_client.py      ← Route A: reads your Suunto account
+│   ├── fit_source.py         ← Route B: reads FIT files
+│   ├── normalizer.py         ← Converts the data to the app's format
+│   ├── validate_output.py    ← Checks the data format
+│   ├── tp_sync.py            ← (Optional) TrainingPeaks plan
+│   ├── make_demo.py          ← Generates the demo
+│   ├── requirements.txt      ← Python dependencies
+│   └── fit/                  ← (Route B) your .fit files
+├── public/data/              ← Downloaded data (JSON)
+└── src/                      ← Web app code (React)
 ```
 
 ---
 
-## Privacidad y qué NO subir a GitHub
+## Privacy and what NOT to upload to GitHub
 
-Estos archivos contienen datos personales o credenciales. El `.gitignore` ya los excluye, pero conviene conocerlos:
+These files contain personal data or credentials. `.gitignore` already excludes them, but it is worth knowing them:
 
-| Archivo / carpeta | Qué contiene | Riesgo |
+| File / folder | What it contains | Risk |
 | --- | --- | --- |
-| `.env` | Opciones personales, cookie de TrainingPeaks, clave de Gemini (y la de sesión de Suunto si la pusiste ahí) | Acceso a tus cuentas |
-| `~/.config/suuntool/session.json` (en tu home) | Clave de sesión de Suunto | Acceso a tu cuenta sin contraseña |
-| `public/data/` | Actividades, estadísticas y rutas GPS | Ubicación exacta, salud, hábitos |
-| `dist/data/` | Copia de los datos al hacer `npm run build` | Igual que arriba |
-| `fetch/debug/` y `fetch/fit/` | Respuestas crudas y ficheros FIT | Rutas GPS completas |
+| `.env` | Personal options, TrainingPeaks cookie, Gemini key (and the Suunto session key if you put it there) | Access to your accounts |
+| `~/.config/suuntool/session.json` (in your home) | Suunto session key | Access to your account without a password |
+| `public/data/` | Activities, statistics and GPS routes | Exact location, health, habits |
+| `dist/data/` | Copy of the data when running `npm run build` | Same as above |
+| `fetch/debug/` and `fetch/fit/` | Raw responses and FIT files | Full GPS routes |
 
-**Datos sensibles dentro de los JSON:**
+**Sensitive data inside the JSON files:**
 
-- Coordenadas GPS de cada entrenamiento (pueden revelar dónde vives o entrenas)
-- FC, VO2max, calorías, ritmos y patrones horarios
+- GPS coordinates of every workout (they can reveal where you live or train)
+- HR, VO2max, calories, paces and time patterns
 
-**Seguro para publicar:**
+**Safe to publish:**
 
-- `.env.example` (solo tiene valores de ejemplo)
-- Todo el código en `src/` y `fetch/` (salvo las carpetas `fetch/debug/` y `fetch/fit/`)
+- `.env.example` (example values only)
+- All the code in `src/` and `fetch/` (except the `fetch/debug/` and `fetch/fit/` folders)
 
-**Antes de hacer `git push`**, comprueba que no se cuelen datos:
+**Before running `git push`**, check that no data slips in:
 
 ```bash
 git status
 ```
 
-No deberían aparecer `.env` ni archivos dentro de `public/data/`. Si alguna vez los añadiste por error:
+Neither `.env` nor files inside `public/data/` should appear. If you ever added them by mistake:
 
 ```bash
 git rm -r --cached public/data/
 git rm --cached .env
 ```
 
-Luego haz commit de la eliminación. Si ya los subiste a GitHub, **cierra la sesión de Suunto** (`suuntool logout`), cambia tu contraseña de Suunto y considera borrar el historial del repositorio.
+Then commit the removal. If you already uploaded them to GitHub, **log out of Suunto** (`suuntool logout`), change your Suunto password and consider deleting the repository history.
 
 ---
 
-## Aviso
+## Disclaimer
 
-Este proyecto no está afiliado a Suunto. La Ruta A usa un servicio que Suunto no ha publicado como API: puede cambiar o dejar de funcionar en cualquier momento, y su uso podría no cumplir los términos de Suunto. Úsala solo con tu propia cuenta y con moderación. Si prefieres evitar ese riesgo, usa la Ruta B.
+This project is not affiliated with Suunto. Route A uses a service that Suunto has not published as an API: it may change or stop working at any time, and using it might not comply with Suunto's terms. Use it only with your own account and in moderation. If you prefer to avoid that risk, use Route B.
+
+---
+
+## License
+
+[MIT](LICENSE): you may use, copy and modify the code freely, keeping the copyright notice.
