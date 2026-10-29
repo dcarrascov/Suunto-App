@@ -74,7 +74,7 @@ describe('geminiMiddleware', () => {
     const { res, done } = fakeRes()
     mw(fakeReq('/api/gemini/status', 'GET', '127.0.0.1'), res, () => {})
     const out = await done
-    expect(out.body).toEqual({ configured: true, model: DEFAULT_MODEL, fallbacks: FALLBACK_MODELS })
+    expect(out.body).toEqual({ configured: true, model: DEFAULT_MODEL, fallbacks: FALLBACK_MODELS, provider: 'gemini', label: 'Gemini', missing: null })
     expect(JSON.stringify(out.body)).not.toContain('SECRETA')
   })
   it('solo desde este ordenador', async () => {

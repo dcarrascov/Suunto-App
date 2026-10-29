@@ -54,7 +54,7 @@ export default function BackupSection() {
       </div>
       {message && <p className={`text-xs ${message.ok ? 'text-slate-400' : 'text-red-300'}`}>{message.text}</p>}
       <p className="text-xs text-slate-600">
-        No incluye claves (la de Gemini y la cookie siguen en .env), pero sí tus datos: guárdala tú y no la subas a GitHub.
+        No incluye claves (la de la IA y la cookie siguen en .env), pero sí tus datos: guárdala tú y no la subas a GitHub.
       </p>
     </div>
   )

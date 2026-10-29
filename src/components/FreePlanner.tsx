@@ -14,7 +14,7 @@ const PRIMARY = 'bg-accent text-black text-sm font-medium px-3 py-1.5 hover:brig
 const WEEKDAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 interface Props {
   data: AthleteData
-  enabled: boolean               // Gemini configurado y nada más en marcha
+  enabled: boolean               // IA configurada y nada más en marcha
 }
 
 /** Modo «sin entrenador»: objetivo, disponibilidad y una semana cada vez, a partir de tus datos o de tu nivel. */
@@ -41,7 +41,7 @@ export default function FreePlanner({ data, enabled }: Props) {
     try {
       const answer = await askGemini(freeWeekPrompt(data, week, goal, previous), true)
       const r = parseProposal(answer.text, week)
-      if (!r.ok) throw new Error(`No he podido leer la respuesta de Gemini (${answer.model}): ${r.error} Vuelve a generarla.`)
+      if (!r.ok) throw new Error(`No he podido leer la respuesta de la IA (${answer.model}): ${r.error} Vuelve a generarla.`)
       saveFreeProposal({ ...r.proposal, model: answer.model, mode: 'free' })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')

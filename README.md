@@ -23,7 +23,7 @@ Your data is downloaded from your Suunto account (or from FIT files you export y
 | **Actividades** (Activities) and **Detalle** (Detail) | Filterable list; for each activity, a map coloured by pace, laps, zones, best efforts and the shoes you wore |
 | **Plan** | Your coach's plan from TrainingPeaks (optional) with what is done and pending, and the **AI weekly review** |
 | **Competiciones** (Races) | Your races, the form you arrived with and the prediction for the next one |
-| **Entrenador IA** (AI Coach) | With Gemini (free, optional): ask about your training and generate weeks **like your coach** or **without a coach** for a goal (5K, 10K, half, marathon or none); send them to your Calendar |
+| **Entrenador IA** (AI Coach) | With Gemini (free, optional; or OpenAI, Mistral, Claude, a local model with Ollama… see [Choosing the AI](#choosing-the-ai)): ask about your training and generate weeks **like your coach** or **without a coach** for a goal (5K, 10K, half, marathon or none); send them to your Calendar |
 | **Forma, Zonas, Rendimiento, Récords, Historial** (Form, Zones, Performance, Records, History) | CTL/ATL/TSB with projection, 80/20, efficiency, decoupling, records with predictions and yearly totals |
 | **Zapatillas** (Shoes) | Km per pair with tags (easy run, race…) and a warning as they near their limit |
 | **Importar FIT** (Import FIT) | Upload `.fit` files from the browser (drag and drop); with a Suunto account they are added to it without duplicating sessions |
@@ -306,6 +306,20 @@ In the side menu, open **Ajustes** (Settings) to configure:
 - Backup: export and import everything the app stores in your browser
 
 These values are stored in your browser and affect the zone, TSS and fitness calculations. If they do not match your data, the Dashboard warns you.
+
+---
+
+## Choosing the AI
+
+The AI Coach uses **Gemini** by default (`GEMINI_API_KEY` in `.env`; free key from Google AI Studio). To use another one, set `AI_PROVIDER` in `.env` (examples in `.env.example`):
+
+| `AI_PROVIDER` | Works with | What to set |
+| --- | --- | --- |
+| `gemini` (default) | Google Gemini | `GEMINI_API_KEY`, optional `GEMINI_MODEL` |
+| `openai` | Any service with the OpenAI format: OpenAI, Mistral, Groq, DeepSeek, OpenRouter… or a model on your own computer with **Ollama** / **LM Studio** (no key, your data never leaves your machine) | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` (not needed for localhost) |
+| `anthropic` | Claude | `AI_API_KEY` (from console.anthropic.com), optional `AI_MODEL` (default `claude-opus-5-5`) |
+
+Keys stay on the app's server and never reach the browser. No restart is needed: the app reads `.env` on every request.
 
 ---
 
