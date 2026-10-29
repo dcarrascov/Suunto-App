@@ -83,7 +83,7 @@ export default function Activities() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div className="page">
       <h1 className="text-xl font-bold text-slate-100 mb-4">Actividades</h1>
 
       {/* Filters */}

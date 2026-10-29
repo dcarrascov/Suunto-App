@@ -48,7 +48,7 @@ export default function Races() {
   const later = upcoming.slice(1, 4)
 
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       <h1 className="text-xl font-semibold text-slate-100">Competiciones</h1>
       <p className="text-sm text-slate-500 mt-0.5 mb-6">
         Las de tu calendario de TrainingPeaks, las deducidas del plan (el día siguiente a la «Activación precompetición») y

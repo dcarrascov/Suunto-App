@@ -69,7 +69,7 @@ export default function History() {
   const prev = totals.get(thisYear - 1)
 
   return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div className="page">
       <div className="flex flex-wrap gap-3 items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Historial</h1>

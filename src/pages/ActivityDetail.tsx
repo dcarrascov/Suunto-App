@@ -82,7 +82,7 @@ export default function ActivityDetailPage() {
   const decoupling = summary?.decoupling ?? act.decoupling ?? null
 
   return (
-    <div className="flex-1 p-4 md:px-10 md:py-8 overflow-y-auto">
+    <div className="page">
       {/* Header */}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>

@@ -100,7 +100,7 @@ export default function PerformanceAnalysis() {
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div className="page">
       <h1 className="text-xl font-bold text-slate-100 mb-1">Análisis de Rendimiento</h1>
       <p className="text-sm text-slate-500 mb-5">Forma física, puntos de mejora y estado actual</p>
 

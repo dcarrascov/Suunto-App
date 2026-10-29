@@ -170,7 +170,7 @@ export default function Plan() {
 
   if (!plan) {
     return (
-      <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+      <div className="page">
         <h1 className="text-xl font-bold text-slate-100 mb-1">Plan de entrenamiento</h1>
         <div className="mt-6 max-w-xl bg-amber-950/30 border border-amber-800/40 rounded-xl p-5 text-sm text-slate-300 space-y-2">
           <p className="font-medium text-amber-300">Aún no hay datos de TrainingPeaks</p>
@@ -187,7 +187,7 @@ export default function Plan() {
   const days = weekDays(week)
 
   return (
-    <div ref={pageRef} className="flex-1 p-4 md:p-6 overflow-y-auto">
+    <div ref={pageRef} className="page">
       <div className="flex flex-wrap gap-3 items-start justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Plan de entrenamiento</h1>

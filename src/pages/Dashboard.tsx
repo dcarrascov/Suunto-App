@@ -114,7 +114,7 @@ export default function Dashboard() {
   const today = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:px-10 md:py-8">
+    <div className="page">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
         <h1 className="text-xl font-semibold text-slate-100">Resumen</h1>
         <span className="text-xs text-slate-500 first-letter:uppercase">
