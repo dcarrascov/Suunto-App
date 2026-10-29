@@ -3,6 +3,7 @@
 
 import type { ActivitySummary, FitnessPoint, GlobalStats, PlannedEvent, PlannedWorkout, UserSettings } from '../types/suunto'
 import type { AiProposal, FreeGoal, FreeGoalDistance } from '../stores/aiStore'
+import type { CustomWorkout } from './customWorkouts'
 import { computePRs, formState, localWeekStart, paceZoneRanges, predictRaces, sameHrEfficiency } from './calculations'
 import { isoDateOffset, parseLocalDate, toLocalISODate } from './date'
 import { formatDuration, formatPace, formatRaceTime } from './formatters'
@@ -466,4 +467,85 @@ export function freeWeekPrompt(full: AthleteData, weekStart: string, goal: FreeG
     '',
     ...prevLines,
   ].join('\n')
+}
+
+// ─── 5. Revisar una semana hecha ─────────────────────────────────────────────
+
+/** Lo planificado de la semana, de donde haya: plan del entrenador, propuesta de la IA o entrenos propios. */
+export interface PlannedSource {
+  kind: 'coach' | 'ia' | 'custom' | 'none'
+  lines: string[]
+}
+
+export function plannedForWeek(
+  weekStart: string, workouts: PlannedWorkout[], proposals: AiProposal[], custom: CustomWorkout[],
+): PlannedSource {
+  const end = addDays(weekStart, 6)
+  const inWeek = (date: string) => date >= weekStart && date <= end
+  const coach = workouts.filter(w => w.hasPlan && inWeek(w.date)).sort((a, b) => a.date.localeCompare(b.date))
+  if (coach.length) {
+    return { kind: 'coach', lines: coach.map(w => `- ${dayName(w.date)} ${w.date}: ${plannedLine(w)}${w.description ? ` — ${w.description.trim().replace(/\s+/g, ' ').slice(0, 220)}` : ''}`) }
+  }
+  const ia = proposals.find(p => p.weekStart === weekStart)
+  if (ia) {
+    return {
+      kind: 'ia',
+      lines: ia.workouts.filter(w => w.type !== 'descanso').map(w => `- ${dayName(w.date)} ${w.date}: ${w.title}${w.durationMin ? ` (${Math.round(w.durationMin)} min)` : ''}`),
+    }
+  }
+  const own = custom.filter(w => inWeek(w.date)).sort((a, b) => a.date.localeCompare(b.date))
+  if (own.length) {
+    return { kind: 'custom', lines: own.map(w => `- ${dayName(w.date)} ${w.date}: ${w.title}${w.durationMin ? ` (${w.durationMin} min)` : ''}`) }
+  }
+  return { kind: 'none', lines: [] }
+}
+
+const PLANNED_LABEL: Record<PlannedSource['kind'], string> = {
+  coach: 'plan de su entrenador en TrainingPeaks',
+  ia: 'propuesta de la IA',
+  custom: 'entrenos que se puso él mismo',
+  none: 'nada planificado',
+}
+
+/**
+ * Texto para revisar la semana que empieza en `weekStart`: lo planificado frente a lo hecho con el reloj,
+ * con la forma al terminar. Nunca rutas GPS.
+ */
+export function weekReviewPrompt(d: AthleteData, weekStart: string, planned: PlannedSource): string {
+  const today = d.today ?? toLocalISODate(new Date())
+  const end = addDays(weekStart, 6)
+  const inProgress = today <= end
+  const done = d.activities
+    .filter(a => a.startTime.slice(0, 10) >= weekStart && a.startTime.slice(0, 10) <= end)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+  const prevLoad = recentRunningLoad(d.activities, weekStart)
+  const runMin = Math.round(done.filter(a => a.sport === 'running').reduce((t, a) => t + a.duration, 0) / 60)
+  const form = d.history.filter(p => p.date <= (inProgress ? today : end)).at(-1)
+  const races = weekEvents(d.events, weekStart)
+  return [
+    'Eres un entrenador de atletismo con experiencia en carreras de fondo. Revisa la semana de entrenamiento de un',
+    `corredor (del ${weekStart} al ${end}${inProgress ? `; la semana aún no ha terminado, hoy es ${dayName(today)} ${today}` : ''}).`,
+    'Compara lo planificado con lo que hizo según su reloj y escribe en español, en 150-300 palabras, con estas secciones:',
+    '1. Cumplimiento (sesiones y tiempo, qué se saltó o cambió).',
+    '2. Lo que salió bien.',
+    '3. A vigilar (carga, descanso, intensidad).',
+    '4. Para la semana siguiente (2-3 consejos concretos).',
+    'Sé concreto y apóyate en los datos. No saques conclusiones del pulso en carreras: su pulso de muñeca no es fiable.',
+    'Suele grabar por separado el calentamiento, la parte principal y la vuelta a la calma: varias actividades seguidas',
+    'del mismo día son una sola sesión, no interrupciones. Habla de tú y no te presentes como su entrenador.',
+    'Texto plano, sin Markdown (sin asteriscos ni almohadillas): cada sección empieza con su número y título en una línea.',
+    planned.kind === 'coach' ? 'Tiene entrenador: no le contradigas; si algo preocupa, que lo hable con él.' : '',
+    '',
+    `## Planificado (${PLANNED_LABEL[planned.kind]})`,
+    ...(planned.lines.length ? planned.lines : ['- (nada)']),
+    ...(races.length ? ['', '## Competiciones de la semana', ...races.map(e => `- ${dayName(e.date)} ${e.date}: ${eventLabel(e)}`)] : []),
+    '',
+    '## Hecho (reloj)',
+    ...(done.length
+      ? done.map(a => `- ${dayName(a.startTime.slice(0, 10))} ${a.startTime.slice(0, 16).replace('T', ' ')} · ${a.sport} · ${km(a.distance)} km · ${formatDuration(a.duration)}`
+        + `${a.avgPace ? ` · ${formatPace(a.avgPace)}` : ''}${a.tss != null ? ` · ${Math.round(a.tss)} TSS` : ''}`)
+      : ['- (ninguna actividad)']),
+    `Tiempo de carrera de la semana: ${runMin} min (media de las 4 semanas anteriores: ${prevLoad.avgMin} min).`,
+    ...(form ? [`Forma al ${inProgress ? 'día de hoy' : 'terminar la semana'}: Fitness ${Math.round(form.ctl)}, Fatiga ${Math.round(form.atl)}, Forma ${signed(form.tsb)} (${formState(form.tsb).label}).`] : []),
+  ].filter(l => l !== '').join('\n').replace(/\n## /g, '\n\n## ')
 }
