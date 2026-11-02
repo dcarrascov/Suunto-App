@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { DEFAULT_TAGS, NONE, withDefault, type Shoe, type ShoeData } from '../utils/shoes'
+import { DEFAULT_TAGS, NONE, migrateShoes, withDefault, type Shoe, type ShoeData } from '../utils/shoes'
+import { toLocalISODate } from '../utils/date'
 
 // Zapatillas: solo en este navegador (localStorage `suunto-zapatillas`); entra en la copia de seguridad.
 
@@ -16,6 +17,7 @@ interface ShoeState extends ShoeData {
 }
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+const today = () => toLocalISODate(new Date())
 const slug = (name: string) => name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')
 
 export const useShoeStore = create<ShoeState>()(
@@ -27,8 +29,8 @@ export const useShoeStore = create<ShoeState>()(
       assignments: {},
       addShoe: (s) => {
         const shoe: Shoe = { ...s, id: newId(), retiredDate: null }
-        // el primer par pasa a ser el de por defecto
-        set(st => ({ shoes: [...st.shoes, shoe], defaults: st.defaults.length ? st.defaults : withDefault([], shoe) }))
+        // el primer par pasa a ser el de por defecto desde hoy
+        set(st => ({ shoes: [...st.shoes, shoe], defaults: st.defaults.length ? st.defaults : withDefault([], shoe.id, today()) }))
       },
       updateShoe: (id, s) => set(st => ({ shoes: st.shoes.map(x => (x.id === id ? { ...x, ...s } : x)) })),
       deleteShoe: (id) => set(st => ({
@@ -37,8 +39,7 @@ export const useShoeStore = create<ShoeState>()(
         assignments: Object.fromEntries(Object.entries(st.assignments).filter(([, v]) => v !== id)),
       })),
       setDefault: (id) => {
-        const shoe = get().shoes.find(s => s.id === id)
-        if (shoe) set(st => ({ defaults: withDefault(st.defaults, shoe) }))
+        if (get().shoes.some(s => s.id === id)) set(st => ({ defaults: withDefault(st.defaults, id, today()) }))
       },
       assign: (activityId, shoeId) => set(st => {
         const next = { ...st.assignments }
@@ -54,9 +55,17 @@ export const useShoeStore = create<ShoeState>()(
         set(st => ({ tags: [...st.tags, { id, name: clean }] }))
         return id
       },
-      deleteTag: (id) => set(st => (st.shoes.some(s => s.tagId === id) ? st : { tags: st.tags.filter(t => t.id !== id) })),
+      deleteTag: (id) => set(st => (st.shoes.some(s => s.tagIds.includes(id)) ? st : { tags: st.tags.filter(t => t.id !== id) })),
     }),
-    { name: 'suunto-zapatillas' },
+    {
+      name: 'suunto-zapatillas',
+      // v1: varias etiquetas por par (antes `tagId`) y sin fecha de estreno
+      version: 1,
+      migrate: (old) => {
+        const s = (old ?? {}) as Partial<ShoeData>
+        return { ...s, shoes: migrateShoes(s.shoes ?? []) } as ShoeState
+      },
+    },
   ),
 )
 

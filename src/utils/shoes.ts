@@ -1,5 +1,5 @@
-// Zapatillas: km por par con aviso. Cada par tiene una etiqueta (Rodaje, Competición, Series…); las carreras van al
-// par por defecto de su fecha y, en el Detalle, se puede cambiar el de un día (p. ej. la competición).
+// Zapatillas: km por par con aviso. Cada par tiene una o varias etiquetas (Rodaje, Competición, Series…); las carreras
+// van al par por defecto de su fecha y, en el Detalle, se puede cambiar el de un día (p. ej. la competición).
 // Todo se guarda solo en este navegador (stores/shoeStore.ts).
 
 import type { ActivitySummary } from '../types/suunto'
@@ -12,8 +12,7 @@ export interface ShoeTag {
 export interface Shoe {
   id: string
   name: string
-  tagId: string
-  startDate: string          // YYYY-MM-DD: desde cuándo se usan
+  tagIds: string[]
   startKm: number            // km que ya traían
   limitKm: number            // aviso al acercarse
   retiredDate: string | null // retiradas: ya no reciben carreras desde el día siguiente
@@ -46,33 +45,38 @@ export const DEFAULT_TAGS: ShoeTag[] = [
 
 const dayOf = (a: ActivitySummary) => a.startTime.slice(0, 10)
 
-function isActiveOn(shoe: Shoe, date: string): boolean {
-  return date >= shoe.startDate && (shoe.retiredDate == null || date <= shoe.retiredDate)
-}
-
-/** Día siguiente (YYYY-MM-DD). */
-function nextDay(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const x = new Date(y, m - 1, d + 1)
-  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+export function isRetiredOn(shoe: Shoe, date: string): boolean {
+  return shoe.retiredDate != null && date > shoe.retiredDate
 }
 
 /**
- * Nueva lista de cambios al poner `shoe` por defecto: cuenta desde su estreno, pero sin pisar el cambio anterior
- * (como pronto, el día siguiente a ese cambio). Las carreras de antes siguen con el par que tenían.
+ * Nueva lista de cambios al poner `shoeId` por defecto desde hoy. Las carreras de antes siguen con el par que tenían;
+ * si ya se cambió hoy, ese cambio se sustituye.
  */
-export function withDefault(defaults: DefaultChange[], shoe: Shoe): DefaultChange[] {
-  const last = defaults.at(-1)
-  if (last?.shoeId === shoe.id) return defaults
-  const from = last ? [shoe.startDate, nextDay(last.from)].sort()[1] : shoe.startDate
-  return [...defaults, { shoeId: shoe.id, from }]
+export function withDefault(defaults: DefaultChange[], shoeId: string, today: string): DefaultChange[] {
+  const kept = defaults.filter(d => d.from < today)
+  if (kept.at(-1)?.shoeId === shoeId) return kept
+  return [...kept, { shoeId, from: today }]
+}
+
+/** Nombres de las etiquetas de un par, juntos («Rodaje, Tempo»). */
+export function tagNames(shoe: Shoe, tags: ShoeTag[]): string {
+  return shoe.tagIds.map(id => tags.find(t => t.id === id)?.name).filter(Boolean).join(', ')
+}
+
+/** Datos guardados de antes (una etiqueta `tagId` y fecha de estreno `startDate`) → formato actual. */
+export function migrateShoes(shoes: unknown[]): Shoe[] {
+  return shoes.map(raw => {
+    const { tagId, startDate: _startDate, tagIds, ...rest } = raw as Shoe & { tagId?: string; startDate?: string }
+    return { ...rest, tagIds: Array.isArray(tagIds) ? tagIds : tagId ? [tagId] : [] }
+  })
 }
 
 /** Par por defecto en una fecha (null si no hay o está retirado). */
 export function defaultShoeOn(data: ShoeData, date: string): Shoe | null {
   const change = [...data.defaults].reverse().find(d => d.from <= date)
   const shoe = change ? data.shoes.find(s => s.id === change.shoeId) : undefined
-  return shoe && isActiveOn(shoe, date) ? shoe : null
+  return shoe && !isRetiredOn(shoe, date) ? shoe : null
 }
 
 /** Par de una actividad: el elegido a mano o, en carreras a pie, el por defecto de ese día. */

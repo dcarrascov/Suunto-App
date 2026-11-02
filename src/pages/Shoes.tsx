@@ -9,13 +9,10 @@ const FIELD = 'w-full bg-[#0f0f11] border border-slate-700 px-2.5 py-1.5 text-sm
 const PRIMARY = 'px-3 py-1.5 text-sm font-medium bg-accent text-black hover:brightness-110 disabled:opacity-40'
 const SECONDARY = 'px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-slate-400'
 const DANGER = 'px-3 py-1.5 text-xs text-slate-300 border border-slate-600 hover:border-red-400 hover:text-red-300'
-const NEW_TAG = '__nueva__'
-
 interface Form {
   name: string
-  tagId: string
+  tagIds: string[]
   newTag: string
-  startDate: string
   startKm: string
   limitKm: string
 }
@@ -23,15 +20,15 @@ interface Form {
 const fmtKm = (v: number) => Math.round(v).toLocaleString('es-ES')
 const fmtDate = (iso: string) => parseLocalDate(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 
-function emptyForm(today: string): Form {
-  return { name: '', tagId: 'rodaje', newTag: '', startDate: today, startKm: '0', limitKm: String(DEFAULT_LIMIT_KM) }
+function emptyForm(): Form {
+  return { name: '', tagIds: ['rodaje'], newTag: '', startKm: '0', limitKm: String(DEFAULT_LIMIT_KM) }
 }
 
 export default function Shoes() {
   const activities = useActivityStore(s => s.activities)
   const st = useShoeStore()
   const today = toLocalISODate(new Date())
-  const [form, setForm] = useState<Form>(() => emptyForm(today))
+  const [form, setForm] = useState<Form>(emptyForm)
   const [editing, setEditing] = useState<string | null>(null)   // id del par que se edita; null = nuevo
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -44,20 +41,28 @@ export default function Shoes() {
   const active = usage.filter(u => u.shoe.retiredDate == null).sort((a, b) => b.ratio - a.ratio)
   const retired = usage.filter(u => u.shoe.retiredDate != null)
   const tagName = (id: string) => st.tags.find(t => t.id === id)?.name ?? 'Sin etiqueta'
-  const usedTags = new Set(st.shoes.map(s => s.tagId))
+  const usedTags = new Set(st.shoes.flatMap(s => s.tagIds))
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }))
+  const toggleTag = (id: string) =>
+    setForm(f => ({ ...f, tagIds: f.tagIds.includes(id) ? f.tagIds.filter(x => x !== id) : [...f.tagIds, id] }))
+
+  function createTag() {
+    if (!form.newTag.trim()) return
+    const id = st.addTag(form.newTag)
+    setForm(f => ({ ...f, newTag: '', tagIds: f.tagIds.includes(id) ? f.tagIds : [...f.tagIds, id] }))
+  }
 
   function openNew() {
     setEditing(null)
-    setForm(emptyForm(today))
+    setForm(emptyForm())
     setError(null)
     setShowForm(true)
   }
 
   function openEdit(s: Shoe) {
     setEditing(s.id)
-    setForm({ name: s.name, tagId: s.tagId, newTag: '', startDate: s.startDate, startKm: String(s.startKm), limitKm: String(s.limitKm) })
+    setForm({ name: s.name, tagIds: s.tagIds, newTag: '', startKm: String(s.startKm), limitKm: String(s.limitKm) })
     setError(null)
     setShowForm(true)
   }
@@ -68,15 +73,11 @@ export default function Shoes() {
     const startKm = Number(form.startKm.replace(',', '.') || 0)
     const limitKm = Number(form.limitKm.replace(',', '.'))
     if (!name) return setError('Ponle un nombre (p. ej. la marca y el modelo).')
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.startDate)) return setError('Fecha de estreno no válida.')
     if (!Number.isFinite(startKm) || startKm < 0) return setError('Los km de partida deben ser 0 o más.')
     if (!Number.isFinite(limitKm) || limitKm <= 0) return setError('El límite debe ser un número de km mayor que 0.')
-    let tagId = form.tagId
-    if (tagId === NEW_TAG) {
-      if (!form.newTag.trim()) return setError('Escribe el nombre de la etiqueta nueva.')
-      tagId = st.addTag(form.newTag)
-    }
-    const data = { name, tagId, startDate: form.startDate, startKm, limitKm }
+    // una etiqueta escrita y sin añadir también cuenta
+    const tagIds = form.newTag.trim() ? [...new Set([...form.tagIds, st.addTag(form.newTag)])] : form.tagIds
+    const data = { name, tagIds, startKm, limitKm }
     if (editing) st.updateShoe(editing, data)
     else st.addShoe(data)
     setShowForm(false)
@@ -91,7 +92,9 @@ export default function Shoes() {
           <div>
             <div className="text-base font-semibold text-slate-100">{s.name}</div>
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              <span className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">{tagName(s.tagId).toUpperCase()}</span>
+              {s.tagIds.map(id => (
+                <span key={id} className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">{tagName(id).toUpperCase()}</span>
+              ))}
               {isDefault && <span className="text-[10px] font-semibold bg-accent text-black px-1.5 py-0.5">POR DEFECTO</span>}
               {s.retiredDate && <span className="text-[10px] text-slate-500">retiradas el {fmtDate(s.retiredDate)}</span>}
             </div>
@@ -105,7 +108,7 @@ export default function Shoes() {
           <div className="h-full" style={{ width: `${Math.min(100, u.ratio * 100)}%`, background: wearColor(u.ratio) }} />
         </div>
         <div className="text-xs text-slate-500">
-          {u.runs} salidas · desde el {fmtDate(s.startDate)}{s.startKm ? ` (con ${fmtKm(s.startKm)} km previos)` : ''}
+          {u.runs} salidas{s.startKm ? ` (con ${fmtKm(s.startKm)} km previos)` : ''}
           {u.lastRun && ` · última el ${fmtDate(u.lastRun)}`}
           {u.ratio >= 1 && <span className="text-red-300"> · han pasado su límite</span>}
         </div>
@@ -139,20 +142,6 @@ export default function Shoes() {
             <label className="block text-xs text-slate-400">Nombre
               <input autoFocus className={`${FIELD} mt-1`} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Marca y modelo" />
             </label>
-            <label className="block text-xs text-slate-400">Etiqueta
-              <select className={`${FIELD} mt-1`} value={form.tagId} onChange={e => set('tagId', e.target.value)}>
-                {st.tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                <option value={NEW_TAG}>+ Crear etiqueta…</option>
-              </select>
-            </label>
-            {form.tagId === NEW_TAG && (
-              <label className="block text-xs text-slate-400 sm:col-span-2 xl:col-span-4">Nombre de la etiqueta nueva
-                <input className={`${FIELD} mt-1`} value={form.newTag} onChange={e => set('newTag', e.target.value)} placeholder="Trail, Pista…" />
-              </label>
-            )}
-            <label className="block text-xs text-slate-400">Fecha de estreno
-              <input type="date" className={`${FIELD} mt-1`} value={form.startDate} max={today} onChange={e => set('startDate', e.target.value)} />
-            </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-xs text-slate-400">Km previos
                 <input inputMode="decimal" className={`${FIELD} mt-1`} value={form.startKm} onChange={e => set('startKm', e.target.value)} />
@@ -162,13 +151,36 @@ export default function Shoes() {
               </label>
             </div>
           </div>
+          <div className="space-y-2">
+            <div className="text-xs text-slate-400">Etiquetas (puedes marcar varias)</div>
+            <div className="flex flex-wrap gap-2">
+              {st.tags.map(t => {
+                const on = form.tagIds.includes(t.id)
+                return (
+                  <button
+                    key={t.id} type="button" onClick={() => toggleTag(t.id)} aria-pressed={on}
+                    className={`text-xs px-2 py-1 border ${on ? 'bg-accent text-black border-accent' : 'border-slate-600 text-slate-300 hover:border-slate-400'}`}
+                  >
+                    {t.name}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex gap-2 max-w-sm">
+              <input
+                className={FIELD} value={form.newTag} onChange={e => set('newTag', e.target.value)} placeholder="Etiqueta nueva: Trail, Pista…"
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createTag() } }}
+              />
+              <button type="button" className={SECONDARY} onClick={createTag} disabled={!form.newTag.trim()}>Crear</button>
+            </div>
+          </div>
           {error && <p className="text-sm text-red-300">{error}</p>}
           <div className="flex gap-2">
             <button type="submit" className={PRIMARY}>Guardar</button>
             <button type="button" className={SECONDARY} onClick={() => setShowForm(false)}>Cancelar</button>
           </div>
           {!editing && st.shoes.length === 0 && (
-            <p className="text-xs text-slate-500">El primer par queda como el de por defecto desde su fecha de estreno.</p>
+            <p className="text-xs text-slate-500">El primer par queda como el de por defecto desde hoy; las carreras de antes puedes asignárselas en su Detalle.</p>
           )}
         </form>
       )}
@@ -198,7 +210,7 @@ export default function Shoes() {
             </span>
           ))}
         </div>
-        <p className="text-xs text-slate-500">Crea etiquetas nuevas al añadir o editar unas zapatillas. Solo se pueden borrar las que no usa ningún par.</p>
+        <p className="text-xs text-slate-500">Crea etiquetas nuevas al añadir o editar unas zapatillas; cada par puede tener varias. Solo se pueden borrar las que no usa ningún par.</p>
       </div>
 
       {st.shoes.length > 0 && (

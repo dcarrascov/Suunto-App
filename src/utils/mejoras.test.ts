@@ -3,7 +3,7 @@ import type { ActivitySummary, PlannedWorkout } from '../types/suunto'
 import { DEFAULT_SETTINGS } from '../types/suunto'
 import type { AiProposal } from '../stores/aiStore'
 import { observedMaxHR, settingsHints } from './settingsCheck'
-import { DEFAULT_TAGS, NONE, defaultShoeOn, shoeFor, shoeUsage, shoesToWarn, withDefault, type Shoe, type ShoeData } from './shoes'
+import { DEFAULT_TAGS, NONE, defaultShoeOn, shoeFor, shoeUsage, shoesToWarn, migrateShoes, tagNames, withDefault, type Shoe, type ShoeData } from './shoes'
 import { makeBackup, readBackup, restoreBackup } from './backup'
 import { plannedForWeek, weekReviewPrompt } from './aiPrompt'
 import type { CustomWorkout } from './customWorkouts'
@@ -38,18 +38,26 @@ describe('aviso de ajustes', () => {
 })
 
 describe('zapatillas', () => {
-  const shoe = (over: Partial<Shoe>): Shoe => ({ id: 'a', name: 'Diarias', tagId: 'rodaje', startDate: '2026-01-01', startKm: 0, limitKm: 700, retiredDate: null, ...over })
+  const shoe = (over: Partial<Shoe>): Shoe => ({ id: 'a', name: 'Diarias', tagIds: ['rodaje'], startKm: 0, limitKm: 700, retiredDate: null, ...over })
   const a = shoe({})
-  const b = shoe({ id: 'b', name: 'Nuevas', startDate: '2026-06-01' })
-  const comp = shoe({ id: 'c', name: 'Voladoras', tagId: 'competicion', startDate: '2026-03-01', limitKm: 400 })
+  const b = shoe({ id: 'b', name: 'Nuevas', tagIds: ['rodaje', 'tempo'] })
+  const comp = shoe({ id: 'c', name: 'Voladoras', tagIds: ['competicion'], limitKm: 400 })
   const data = (over: Partial<ShoeData> = {}): ShoeData => ({
-    shoes: [a, b, comp], tags: DEFAULT_TAGS, defaults: withDefault(withDefault([], a), b), assignments: {}, ...over,
+    shoes: [a, b, comp], tags: DEFAULT_TAGS, defaults: withDefault(withDefault([], 'a', '2026-01-01'), 'b', '2026-06-01'), assignments: {}, ...over,
   })
-  it('el por defecto cambia desde el estreno del par nuevo, sin tocar lo anterior', () => {
+  it('el por defecto cambia desde el día en que lo eliges, sin tocar lo anterior', () => {
     expect(data().defaults).toEqual([{ shoeId: 'a', from: '2026-01-01' }, { shoeId: 'b', from: '2026-06-01' }])
     expect(defaultShoeOn(data(), '2026-05-31')?.id).toBe('a')
     expect(defaultShoeOn(data(), '2026-06-01')?.id).toBe('b')
     expect(defaultShoeOn(data(), '2025-12-31')).toBeNull()
+    // dos cambios el mismo día: vale el último
+    expect(withDefault(data().defaults, 'c', '2026-06-01')).toEqual([{ shoeId: 'a', from: '2026-01-01' }, { shoeId: 'c', from: '2026-06-01' }])
+  })
+  it('varias etiquetas por par y datos de antes (una etiqueta y fecha de estreno) convertidos', () => {
+    expect(tagNames(b, DEFAULT_TAGS)).toBe('Rodaje, Tempo')
+    expect(migrateShoes([{ id: 'x', name: 'Viejas', tagId: 'series', startDate: '2025-01-01', startKm: 5, limitKm: 700, retiredDate: null }]))
+      .toEqual([{ id: 'x', name: 'Viejas', tagIds: ['series'], startKm: 5, limitKm: 700, retiredDate: null }])
+    expect(migrateShoes([b])[0].tagIds).toEqual(['rodaje', 'tempo'])
   })
   it('el día de competición se cambia a mano; «sin zapatillas» y otros deportes no suman', () => {
     const race = act({ id: 7, startTime: '2026-07-05T09:00:00' })
