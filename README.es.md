@@ -6,6 +6,8 @@ Panel personal para ver tus estadísticas de entrenamiento de Suunto: actividade
 
 Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes tú) a archivos locales en tu ordenador. La app los lee desde ahí; no hay servidor en la nube ni base de datos.
 
+Por defecto solo se abre en tu ordenador. Si quieres publicarla en tu propio dominio, puedes protegerla con contraseña y un código de una app de autenticación: mira la [guía de despliegue](GUIA_DESPLIEGUE.md).
+
 ![Resumen](docs/capturas/resumen.png)
 
 > Las capturas son de la **demo**, con datos inventados: puedes verla tú sin cuenta de Suunto (ver [Probar la demo](#probar-la-demo-sin-cuenta)).
@@ -321,6 +323,10 @@ Las claves se quedan en el servidor de la app y nunca llegan al navegador. No ha
 
 ---
 
+## Publicarla en tu dominio
+
+Por defecto la app solo se abre en el ordenador donde se ejecuta, sin login. Para abrirla desde cualquier sitio, despliégala en un servidor detrás de [Authelia](https://www.authelia.com) (contraseña + código de una app de autenticación) con `AUTH_MODE=authelia`. Guía paso a paso para Dokploy: [GUIA_DESPLIEGUE.md](GUIA_DESPLIEGUE.md).
+
 ## Qué datos de Suunto verás
 
 | Dato | Detalle |
@@ -404,7 +410,8 @@ suunto-stats/
 ├── .env                      ← Opciones personales (opcional, no compartir)
 ├── actualizar.ps1 / .sh      ← Actualiza todo de una vez (Windows / Mac-Linux)
 ├── demo/data/                ← Datos inventados para `npm run demo`
-├── server/                   ← Rutas del servidor de Vite (Gemini y botón de recargar)
+├── server/                   ← Rutas del servidor de Vite (acceso, IA, botón de recargar, subir FIT)
+├── deploy/authelia/          ← Configuración de Authelia para publicarla en un dominio
 ├── fetch/
 │   ├── sync.py               ← Script que descarga los datos
 │   ├── suunto_client.py      ← Ruta A: lectura de tu cuenta de Suunto
