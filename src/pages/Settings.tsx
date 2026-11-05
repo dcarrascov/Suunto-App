@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { LTHR_OFFSET, estimateThresholdPace, lthrFor, paceZoneRanges } from '../utils/calculations'
 import { isoDateOffset } from '../utils/date'
 import { formatPace } from '../utils/formatters'
+import AccessSection from '../components/AccessSection'
 import BackupSection from '../components/BackupSection'
 
 export default function Settings() {
@@ -162,6 +163,11 @@ export default function Settings() {
             label="Grabo por separado calentamiento, parte principal y vuelta a la calma"
             hint="Varias actividades seguidas del mismo día cuentan como una sola sesión, no como interrupciones."
           />
+        </div>
+
+        {/* Acceso */}
+        <div className="g-cell col-span-12">
+          <AccessSection />
         </div>
 
         {/* Copia de seguridad */}

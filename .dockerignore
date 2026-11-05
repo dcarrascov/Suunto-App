@@ -1,0 +1,22 @@
+# Nada de credenciales ni datos personales dentro de la imagen
+.env
+.env.*
+!.env.example
+public/data
+dist
+fetch/debug
+fetch/fit
+*.fit
+
+# Lo que no hace falta para construirla
+.git
+.github
+.idea
+.claude
+CLAUDE.md
+disenos
+demo
+docs
+node_modules
+**/__pycache__
+.venv

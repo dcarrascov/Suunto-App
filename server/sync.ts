@@ -7,8 +7,6 @@ import type { ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import type { Connect, Plugin } from 'vite'
 
-const LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
-
 export type SyncStep = 'inicio' | 'suunto' | 'trainingpeaks' | 'validacion' | 'fin'
 
 export interface SyncState {
@@ -109,7 +107,6 @@ export function syncMiddleware(root: () => string, demo: () => boolean = () => f
   return (req, res, next) => {
     const [url, query = ''] = (req.url ?? '').split('?')
     if (url !== '/api/sync' && url !== '/api/sync/status') return next()
-    if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
     if (url === '/api/sync/status') return send(res, 200, withListProgress(state, Date.now()))
     if (req.method !== 'POST') return send(res, 405, { error: 'Usa POST.' })
     if (demo()) return send(res, 403, { error: 'En la demo no se actualizan datos: son inventados (fetch/make_demo.py).' })

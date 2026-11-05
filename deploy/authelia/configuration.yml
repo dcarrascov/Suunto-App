@@ -1,0 +1,50 @@
+# Configuración de Authelia para Suunto Stats. Se copia tal cual: los dominios y los secretos salen de las variables
+# de docker-compose.yml (filtro «template» de Authelia). Aquí no se escribe ninguna clave.
+
+server:
+  address: 'tcp://:9091'
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: 'ForwardAuth'
+
+log:
+  level: 'info'
+
+totp:
+  issuer: 'Suunto Stats'
+
+authentication_backend:
+  password_reset:
+    disable: true                 # sin correo configurado: la contraseña se cambia en users_database.yml
+  file:
+    path: '/config/users_database.yml'
+
+access_control:
+  default_policy: 'deny'
+  rules:
+    - domain: '{{ mustEnv "SUUNTO_DOMAIN" }}'
+      policy: 'two_factor'        # contraseña + código
+
+session:
+  expiration: '8h'
+  inactivity: '1h'
+  cookies:
+    - domain: '{{ mustEnv "COOKIE_DOMAIN" }}'
+      authelia_url: 'https://{{ mustEnv "AUTH_DOMAIN" }}'
+      default_redirection_url: 'https://{{ mustEnv "SUUNTO_DOMAIN" }}'
+
+# Tras 3 fallos en 2 minutos, ese usuario queda bloqueado 15 minutos
+regulation:
+  max_retries: 3
+  find_time: '2m'
+  ban_time: '15m'
+
+storage:
+  local:
+    path: '/data/db.sqlite3'
+
+# Sin correo: el código de verificación para dar de alta la app de autenticación se escribe en este fichero
+notifier:
+  filesystem:
+    filename: '/data/notification.txt'

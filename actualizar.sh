@@ -45,11 +45,11 @@ if [ "$COMPLETO" = 1 ]; then sync_args+=(--force); fi
   exit "$code"
 }
 
-# Comprueba que existe la línea con la cookie, sin leer ni mostrar su valor
+# Comprueba que existe la cookie (en .env o, en un servidor, en las variables), sin mostrar su valor
 plan_fallido=0
 if [ "$SIN_PLAN" = 1 ]; then
   paso 'TrainingPeaks (omitido con --sin-plan)'
-elif ! { [ -f .env ] && grep -Eq '^[[:space:]]*TP_AUTH_COOKIE=[^[:space:]]' .env; }; then
+elif ! { [ -n "${TP_AUTH_COOKIE:-}" ] || { [ -f .env ] && grep -Eq '^[[:space:]]*TP_AUTH_COOKIE=[^[:space:]]' .env; }; }; then
   paso 'TrainingPeaks (omitido: no hay TP_AUTH_COOKIE en .env; ver GUIA_TRAININGPEAKS.md)'
 else
   paso 'TrainingPeaks'

@@ -1,0 +1,9 @@
+# Plantilla de usuarios de Authelia. Cópiala como users_database.yml en el servidor (no en el repositorio) y pon tus datos.
+# El hash de la contraseña se genera con:
+#   docker run --rm -it authelia/authelia:4.39 authelia crypto hash generate argon2
+users:
+  tu-usuario:
+    disabled: false
+    displayname: 'Tu nombre'
+    email: 'tu-correo@example.com'
+    password: 'pega-aqui-el-hash-que-empieza-por-$argon2id$'

@@ -16,7 +16,6 @@ const RETRY_DELAYS_MS = [2000, 4000]   // espera antes del 2.º y del 3.er inten
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 const TIMEOUT_MS = 180_000          // el análisis del entrenador lleva ~150 mil caracteres: puede tardar
 const MAX_BODY_BYTES = 3_000_000
-const LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 
 interface GeminiPart { text?: string; thought?: boolean }
 interface GeminiResponse {
@@ -203,9 +202,7 @@ export function geminiMiddleware(getEnv: () => Record<string, string>): Connect.
   return (req, res, next) => {
     const url = req.url?.split('?')[0]
     if (url !== '/api/gemini' && url !== '/api/gemini/status') return next()
-    // solo desde este ordenador: aunque el servidor se abra a la red (--host), nadie más gasta tu clave
-    if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
-
+    // quién puede llegar hasta aquí lo decide server/auth.ts: nadie más gasta tu clave
     const cfg = aiConfig(getEnv())
     const [model = '', ...fallbacks] = cfg.models
     if (url === '/api/gemini/status') {

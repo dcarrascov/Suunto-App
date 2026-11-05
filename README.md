@@ -6,6 +6,8 @@ A personal dashboard for your Suunto training statistics: activities, maps, HR z
 
 Your data is downloaded from your Suunto account (or from FIT files you export yourself) into local files on your computer. The app reads them from there; there is no cloud server and no database.
 
+By default it only opens on your own computer. If you want to publish it on your own domain, you can protect it with a password and a code from an authenticator app: see the [deployment guide](GUIDE_DEPLOY.md).
+
 > The app's interface is in **Spanish**. Section names below are given as they appear on screen, with a translation the first time.
 
 ![Dashboard](docs/capturas/resumen.png)
@@ -323,6 +325,10 @@ Keys stay on the app's server and never reach the browser. No restart is needed:
 
 ---
 
+## Publishing it on your own domain
+
+By default the app only opens on the computer running it, with no login. To open it from anywhere, deploy it on a server behind [Authelia](https://www.authelia.com) (password + code from an authenticator app) by setting `AUTH_MODE=authelia`. Step-by-step guide for Dokploy: [GUIDE_DEPLOY.md](GUIDE_DEPLOY.md).
+
 ## Which Suunto data you will see
 
 | Data | Detail |
@@ -406,7 +412,8 @@ suunto-stats/
 ├── .env                      ← Personal options (optional, do not share)
 ├── actualizar.ps1 / .sh      ← Updates everything at once (Windows / Mac-Linux)
 ├── demo/data/                ← Made-up data for `npm run demo`
-├── server/                   ← Vite server routes (Gemini and the refresh button)
+├── server/                   ← Vite server routes (access control, AI, refresh button, FIT upload)
+├── deploy/authelia/          ← Authelia configuration for a public deployment
 ├── fetch/
 │   ├── sync.py               ← Script that downloads the data
 │   ├── suunto_client.py      ← Route A: reads your Suunto account
