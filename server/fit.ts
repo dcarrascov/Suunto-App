@@ -1,5 +1,5 @@
 // Ruta /api/fit del servidor de Vite (npm run dev / npm run preview): sube ficheros .fit desde el navegador a
-// fetch/fit/. Solo desde este ordenador, solo ficheros FIT de verdad y sin salir de esa carpeta. En la demo no hace nada.
+// fetch/fit/. Solo ficheros FIT de verdad y sin salir de esa carpeta. En la demo no hace nada. El acceso: server/auth.ts.
 
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -7,7 +7,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import type { Connect, Plugin } from 'vite'
 
-const LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 export const MAX_FIT_BYTES = 20 * 1024 * 1024
 
 /** Nombre seguro dentro de fetch/fit/: sin carpetas ni caracteres raros, y con extensión .fit. null si no vale. */
@@ -84,7 +83,6 @@ export function fitMiddleware(dir: () => string, demo: () => boolean = () => fal
   return (req, res, next) => {
     const [path, query = ''] = (req.url ?? '').split('?')
     if (path !== '/api/fit') return next()
-    if (!LOCAL.has(req.socket.remoteAddress ?? '')) return send(res, 403, { error: 'Solo disponible desde este ordenador.' })
     if (req.method === 'GET') return send(res, 200, { files: listFit(dir()), demo: demo() })
     if (req.method !== 'PUT') return send(res, 405, { error: 'Usa PUT.' })
     if (demo()) return send(res, 403, { error: 'En la demo no se suben ficheros.' })

@@ -77,12 +77,6 @@ describe('geminiMiddleware', () => {
     expect(out.body).toEqual({ configured: true, model: DEFAULT_MODEL, fallbacks: FALLBACK_MODELS, provider: 'gemini', label: 'Gemini', missing: null })
     expect(JSON.stringify(out.body)).not.toContain('SECRETA')
   })
-  it('solo desde este ordenador', async () => {
-    const mw = geminiMiddleware(() => ({ GEMINI_API_KEY: 'k' }))
-    const { res, done } = fakeRes()
-    mw(fakeReq('/api/gemini', 'POST', '192.168.1.40', '{"prompt":"x"}'), res, () => {})
-    expect((await done).status).toBe(403)
-  })
   it('sin clave avisa y no llama a Gemini', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
