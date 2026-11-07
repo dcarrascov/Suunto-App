@@ -463,6 +463,12 @@ Luego haz commit de la eliminación. Si ya los subiste a GitHub, **cierra la ses
 
 ---
 
+## Contribuir
+
+Se agradecen los avisos de fallos, las ideas y los pull requests. Lee antes [CONTRIBUTING.es.md](CONTRIBUTING.es.md): cómo preparar el proyecto con los datos de la demo, las comprobaciones que hay que pasar y, sobre todo, cómo avisar de un problema sin compartir tus datos personales.
+
+---
+
 ## Aviso
 
 Este proyecto no está afiliado a Suunto. La Ruta A usa un servicio que Suunto no ha publicado como API: puede cambiar o dejar de funcionar en cualquier momento, y su uso podría no cumplir los términos de Suunto. Úsala solo con tu propia cuenta y con moderación. Si prefieres evitar ese riesgo, usa la Ruta B.
