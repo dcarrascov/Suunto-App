@@ -2,11 +2,7 @@
 
 [English](README.md) · **Español**
 
-Panel personal para ver tus estadísticas de entrenamiento de Suunto: actividades, mapas, zonas de FC, fitness (CTL/ATL/TSB), récords y más.
-
-Los datos se descargan de tu cuenta de Suunto (o de ficheros FIT que exportes tú) a archivos locales en tu ordenador. La app los lee desde ahí; no hay servidor en la nube ni base de datos.
-
-Por defecto solo se abre en tu ordenador. Si quieres publicarla en tu propio dominio, puedes protegerla con contraseña y un código de una app de autenticación: mira la [guía de despliegue](GUIA_DESPLIEGUE.md).
+**Suunto Stats** es un panel de entrenamiento gratuito y de código abierto para corredores con reloj Suunto. Descarga tus entrenamientos a tu propio ordenador y te muestra tu forma física y la **forma prevista** para las próximas semanas, tus zonas de pulso y de ritmo (con el reparto 80/20), tus **récords** con **predicción de tiempos de carrera**, tus competiciones, el historial por años, los mapas de cada salida coloreados por ritmo y los km de tus **zapatillas**. Con el **calendario** ves en un mes lo que hiciste y lo que tienes planificado, y puedes añadir tus propios entrenos. Si tienes entrenador, añade su **plan de TrainingPeaks** (opcional) junto a lo que hiciste de verdad. Además, un **entrenador IA** (Gemini, Claude, OpenAI o un modelo local) crea **planificaciones semanales**, al estilo de tu entrenador o sin entrenador para un 5k, 10k, media o maratón, las pasa al calendario y revisa cómo te ha ido cada semana. Funciona con tu cuenta de Suunto o con ficheros FIT. Sin nube y sin base de datos: tus datos se quedan contigo, salvo los resúmenes que tú decidas mandar a la IA. Y si quieres usarla desde cualquier sitio, puedes publicarla en tu dominio con contraseña y código ([guía de despliegue](GUIA_DESPLIEGUE.md)).
 
 ![Resumen](docs/capturas/resumen.png)
 
