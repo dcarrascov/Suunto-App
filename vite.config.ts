@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => {
     // npm run demo: datos inventados de demo/data/ (fetch/make_demo.py) en lugar de los tuyos de public/data/
     publicDir: mode === 'demo' ? 'demo' : 'public',
     // los datos los recarga la app al terminar la actualización: que Vite no recargue la página a mitad
-    server: { allowedHosts, watch: { ignored: ['**/public/data/**', '**/demo/data/**', '**/fetch/**'] } },
-    preview: { allowedHosts },
+    // cors: false = ninguna otra web (tampoco otro puerto de localhost) puede leer las respuestas
+    server: { allowedHosts, cors: false, watch: { ignored: ['**/public/data/**', '**/demo/data/**', '**/fetch/**'] } },
+    preview: { allowedHosts, cors: false },
   }
 })

@@ -29,6 +29,8 @@ access_control:
 session:
   expiration: '8h'
   inactivity: '1h'
+  remember_me: '1w'               # con «Recordarme», como mucho una semana
+  # COOKIE_DOMAIN = la dirección de la app (no el dominio entero): la sesión no llega a tus otras webs
   cookies:
     - domain: '{{ mustEnv "COOKIE_DOMAIN" }}'
       authelia_url: 'https://{{ mustEnv "AUTH_DOMAIN" }}'
