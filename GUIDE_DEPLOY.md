@@ -17,9 +17,9 @@ Internet → Traefik (HTTPS) → Authelia (password + code) → Suunto Stats
 ## What you need
 
 - A server with Dokploy (or [without it](#without-dokploy)).
-- A domain with two subdomains pointing to the server (DNS `A` record), for example:
+- Two addresses on your domain pointing to the server (DNS `A` record), for example:
   - `suunto.yourdomain.com`: the app.
-  - `auth.yourdomain.com`: the login screen.
+  - `auth.suunto.yourdomain.com`: the login screen. It sits inside the app's address on purpose: that way the session is only valid for the app, not for your other websites on the same domain.
 - Docker on any machine, to generate your password hash (the server's is fine).
 
 ## 1. Create the application in Dokploy
@@ -35,8 +35,8 @@ In the **Environment** tab, with your values:
 
 ```bash
 SUUNTO_DOMAIN=suunto.yourdomain.com
-AUTH_DOMAIN=auth.yourdomain.com
-COOKIE_DOMAIN=yourdomain.com
+AUTH_DOMAIN=auth.suunto.yourdomain.com
+COOKIE_DOMAIN=suunto.yourdomain.com
 
 AUTH_PROXY_SECRET=...
 AUTHELIA_SESSION_SECRET=...
@@ -49,6 +49,7 @@ GEMINI_API_KEY=...
 # TP_AUTH_COOKIE=...
 ```
 
+- **`COOKIE_DOMAIN`** is the app's address, not your whole domain. With `yourdomain.com`, the Authelia session would also be sent to your other websites on that domain, and any of them could use it.
 - **The four secrets** are random strings, a different one for each. Generate each with:
 
   ```bash
@@ -120,6 +121,8 @@ To update it automatically, create a **Schedule Job** of type Compose in Dokploy
 
 - **Two locks.** Traefik goes through Authelia and adds a secret (`AUTH_PROXY_SECRET`) that the app requires. Without it, the app rejects the request even if someone makes up the user header.
 - **No open ports.** Do not add `ports:` to `app`: it must only be reachable through Traefik.
+- **The session is only valid for the app.** With `COOKIE_DOMAIN` set to the app's address, the Authelia cookie never reaches your other websites. «Remember me» lasts one week at most.
+- **Other websites cannot use it.** The app cannot be embedded in another website, and another website can only open it with a link: it cannot read your data or trigger actions.
 - **If something is missing, access is denied.** Without `AUTH_MODE=authelia`, or without the secret, the app rejects all outside access.
 - **Your data and keys move to the server:** the Suunto session, the TrainingPeaks cookie and the AI key. Also protect the Dokploy panel with its two-factor authentication and keep the server up to date.
 - **None of this goes in the repository:** neither Dokploy's `.env` nor `users_database.yml` should be uploaded to GitHub.
@@ -136,7 +139,7 @@ To update it automatically, create a **Schedule Job** of type Compose in Dokploy
 | «Acceso no permitido» when opening the domain | Check that `AUTH_PROXY_SECRET` has at least 32 characters and the Traefik labels are intact. |
 | Certificate error or 404 | The DNS of both subdomains, and the `websecure` and `letsencrypt` names from step 4. |
 | Authelia does not start | Its logs in Dokploy. Usually a misplaced file from step 3 or a missing variable. |
-| The login keeps starting over | `COOKIE_DOMAIN` must be the domain both subdomains share. |
+| The login keeps starting over | `COOKIE_DOMAIN` must be the app's address (`suunto.yourdomain.com`), and `AUTH_DOMAIN` an address inside it (`auth.suunto.yourdomain.com`). |
 | You are locked out | After 3 failures in 2 minutes, the user is locked for 15 minutes. Wait. |
 | You lost your phone | With server access, run `authelia storage user totp delete YOUR_USER` in the Authelia terminal and register again. |
 | The download fails | `SUUNTO_SESSION_KEY` may have expired. Run `./actualizar.sh` in the `app` container terminal to see why. |
