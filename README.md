@@ -2,11 +2,7 @@
 
 **English** · [Español](README.es.md)
 
-A personal dashboard for your Suunto training statistics: activities, maps, HR zones, fitness (CTL/ATL/TSB), records and more.
-
-Your data is downloaded from your Suunto account (or from FIT files you export yourself) into local files on your computer. The app reads them from there; there is no cloud server and no database.
-
-By default it only opens on your own computer. If you want to publish it on your own domain, you can protect it with a password and a code from an authenticator app: see the [deployment guide](GUIDE_DEPLOY.md).
+**Suunto Stats** is a free, open-source training dashboard for runners with a Suunto watch. It downloads your workouts to your own computer and shows your fitness and your **projected form** for the coming weeks, your heart rate and pace zones (with the 80/20 split), your **records** with **race time predictions**, your races, your history by year, a map of every run colored by pace and the km on your **shoes**. The **calendar** shows a month of what you did and what you have planned, and you can add your own workouts. If you have a coach, it adds their **TrainingPeaks plan** (optional) next to what you actually did. On top of that, an **AI coach** (Gemini, Claude, OpenAI or a local model) creates **weekly plans**, in your coach's style or without a coach for a 5K, 10K, half or full marathon, adds them to the calendar and reviews how each week went. It works with your Suunto account or with FIT files. No cloud and no database: your data stays with you, except the summaries you choose to send to the AI. And if you want to use it from anywhere, you can publish it on your own domain with a password and a code ([deployment guide](GUIDE_DEPLOY.md)).
 
 > The app's interface is in **Spanish**. Section names below are given as they appear on screen, with a translation the first time.
 
