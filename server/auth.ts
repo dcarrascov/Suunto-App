@@ -46,10 +46,23 @@ function sameSecret(a: string, b: string): boolean {
   return timingSafeEqual(hash(a), hash(b))
 }
 
-/** Una web de otro sitio no puede lanzar acciones con tu sesión (actualizar, subir ficheros, gastar tu clave de IA). */
-function isCrossSite(method: string | undefined, headers: Headers): boolean {
-  if (method === 'GET' || method === 'HEAD') return false
-  if (first(headers['sec-fetch-site']) === 'cross-site') return true
+// Rutas que solo pide la propia app (datos, /api y las internas de Vite, como la que abre el editor)
+const APP_ONLY = /^\/(?:api|data)\/|^\/(?:__|@)/
+
+/**
+ * ¿La pide otra web? Desde otra web (aunque sea otro puerto de localhost) solo se puede abrir una página de la app con
+ * un enlace; ni leer datos, ni incrustarla, ni lanzar acciones con tu sesión (actualizar, subir ficheros, gastar tu
+ * clave de IA). Lo dicen las cabeceras Sec-Fetch-* de los navegadores; sin ellas, el Origin en lo que no es lectura.
+ */
+function isFromOtherSite(method: string | undefined, path: string, headers: Headers): boolean {
+  const read = method === 'GET' || method === 'HEAD'
+  const site = first(headers['sec-fetch-site'])
+  if (site === 'cross-site' || site === 'same-site') {
+    const openPage = read && !APP_ONLY.test(path)
+      && first(headers['sec-fetch-mode']) === 'navigate' && first(headers['sec-fetch-dest']) === 'document'
+    if (!openPage) return true
+  }
+  if (read) return false
   const origin = first(headers.origin)
   if (!origin) return false
   try {
@@ -61,7 +74,7 @@ function isCrossSite(method: string | undefined, headers: Headers): boolean {
 
 /** ¿Se atiende esta petición? */
 export function checkAccess(
-  req: { method?: string; headers: Headers; socket: { remoteAddress?: string } },
+  req: { method?: string; url?: string; headers: Headers; socket: { remoteAddress?: string } },
   env: Record<string, string | undefined>,
 ): Access {
   const mode = authModeOf(env)
@@ -89,7 +102,9 @@ export function checkAccess(
       return { ok: false, status: 401, reason: 'Entra por la dirección pública de la app, identificándote en Authelia.' }
     }
   }
-  if (isCrossSite(req.method, req.headers)) return { ok: false, status: 403, reason: 'Petición rechazada: viene de otro sitio web.' }
+  if (isFromOtherSite(req.method, req.url?.split('?')[0] ?? '', req.headers)) {
+    return { ok: false, status: 403, reason: 'Petición rechazada: viene de otro sitio web.' }
+  }
   return { ok: true, mode, user }
 }
 
@@ -117,9 +132,21 @@ function deniedPage(reason: string): string {
 <h1 style="font-size:20px">Acceso no permitido</h1><p style="max-width:40rem;color:#a3a3a3">${reason}</p></body></html>`
 }
 
+/** Cabeceras de seguridad para todas las respuestas. HSTS solo en el dominio público, que siempre va por HTTPS. */
+export function securityHeaders(mode: AuthMode | null): Record<string, string> {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',                          // nadie puede incrustar la app en su web
+    'Content-Security-Policy': "frame-ancestors 'none'",
+    ...(mode === 'authelia' ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}),
+  }
+}
+
 /** Middleware: corta lo no permitido y responde GET /api/auth/status (lo que enseña Ajustes). */
 export function authMiddleware(env: Record<string, string | undefined>): Connect.NextHandleFunction {
+  const headers = securityHeaders(authModeOf(env))
   return (req, res, next) => {
+    for (const [k, v] of Object.entries(headers)) res.setHeader(k, v)
     const path = req.url?.split('?')[0] ?? ''
     const access = checkAccess(req, env)
     if (!access.ok) {

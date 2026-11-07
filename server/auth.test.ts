@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { authModeOf, checkAccess, logoutUrlOf, SECRET_HEADER } from './auth.ts'
+import { authModeOf, checkAccess, logoutUrlOf, SECRET_HEADER, securityHeaders } from './auth.ts'
 
 const SECRET = 'x'.repeat(32)
 const AUTHELIA = { AUTH_MODE: 'authelia', AUTH_PROXY_SECRET: SECRET }
@@ -43,6 +43,31 @@ describe('con Authelia', () => {
     expect(checkAccess(post({ 'sec-fetch-site': 'cross-site' }), AUTHELIA)).toMatchObject({ ok: false, status: 403 })
     expect(checkAccess(post({ origin: 'https://suunto.example.com' }), AUTHELIA).ok).toBe(true)
     expect(checkAccess(req({ host: 'localhost:5173', origin: 'https://malo.example.org' }, '127.0.0.1', 'POST'), {})).toMatchObject({ ok: false, status: 403 })
+  })
+})
+
+describe('peticiones de otras webs', () => {
+  const local = (url: string, headers: Record<string, string>, method = 'GET') =>
+    ({ method, url, headers: { host: 'localhost:5173', ...headers }, socket: { remoteAddress: '127.0.0.1' } })
+  const other = (dest: string, mode: string, site = 'cross-site') => ({ 'sec-fetch-site': site, 'sec-fetch-mode': mode, 'sec-fetch-dest': dest })
+  it('desde otra web no se piden datos, ni rutas internas de Vite, ni se incrusta la app', () => {
+    expect(checkAccess(local('/__open-in-editor?file=x', other('image', 'no-cors')), {})).toMatchObject({ ok: false, status: 403 })
+    expect(checkAccess(local('/__open-in-editor?file=x', other('document', 'navigate')), {})).toMatchObject({ ok: false, status: 403 })
+    expect(checkAccess(local('/data/activities.json', other('empty', 'cors', 'same-site')), {})).toMatchObject({ ok: false, status: 403 })
+    expect(checkAccess(local('/api/sync/status', other('script', 'no-cors')), {})).toMatchObject({ ok: false, status: 403 })
+    expect(checkAccess(local('/', other('iframe', 'navigate')), {})).toMatchObject({ ok: false, status: 403 })
+  })
+  it('un enlace desde otra web abre la app; la propia app y las herramientas sin navegador pasan', () => {
+    expect(checkAccess(local('/activity/1', other('document', 'navigate')), {}).ok).toBe(true)
+    expect(checkAccess(local('/data/activities.json', other('empty', 'cors', 'same-origin')), {}).ok).toBe(true)
+    expect(checkAccess(local('/data/activities.json', {}), {}).ok).toBe(true)
+    // vuelta del login de Authelia (auth.suunto… → suunto…: mismo sitio)
+    expect(checkAccess({ ...viaProxy(other('document', 'navigate', 'same-site')), url: '/' }, AUTHELIA).ok).toBe(true)
+  })
+  it('cabeceras de seguridad; HSTS solo con el dominio público', () => {
+    expect(securityHeaders('none')).toMatchObject({ 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff' })
+    expect(securityHeaders('none')['Strict-Transport-Security']).toBeUndefined()
+    expect(securityHeaders('authelia')['Strict-Transport-Security']).toMatch(/max-age=/)
   })
 })
 

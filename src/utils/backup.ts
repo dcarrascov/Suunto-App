@@ -51,7 +51,7 @@ export function readBackup(text: string): ReadResult {
   if (b?.app !== 'suunto-stats' || b.version !== 1 || typeof b.data !== 'object' || b.data == null) {
     return { ok: false, error: 'No es una copia de seguridad de Suunto Stats.' }
   }
-  const keys = (Object.keys(b.data) as BackupKey[]).filter(k => k in BACKUP_KEYS)
+  const keys = (Object.keys(b.data) as BackupKey[]).filter(k => Object.hasOwn(BACKUP_KEYS, k))
   if (keys.length === 0) return { ok: false, error: 'La copia está vacía.' }
   const state = (k: BackupKey) => ((b.data![k] as { state?: Record<string, unknown> })?.state ?? {})
   const count = (v: unknown) => (Array.isArray(v) ? v.length : v && typeof v === 'object' ? Object.keys(v).length : 0)
@@ -68,7 +68,7 @@ export function readBackup(text: string): ReadResult {
 /** Sustituye lo guardado por lo de la copia (solo las claves que trae). */
 export function restoreBackup(backup: Backup, storage: Pick<Storage, 'setItem'>): void {
   for (const key of Object.keys(backup.data) as BackupKey[]) {
-    if (!(key in BACKUP_KEYS)) continue
+    if (!Object.hasOwn(BACKUP_KEYS, key)) continue
     storage.setItem(key, JSON.stringify(backup.data[key]))
   }
 }
