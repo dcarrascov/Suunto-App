@@ -465,6 +465,12 @@ Then commit the removal. If you already uploaded them to GitHub, **log out of Su
 
 ---
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: how to set up the project with the demo data, the checks to run and, above all, how to report a problem without sharing your personal data.
+
+---
+
 ## Disclaimer
 
 This project is not affiliated with Suunto. Route A uses a service that Suunto has not published as an API: it may change or stop working at any time, and using it might not comply with Suunto's terms. Use it only with your own account and in moderation. If you prefer to avoid that risk, use Route B.
