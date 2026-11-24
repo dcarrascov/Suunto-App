@@ -1,23 +1,30 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useActivityStore } from './stores/activityStore'
 import Sidebar from './components/Sidebar'
 import SyncBar from './components/SyncBar'
 import Dashboard from './pages/Dashboard'
-import Activities from './pages/Activities'
-import ActivityDetailPage from './pages/ActivityDetail'
-import FitnessChartPage from './pages/FitnessChartPage'
-import ZoneAnalysis from './pages/ZoneAnalysis'
-import Records from './pages/Records'
-import Settings from './pages/Settings'
-import PerformanceAnalysis from './pages/PerformanceAnalysis'
-import History from './pages/History'
-import Plan from './pages/Plan'
-import Races from './pages/Races'
-import AiCoach from './pages/AiCoach'
-import CalendarPage from './pages/CalendarPage'
-import Shoes from './pages/Shoes'
-import FitImport from './pages/FitImport'
+import { lazyPage } from './utils/lazyPage'
+
+// El Resumen va en la carga inicial (es la primera pantalla); el resto se descarga al abrirlo
+const Activities = lazyPage(() => import('./pages/Activities'))
+const ActivityDetailPage = lazyPage(() => import('./pages/ActivityDetail'))
+const FitnessChartPage = lazyPage(() => import('./pages/FitnessChartPage'))
+const ZoneAnalysis = lazyPage(() => import('./pages/ZoneAnalysis'))
+const Records = lazyPage(() => import('./pages/Records'))
+const Settings = lazyPage(() => import('./pages/Settings'))
+const PerformanceAnalysis = lazyPage(() => import('./pages/PerformanceAnalysis'))
+const History = lazyPage(() => import('./pages/History'))
+const Plan = lazyPage(() => import('./pages/Plan'))
+const Races = lazyPage(() => import('./pages/Races'))
+const AiCoach = lazyPage(() => import('./pages/AiCoach'))
+const CalendarPage = lazyPage(() => import('./pages/CalendarPage'))
+const Shoes = lazyPage(() => import('./pages/Shoes'))
+const FitImport = lazyPage(() => import('./pages/FitImport'))
+
+function PageLoading() {
+  return <div className="page text-sm text-slate-500" role="status">Cargando…</div>
+}
 
 export default function App() {
   const loadActivities = useActivityStore(s => s.loadActivities)
@@ -36,6 +43,7 @@ export default function App() {
       <div className="flex flex-col md:flex-row min-h-screen">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex flex-col">
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/activities" element={<Activities />} />
@@ -53,6 +61,7 @@ export default function App() {
             <Route path="/import" element={<FitImport />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </BrowserRouter>

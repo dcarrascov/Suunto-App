@@ -44,7 +44,9 @@ services:
       - traefik.http.routers.suunto.entrypoints=websecure
       - traefik.http.routers.suunto.tls.certresolver=letsencrypt
       - traefik.http.routers.suunto.service=suunto
-      - traefik.http.routers.suunto.middlewares=suunto-authelia,suunto-proxy-secret
+      - traefik.http.routers.suunto.middlewares=suunto-comprimir,suunto-authelia,suunto-proxy-secret
+      # gzip/brotli: los JSON de datos y el JavaScript viajan comprimidos (mucho más rápido en el móvil)
+      - traefik.http.middlewares.suunto-comprimir.compress=true
       - traefik.http.middlewares.suunto-proxy-secret.headers.customrequestheaders.X-Auth-Proxy-Secret=${AUTH_PROXY_SECRET}
       # Solo /api/mcp/ (el MCP de Claude Desktop): sin Authelia, con el secreto del proxy, el MCP_TOKEN que exige la
       # app y un límite de peticiones. Prioridad alta para ganar a la ruta general.
@@ -53,7 +55,7 @@ services:
       - traefik.http.routers.suunto-mcp.entrypoints=websecure
       - traefik.http.routers.suunto-mcp.tls.certresolver=letsencrypt
       - traefik.http.routers.suunto-mcp.service=suunto
-      - traefik.http.routers.suunto-mcp.middlewares=suunto-mcp-limite,suunto-mcp-sin-usuario,suunto-proxy-secret
+      - traefik.http.routers.suunto-mcp.middlewares=suunto-comprimir,suunto-mcp-limite,suunto-mcp-sin-usuario,suunto-proxy-secret
       # Aquí no pasa Authelia: se borran las cabeceras de usuario que pudiera mandar alguien desde fuera
       - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-User=
       - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-Groups=
