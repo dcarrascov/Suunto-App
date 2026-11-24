@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ActivitySummary, ActivityDetail, GlobalStats, TrainingPlan, UserSettings } from '../types/suunto'
 import { DEFAULT_SETTINGS } from '../types/suunto'
-import { uploadSettings } from '../utils/settingsUpload'
 
 const SETTINGS_KEY = 'suunto-settings'
 const LEGACY_SETTINGS_KEY = 'garmin-settings' // nombre antiguo: se migra una vez para no perder los ajustes
@@ -135,9 +134,3 @@ export const useActivityStore = create<ActivityState>()(
     }
   )
 )
-
-// Copia de los ajustes en el servidor para el MCP: al abrir la app y cada vez que cambian
-uploadSettings(useActivityStore.getState().settings)
-useActivityStore.subscribe((s, prev) => {
-  if (s.settings !== prev.settings) uploadSettings(s.settings)
-})

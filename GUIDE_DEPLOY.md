@@ -129,7 +129,7 @@ To update it automatically, create a **Schedule Job** of type Compose in Dokploy
 
 ## Good to know
 
-- **What is saved in the browser is not shared between devices:** shoes, settings, your own workouts and AI proposals. Move them with **Ajustes → Copia de seguridad**.
+- **Shoes, settings, your own workouts and AI proposals look the same on all your devices:** they are also saved on the server, and each device catches up when you open the app. The first time, open the app from the device that already has that data.
 - **If the session expires** while the app is open, reload the page to sign in again.
 
 ## Troubleshooting
