@@ -1,0 +1,25 @@
+{
+  "name": "suunto-stats-mcp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MCP de Suunto Stats: Claude consulta tus entrenamientos de la app (local o en tu servidor)",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "suunto-stats-mcp": "dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.5"
+  }
+}
