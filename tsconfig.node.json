@@ -5,6 +5,7 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "skipLibCheck": true,
+    "strict": true,
 
     /* Bundler mode: Vite empaqueta vite.config.ts con server/ (y los src/utils que importa) */
     "module": "esnext",
