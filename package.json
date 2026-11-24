@@ -10,7 +10,7 @@
     "demo": "vite --mode demo",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"mcp/**\"",
     "preview": "vite preview"
   },
   "dependencies": {

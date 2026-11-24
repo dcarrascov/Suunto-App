@@ -1,6 +1,6 @@
-import type { ActivitySummary, PlanSport, PlannedWorkout } from '../types/suunto'
-import { localWeekStart } from './calculations'
-import { parseLocalDate, toLocalISODate } from './date'
+import type { ActivitySummary, PlanSport, PlannedWorkout } from '../types/suunto.ts'
+import { localWeekStart } from './calculations.ts'
+import { parseLocalDate, toLocalISODate } from './date.ts'
 
 export type PlanStatus = 'done' | 'missed' | 'today' | 'upcoming' | 'rest'
 

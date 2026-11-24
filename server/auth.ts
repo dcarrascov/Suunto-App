@@ -6,8 +6,10 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { join } from 'node:path'
 import { loadEnv } from 'vite'
 import type { Connect, Plugin } from 'vite'
+import { mcpHandler } from './mcpApi.ts'
 
 export type AuthMode = 'none' | 'authelia'
 type Headers = IncomingMessage['headers']
@@ -20,9 +22,18 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 // Si llega alguna de estas, hay un proxy delante aunque la conexión parezca local
 const PROXY_HEADERS = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip']
 
+// API del MCP (server/mcpApi.ts): sin Authelia, con su propio token. Ver docs/DISENO_MCP.md
+export const MCP_PREFIX = '/api/mcp/'
+
 export type Access =
-  | { ok: true; mode: AuthMode; user: string | null }
+  | { ok: true; mode: AuthMode; user: string | null; mcp: boolean }   // mcp = entra con MCP_TOKEN, solo a /api/mcp/
   | { ok: false; status: number; reason: string }
+
+/** Token del MCP («Authorization: Bearer …»); null si el MCP está apagado (sin MCP_TOKEN o demasiado corto). */
+export function mcpTokenOf(env: Record<string, string | undefined>): string | null {
+  const token = env.MCP_TOKEN?.trim() ?? ''
+  return token.length >= MIN_SECRET_LENGTH ? token : null
+}
 
 /** Modo configurado; null si AUTH_MODE trae algo que no se entiende. */
 export function authModeOf(env: Record<string, string | undefined>): AuthMode | null {
@@ -79,6 +90,11 @@ export function checkAccess(
 ): Access {
   const mode = authModeOf(env)
   if (!mode) return { ok: false, status: 500, reason: 'AUTH_MODE no es válido: usa none o authelia.' }
+  const path = req.url?.split('?')[0] ?? ''
+  // Ninguna ruta de la app lleva barras codificadas: son la forma típica de que el proxy y la app entiendan rutas
+  // distintas (p. ej. que Traefik la lleve por la entrada del MCP y la app la tome por otra)
+  if (/%(?:2f|5c)/i.test(path)) return { ok: false, status: 400, reason: 'Ruta no válida.' }
+  const mcp = path.startsWith(MCP_PREFIX)
 
   let user: string | null = null
   if (mode === 'none') {
@@ -96,16 +112,28 @@ export function checkAccess(
     if (secret.length < MIN_SECRET_LENGTH) {
       return { ok: false, status: 503, reason: `Con AUTH_MODE=authelia falta AUTH_PROXY_SECRET (mínimo ${MIN_SECRET_LENGTH} caracteres).` }
     }
-    user = first(req.headers['remote-user'])
-    // el secreto solo lo añade el proxy: sin él, alguien ha llegado a la app sin pasar por Authelia
-    if (!sameSecret(first(req.headers[SECRET_HEADER]), secret) || !user) {
+    // el secreto solo lo añade el proxy: sin él, alguien ha llegado a la app sin pasar por Traefik
+    if (!sameSecret(first(req.headers[SECRET_HEADER]), secret)) {
+      return { ok: false, status: 401, reason: 'Entra por la dirección pública de la app, identificándote en Authelia.' }
+    }
+    // el MCP no pasa por Authelia (no hay usuario): se identifica con su token, más abajo
+    user = mcp ? null : first(req.headers['remote-user'])
+    if (!mcp && !user) {
       return { ok: false, status: 401, reason: 'Entra por la dirección pública de la app, identificándote en Authelia.' }
     }
   }
-  if (isFromOtherSite(req.method, req.url?.split('?')[0] ?? '', req.headers)) {
+  if (mcp) {
+    const token = mcpTokenOf(env)
+    if (!token) return { ok: false, status: 404, reason: 'El MCP está desactivado: falta MCP_TOKEN (mínimo 32 caracteres) en el servidor.' }
+    const sent = /^Bearer\s+(\S+)$/i.exec(first(req.headers.authorization))?.[1] ?? ''
+    // sin token, como si no existiera (un escáner no sabe que aquí hay algo); con uno equivocado, 401 para poder diagnosticarlo
+    if (!sent) return { ok: false, status: 404, reason: 'No existe.' }
+    if (!sameSecret(sent, token)) return { ok: false, status: 401, reason: 'Token del MCP incorrecto.' }
+  }
+  if (isFromOtherSite(req.method, path, req.headers)) {
     return { ok: false, status: 403, reason: 'Petición rechazada: viene de otro sitio web.' }
   }
-  return { ok: true, mode, user }
+  return { ok: true, mode, user, mcp }
 }
 
 /** Dirección para cerrar sesión; solo si es una URL web válida. */
@@ -142,8 +170,15 @@ export function securityHeaders(mode: AuthMode | null): Record<string, string> {
   }
 }
 
-/** Middleware: corta lo no permitido y responde GET /api/auth/status (lo que enseña Ajustes). */
-export function authMiddleware(env: Record<string, string | undefined>): Connect.NextHandleFunction {
+/**
+ * Middleware: corta lo no permitido y responde GET /api/auth/status (lo que enseña Ajustes).
+ * Lo que entra con el token del MCP lo atiende `mcp` y nunca sigue al resto del servidor (ficheros, /data…): así un
+ * truco en la ruta («/api/mcp/../data/…») no puede llevar a otra parte.
+ */
+export function authMiddleware(
+  env: Record<string, string | undefined>,
+  mcp?: (req: IncomingMessage, res: ServerResponse) => void,
+): Connect.NextHandleFunction {
   const headers = securityHeaders(authModeOf(env))
   return (req, res, next) => {
     for (const [k, v] of Object.entries(headers)) res.setHeader(k, v)
@@ -153,6 +188,9 @@ export function authMiddleware(env: Record<string, string | undefined>): Connect
       return path.startsWith('/api/') || path.startsWith('/data/')
         ? send(res, access.status, 'application/json', JSON.stringify({ error: access.reason }))
         : send(res, access.status, 'text/html', deniedPage(access.reason))
+    }
+    if (access.mcp) {
+      return mcp ? mcp(req, res) : send(res, 404, 'application/json', JSON.stringify({ error: 'No existe.' }))
     }
     if (path === '/api/auth/status') {
       return send(res, 200, 'application/json', JSON.stringify({
@@ -166,16 +204,19 @@ export function authMiddleware(env: Record<string, string | undefined>): Connect
 /** Plugin de Vite: debe ir el primero de la lista para quedar delante de todo, en `npm run dev` y en `npm run preview`. */
 export function authPlugin(): Plugin {
   let env: Record<string, string> = {}
+  let dataDir = ''
+  const mcp = () => mcpHandler(() => dataDir)
   return {
     name: 'suunto-auth',
     configResolved(config) {
       env = loadEnv(config.mode, config.root, '')   // prefijo '' = todas las variables, solo en el servidor
+      dataDir = join(config.publicDir, 'data')
     },
     configureServer(server) {
-      server.middlewares.use(authMiddleware(env))
+      server.middlewares.use(authMiddleware(env, mcp()))
     },
     configurePreviewServer(server) {
-      server.middlewares.use(authMiddleware(env))
+      server.middlewares.use(authMiddleware(env, mcp()))
     },
   }
 }

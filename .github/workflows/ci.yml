@@ -23,12 +23,18 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Dependencias del MCP
+        run: npm ci --prefix mcp
       - name: Tipos
         run: npx tsc -b
+      - name: Compila el MCP
+        run: npm --prefix mcp run build
       - name: Lint
         run: npx oxlint
       - name: Tests
         run: npm test
+      - name: Tests del MCP
+        run: npm --prefix mcp test
       - name: Build
         run: npx vite build
 

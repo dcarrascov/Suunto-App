@@ -18,5 +18,6 @@ disenos
 demo
 docs
 node_modules
+mcp
 **/__pycache__
 .venv

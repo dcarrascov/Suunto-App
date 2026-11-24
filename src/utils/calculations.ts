@@ -1,5 +1,5 @@
-import type { ActivitySummary, FitnessPoint, HRZone, Sport, UserSettings } from '../types/suunto'
-import { parseLocalDate, toLocalISODate } from './date'
+import type { ActivitySummary, FitnessPoint, HRZone, Sport, UserSettings } from '../types/suunto.ts'
+import { parseLocalDate, toLocalISODate } from './date.ts'
 
 // ─── TSS Estimation ─────────────────────────────────────────────────────────
 
