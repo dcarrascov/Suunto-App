@@ -1,7 +1,7 @@
-import type { PlannedEvent, PlannedWorkout } from '../types/suunto'
-import { localWeekStart } from './calculations'
-import { parseLocalDate, toLocalISODate } from './date'
-import { raceDatesFromPlan } from './races'
+import type { PlannedEvent, PlannedWorkout } from '../types/suunto.ts'
+import { localWeekStart } from './calculations.ts'
+import { parseLocalDate, toLocalISODate } from './date.ts'
+import { raceDatesFromPlan } from './races.ts'
 
 // ─── Tipos de sesión ─────────────────────────────────────────────────────────
 // Se deducen del título (el entrenador es muy sistemático: «RODAJE 45'», «SERIES LT2 4x6'»...)

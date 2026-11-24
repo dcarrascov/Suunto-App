@@ -1,6 +1,6 @@
-import type { ActivitySummary, FitnessPoint, PlannedEvent, PlannedWorkout, UserSettings } from '../types/suunto'
-import { riegel } from './calculations'
-import { parseLocalDate, toLocalISODate } from './date'
+import type { ActivitySummary, FitnessPoint, PlannedEvent, PlannedWorkout, UserSettings } from '../types/suunto.ts'
+import { riegel } from './calculations.ts'
+import { parseLocalDate, toLocalISODate } from './date.ts'
 
 // El entrenador pone esta sesión el día ANTES de cada competición
 const PRE_RACE = /activaci[oó]n\s+precompetici[oó]n/i
