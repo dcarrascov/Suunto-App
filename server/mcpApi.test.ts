@@ -26,7 +26,7 @@ writeFileSync(join(dir, 'stats.json'), JSON.stringify({ totalActivities: 4, byTy
 writeFileSync(join(dir, 'activity_3.json'), JSON.stringify({
   ...activities[0], laps: [{ index: 1, distance: 1, duration: 270, avgHR: 148, avgPace: 270, avgSpeed: null, avgPower: null, elevationGain: 1 }],
   hrZones: [{ zone: 1, name: 'Z1', seconds: 600, lowBPM: null, highBPM: null }],
-  gpxCoords: [[37.389123, -5.984456], [37.389234, -5.984567]], routePace: [270, 271],
+  gpxCoords: [[10.000001, 20.000001], [10.000002, 20.000002]], routePace: [270, 271],
   extra: { peakPace30s: 200, peakPace1m: 210, peakPace3m: 230, peakPace5m: 240, ngp: 265, recoveryTime: 36000 },
 }))
 writeFileSync(join(dir, 'plan.json'), JSON.stringify({
@@ -94,7 +94,7 @@ describe('API del MCP', () => {
     expect(status).toBe(200)
     expect(body).toMatchObject({ id: 3, parciales: [{ n: 1, ritmo: '4:30/km' }], ritmos_maximos: { '30s': '3:20/km' } })
     expect(body.mejores_tramos).toContainEqual(expect.objectContaining({ distancia: '1 km', es_record: true }))
-    expect(raw).not.toMatch(/gpxCoords|routePace|37\.389|-5\.984/)
+    expect(raw).not.toMatch(/gpxCoords|routePace|10\.00000|20\.00000/)
     expect((await call('/api/mcp/v1/actividades/12345')).status).toBe(404)
   })
 
@@ -102,7 +102,7 @@ describe('API del MCP', () => {
     for (const p of ['perfil', 'actividades', 'semanas', 'forma', 'records', 'intensidad', 'plan', 'competiciones', 'semana/2026-11-16', 'estilo']) {
       const { status, raw } = await call(`/api/mcp/v1/${p}`)
       expect(status, p).toBe(200)
-      expect(raw, p).not.toMatch(/gpxCoords|routePace|37\.389|-5\.984/)
+      expect(raw, p).not.toMatch(/gpxCoords|routePace|10\.00000|20\.00000/)
     }
   })
 
