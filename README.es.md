@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español**
 
-**Suunto Stats** es un panel de entrenamiento gratuito y de código abierto para corredores con reloj Suunto. Descarga tus entrenamientos a tu propio ordenador y te muestra tu forma física y la **forma prevista** para las próximas semanas, tus zonas de pulso y de ritmo (con el reparto 80/20), tus **récords** con **predicción de tiempos de carrera**, tus competiciones, el historial por años, los mapas de cada salida coloreados por ritmo y los km de tus **zapatillas**. Con el **calendario** ves en un mes lo que hiciste y lo que tienes planificado, y puedes añadir tus propios entrenos. Si tienes entrenador, añade su **plan de TrainingPeaks** (opcional) junto a lo que hiciste de verdad. Además, un **entrenador IA** (Gemini, Claude, OpenAI o un modelo local) crea **planificaciones semanales**, al estilo de tu entrenador o sin entrenador para un 5k, 10k, media o maratón, las pasa al calendario y revisa cómo te ha ido cada semana. Funciona con tu cuenta de Suunto o con ficheros FIT. Sin nube y sin base de datos: tus datos se quedan contigo, salvo los resúmenes que tú decidas mandar a la IA. Y si quieres usarla desde cualquier sitio, puedes publicarla en tu dominio con contraseña y código ([guía de despliegue](GUIA_DESPLIEGUE.md)).
+**Suunto Stats** es un panel de entrenamiento gratuito y de código abierto para corredores con reloj Suunto. Descarga tus entrenamientos a tu propio ordenador y te muestra tu forma física y la **forma prevista** para las próximas semanas, tus zonas de pulso y de ritmo (con el reparto 80/20), tus **récords** con **predicción de tiempos de carrera**, tus competiciones, el historial por años, los mapas de cada salida coloreados por ritmo y los km de tus **zapatillas**. Con el **calendario** ves en un mes lo que hiciste y lo que tienes planificado, y puedes añadir tus propios entrenos. Si tienes entrenador, añade su **plan de TrainingPeaks** (opcional) junto a lo que hiciste de verdad. Además, un **entrenador IA** (Gemini, Claude, OpenAI o un modelo local) crea **planificaciones semanales**, al estilo de tu entrenador o sin entrenador para un 5k, 10k, media o maratón, las pasa al calendario y revisa cómo te ha ido cada semana. También puedes hablar con Claude de tus entrenamientos con su MCP, sin clave de API ([guía del MCP](GUIA_MCP.md)). Funciona con tu cuenta de Suunto o con ficheros FIT. Sin nube y sin base de datos: tus datos se quedan contigo, salvo los resúmenes que tú decidas mandar a la IA. Y si quieres usarla desde cualquier sitio, puedes publicarla en tu dominio con contraseña y código ([guía de despliegue](GUIA_DESPLIEGUE.md)).
 
 ![Resumen](docs/capturas/resumen.png)
 
@@ -323,6 +323,10 @@ Las claves se quedan en el servidor de la app y nunca llegan al navegador. No ha
 
 Por defecto la app solo se abre en el ordenador donde se ejecuta, sin login. Para abrirla desde cualquier sitio, despliégala en un servidor detrás de [Authelia](https://www.authelia.com) (contraseña + código de una app de autenticación) con `AUTH_MODE=authelia`. Guía paso a paso para Dokploy: [GUIA_DESPLIEGUE.md](GUIA_DESPLIEGUE.md).
 
+## Habla con Claude de tus entrenamientos (MCP)
+
+Además del entrenador IA de la app, puedes conectar **Claude Desktop** o **Claude Code** a la app con su MCP y preguntarle por tus actividades, tu forma, tus récords, el plan de tu entrenador y tus competiciones en una conversación normal, con tu suscripción de Claude y sin clave de API. Funciona con la app en tu ordenador o en tu servidor, es de solo lectura y nunca manda rutas GPS. Paso a paso: [GUIA_MCP.md](GUIA_MCP.md).
+
 ## Qué datos de Suunto verás
 
 | Dato | Detalle |
@@ -408,6 +412,7 @@ suunto-stats/
 ├── demo/data/                ← Datos inventados para `npm run demo`
 ├── server/                   ← Rutas del servidor de Vite (acceso, IA, botón de recargar, subir FIT)
 ├── deploy/authelia/          ← Configuración de Authelia para publicarla en un dominio
+├── mcp/                      ← MCP para Claude Desktop y Claude Code (GUIA_MCP.md)
 ├── fetch/
 │   ├── sync.py               ← Script que descarga los datos
 │   ├── suunto_client.py      ← Ruta A: lectura de tu cuenta de Suunto

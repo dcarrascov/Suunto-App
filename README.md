@@ -2,7 +2,7 @@
 
 **English** · [Español](README.es.md)
 
-**Suunto Stats** is a free, open-source training dashboard for runners with a Suunto watch. It downloads your workouts to your own computer and shows your fitness and your **projected form** for the coming weeks, your heart rate and pace zones (with the 80/20 split), your **records** with **race time predictions**, your races, your history by year, a map of every run colored by pace and the km on your **shoes**. The **calendar** shows a month of what you did and what you have planned, and you can add your own workouts. If you have a coach, it adds their **TrainingPeaks plan** (optional) next to what you actually did. On top of that, an **AI coach** (Gemini, Claude, OpenAI or a local model) creates **weekly plans**, in your coach's style or without a coach for a 5K, 10K, half or full marathon, adds them to the calendar and reviews how each week went. It works with your Suunto account or with FIT files. No cloud and no database: your data stays with you, except the summaries you choose to send to the AI. And if you want to use it from anywhere, you can publish it on your own domain with a password and a code ([deployment guide](GUIDE_DEPLOY.md)).
+**Suunto Stats** is a free, open-source training dashboard for runners with a Suunto watch. It downloads your workouts to your own computer and shows your fitness and your **projected form** for the coming weeks, your heart rate and pace zones (with the 80/20 split), your **records** with **race time predictions**, your races, your history by year, a map of every run colored by pace and the km on your **shoes**. The **calendar** shows a month of what you did and what you have planned, and you can add your own workouts. If you have a coach, it adds their **TrainingPeaks plan** (optional) next to what you actually did. On top of that, an **AI coach** (Gemini, Claude, OpenAI or a local model) creates **weekly plans**, in your coach's style or without a coach for a 5K, 10K, half or full marathon, adds them to the calendar and reviews how each week went. You can also talk to Claude about your training through its MCP, with no API key ([MCP guide](GUIDE_MCP.md)). It works with your Suunto account or with FIT files. No cloud and no database: your data stays with you, except the summaries you choose to send to the AI. And if you want to use it from anywhere, you can publish it on your own domain with a password and a code ([deployment guide](GUIDE_DEPLOY.md)).
 
 > The app's interface is in **Spanish**. Section names below are given as they appear on screen, with a translation the first time.
 
@@ -325,6 +325,10 @@ Keys stay on the app's server and never reach the browser. No restart is needed:
 
 By default the app only opens on the computer running it, with no login. To open it from anywhere, deploy it on a server behind [Authelia](https://www.authelia.com) (password + code from an authenticator app) by setting `AUTH_MODE=authelia`. Step-by-step guide for Dokploy: [GUIDE_DEPLOY.md](GUIDE_DEPLOY.md).
 
+## Talk to Claude about your training (MCP)
+
+Besides the AI coach inside the app, you can connect **Claude Desktop** or **Claude Code** to the app through its MCP and ask about your activities, fitness, records, your coach's plan and your races in a normal conversation, with your Claude subscription and no API key. It works with the app on your computer or on your server, it is read-only and it never sends GPS routes. Step by step: [GUIDE_MCP.md](GUIDE_MCP.md).
+
 ## Which Suunto data you will see
 
 | Data | Detail |
@@ -410,6 +414,7 @@ suunto-stats/
 ├── demo/data/                ← Made-up data for `npm run demo`
 ├── server/                   ← Vite server routes (access control, AI, refresh button, FIT upload)
 ├── deploy/authelia/          ← Authelia configuration for a public deployment
+├── mcp/                      ← MCP for Claude Desktop and Claude Code (GUIDE_MCP.md)
 ├── fetch/
 │   ├── sync.py               ← Script that downloads the data
 │   ├── suunto_client.py      ← Route A: reads your Suunto account

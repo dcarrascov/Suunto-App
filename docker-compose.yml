@@ -26,6 +26,10 @@ services:
       - AI_API_KEY=${AI_API_KEY:-}
       - AI_MODEL=${AI_MODEL:-}
       - AI_FALLBACK_MODELS=${AI_FALLBACK_MODELS:-}
+      # MCP para Claude Desktop (GUIA_MCP.md): sin MCP_TOKEN está apagado
+      - MCP_TOKEN=${MCP_TOKEN:-}
+      # «hoy» en tu zona horaria (si no, el servidor va en UTC)
+      - TZ=${SUUNTO_TIMEZONE:-UTC}
     volumes:
       - suunto-data:/app/public/data
       - suunto-fit:/app/fetch/fit
@@ -42,6 +46,22 @@ services:
       - traefik.http.routers.suunto.service=suunto
       - traefik.http.routers.suunto.middlewares=suunto-authelia,suunto-proxy-secret
       - traefik.http.middlewares.suunto-proxy-secret.headers.customrequestheaders.X-Auth-Proxy-Secret=${AUTH_PROXY_SECRET}
+      # Solo /api/mcp/ (el MCP de Claude Desktop): sin Authelia, con el secreto del proxy, el MCP_TOKEN que exige la
+      # app y un límite de peticiones. Prioridad alta para ganar a la ruta general.
+      - traefik.http.routers.suunto-mcp.rule=Host(`${SUUNTO_DOMAIN}`) && PathPrefix(`/api/mcp/`)
+      - traefik.http.routers.suunto-mcp.priority=100
+      - traefik.http.routers.suunto-mcp.entrypoints=websecure
+      - traefik.http.routers.suunto-mcp.tls.certresolver=letsencrypt
+      - traefik.http.routers.suunto-mcp.service=suunto
+      - traefik.http.routers.suunto-mcp.middlewares=suunto-mcp-limite,suunto-mcp-sin-usuario,suunto-proxy-secret
+      # Aquí no pasa Authelia: se borran las cabeceras de usuario que pudiera mandar alguien desde fuera
+      - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-User=
+      - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-Groups=
+      - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-Email=
+      - traefik.http.middlewares.suunto-mcp-sin-usuario.headers.customrequestheaders.Remote-Name=
+      - traefik.http.middlewares.suunto-mcp-limite.ratelimit.average=30
+      - traefik.http.middlewares.suunto-mcp-limite.ratelimit.period=1m
+      - traefik.http.middlewares.suunto-mcp-limite.ratelimit.burst=10
       # http:// solo redirige a https://
       - traefik.http.routers.suunto-http.rule=Host(`${SUUNTO_DOMAIN}`)
       - traefik.http.routers.suunto-http.entrypoints=web

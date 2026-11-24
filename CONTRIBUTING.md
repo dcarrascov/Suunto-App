@@ -37,6 +37,9 @@ npx oxlint
 npm test
 python3 -m unittest discover -s fetch -p "test_*.py"
 python3 fetch/validate_output.py --data demo/data
+npm --prefix mcp install    # once, for the MCP
+npm --prefix mcp run build
+npm --prefix mcp test
 ```
 
 The continuous integration runs most of them on every pull request. Add tests for new logic: `src/utils/*.test.ts`, `server/*.test.ts` or `fetch/test_*.py`.
