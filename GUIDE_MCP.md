@@ -10,7 +10,9 @@ activities, fitness, records, your coach's plan and races.
 Claude Desktop ──► MCP (on your computer) ──► your app (on your computer or on your server)
 ```
 
-For now it **only reads**: saving the weeks Claude proposes into the app will come later. The full design (in Spanish)
+Almost everything is **read-only**. The only writes are saving or deleting in the app the weeks Claude proposes, and only
+when you ask: they show up in Entrenador IA and Plan as «PROPUESTA IA», where you can move them to the calendar if you
+like them. The full design (in Spanish)
 is in [docs/DISENO_MCP.md](docs/DISENO_MCP.md). The tools and their data use Spanish names, like the app.
 
 ## What you can ask
@@ -97,7 +99,8 @@ claude mcp add suunto-stats --scope user --env SUUNTO_APP_URL=https://suunto.you
 ## 5. Try it
 
 Ask Claude «how is my fitness?». The first time, it asks for permission to use each tool. They are all
-**read-only**, so you can allow them always.
+**read-only** except `guardar_propuesta_semana` and `borrar_propuesta`, so you can always allow the read-only ones and
+let it ask you about those two.
 
 ## Tools
 
@@ -114,6 +117,12 @@ Ask Claude «how is my fitness?». The first time, it asks for permission to use
 | `estilo_entrenador` | How your coach plans, in short, with their last 2 weeks as examples |
 | `competiciones` | Upcoming (with prediction) and past (with result) |
 | `comparar_semana` | Planned versus done in one week, day by day |
+| `propuestas_guardadas` | Proposed weeks already in the app (from Claude or from the AI coach) |
+| `guardar_propuesta_semana` | **Writes:** saves a proposed week in the app (like your coach or without a coach) |
+| `borrar_propuesta` | **Writes:** deletes a week Claude saved (it never touches the others or the calendar) |
+
+To save one, just ask: «suggest next week the way my coach would and, if it looks good, save it». You will see it in
+Entrenador IA and Plan as soon as you open the app or return to it.
 
 ## Privacy and security
 
@@ -128,7 +137,9 @@ Ask Claude «how is my fitness?». The first time, it asks for permission to use
 - **On your server,** that route skips Authelia but still goes through Traefik, with a request limit. Traefik removes
   any user header sent from outside, and the route still requires the proxy secret, like everything else. Anyone
   arriving without a token gets an answer as if the route did not exist.
-- **The MCP cannot change anything:** not in the app, not in Suunto, not in TrainingPeaks.
+- **The only thing it can change is its own proposed weeks in the app.** They are validated like the app's (dates in
+  that week, sensible numbers, from 12 weeks back to 26 ahead), it never overwrites an existing one unless asked and it
+  only deletes the ones it saved. It never touches Suunto, TrainingPeaks, your activities, your settings or the calendar.
 - **The token is written in Claude Desktop's configuration on your computer:** protect your user account and do not
   share that file.
 - **If you think the token leaked,** change `MCP_TOKEN` on the server (and in Claude) and the old one stops working.

@@ -327,7 +327,7 @@ By default the app only opens on the computer running it, with no login. To open
 
 ## Talk to Claude about your training (MCP)
 
-Besides the AI coach inside the app, you can connect **Claude Desktop** or **Claude Code** to the app through its MCP and ask about your activities, fitness, records, your coach's plan and your races in a normal conversation, with your Claude subscription and no API key. It works with the app on your computer or on your server, it is read-only and it never sends GPS routes. Step by step: [GUIDE_MCP.md](GUIDE_MCP.md).
+Besides the AI coach inside the app, you can connect **Claude Desktop** or **Claude Code** to the app through its MCP and ask about your activities, fitness, records, your coach's plan and your races in a normal conversation, with your Claude subscription and no API key. It works with the app on your computer or on your server, it never sends GPS routes, and the only thing it can save is the weeks Claude proposes, when you ask. Step by step: [GUIDE_MCP.md](GUIDE_MCP.md).
 
 ## Which Suunto data you will see
 

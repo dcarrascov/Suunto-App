@@ -15,6 +15,7 @@ import { parseLocalDate, toLocalISODate } from '../src/utils/date.ts'
 import { planItems, shiftWeek, weekDays, type PlanStatus } from '../src/utils/plan.ts'
 import { findRaces, raceActivityIds, raceDatesFromPlan, upcomingEvents } from '../src/utils/races.ts'
 import { loadAppData, loadDetail, type AppData } from './mcpData.ts'
+import { deleteProposal, listProposals, ProposalError, saveProposal, type ProposalMode } from './mcpProposals.ts'
 
 const MAX_LIST = 200
 const MAX_TEXT = 1500
@@ -535,6 +536,7 @@ const ROUTES: [RegExp, (m: RegExpExecArray, c: Ctx) => unknown][] = [
   [/^\/api\/mcp\/v1\/competiciones$/, (_, c) => competiciones(c.data, c.q, c.today)],
   [/^\/api\/mcp\/v1\/semana\/(\d{4}-\d{2}-\d{2})$/, (m, c) => semana(c.data, m[1], c.today)],
   [/^\/api\/mcp\/v1\/estilo$/, (_, c) => estilo(c.data, c.q, c.today)],
+  [/^\/api\/mcp\/v1\/propuestas$/, (_, c) => listProposals(c.dir, c.q.get('semana'), c.today)],
 ]
 
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -547,11 +549,62 @@ function send(res: ServerResponse, status: number, body: unknown) {
   }))
 }
 
+const MAX_BODY_BYTES = 100_000
+const PROPOSAL_ROUTE = /^\/api\/mcp\/v1\/propuestas\/(\d{4}-\d{2}-\d{2})$/
+
+function readBody(req: IncomingMessage): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        resolve(null)
+        req.destroy()
+      } else chunks.push(c)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', reject)
+  })
+}
+
+/** Lo único que escribe el MCP: guardar (PUT) o borrar (DELETE) la propuesta de una semana. */
+function proposalWrite(req: IncomingMessage, res: ServerResponse, dir: string, day: string, query: string, today: string): void {
+  const fail = (e: unknown) => {
+    if (e instanceof ProposalError) return send(res, e.status, { error: e.message })
+    if (e instanceof SyntaxError) return send(res, 400, { error: 'El cuerpo no es un JSON válido.' })
+    console.error('[mcp]', e)
+    send(res, 500, { error: 'No se ha podido guardar.' })
+  }
+  if (req.method === 'DELETE') {
+    const modo = new URLSearchParams(query).get('modo') as ProposalMode
+    try {
+      deleteProposal(dir, day, modo, today)
+      console.log(`[mcp] propuesta borrada: semana de ${day} (${modo})`)
+      return send(res, 200, { borrada: true })
+    } catch (e) {
+      return fail(e)
+    }
+  }
+  readBody(req)
+    .then(raw => {
+      if (raw == null) return send(res, 413, { error: 'La propuesta ocupa demasiado.' })
+      const b = JSON.parse(raw) as { modo?: ProposalMode; explicacion?: unknown; sesiones?: unknown; reemplazar?: unknown }
+      const p = saveProposal(dir, { semana: day, modo: b.modo as ProposalMode, explicacion: b.explicacion, sesiones: b.sesiones, reemplazar: b.reemplazar === true }, today)
+      console.log(`[mcp] propuesta guardada: semana del ${p.weekStart} (${b.modo}), ${p.workouts.length} sesiones`)
+      send(res, 200, {
+        guardada: true, semana: p.weekStart, modo: b.modo, sesiones: p.workouts.length,
+        aviso: 'Aparece en la app (Entrenador IA y Plan) al abrirla o al volver a ella, marcada como PROPUESTA IA. No se envía a TrainingPeaks.',
+      })
+    })
+    .catch(fail)
+}
+
 /**
  * Atiende todo lo que entra con el token del MCP. Siempre responde: nunca pasa la petición al resto del servidor.
- * `now` se puede fijar en los tests.
+ * `now` se puede fijar en los tests; `readOnly` (la demo) impide guardar propuestas.
  */
-export function mcpHandler(dir: () => string, now: () => Date = () => new Date()) {
+export function mcpHandler(dir: () => string, now: () => Date = () => new Date(), readOnly: () => boolean = () => false) {
   const hits: number[] = []
   return (req: IncomingMessage, res: ServerResponse): void => {
     const t = Date.now()
@@ -562,7 +615,12 @@ export function mcpHandler(dir: () => string, now: () => Date = () => new Date()
     const [path, query = ''] = (req.url ?? '').split('?')
     // nada de rutas raras: ni «..», ni caracteres codificados, ni barras invertidas
     if (/\.\.|%|\\/.test(path)) return send(res, 400, { error: 'Ruta no válida.' })
-    if (req.method !== 'GET') return send(res, 405, { error: 'Solo lectura: usa GET.' })
+    const write = PROPOSAL_ROUTE.exec(path)
+    if (write && (req.method === 'PUT' || req.method === 'DELETE')) {
+      if (readOnly()) return send(res, 403, { error: 'En la demo no se guarda nada.' })
+      return proposalWrite(req, res, dir(), write[1], query, toLocalISODate(now()))
+    }
+    if (req.method !== 'GET') return send(res, 405, { error: 'Aquí solo se lee (GET). Solo las propuestas se guardan o borran.' })
     for (const [re, run] of ROUTES) {
       const m = re.exec(path)
       if (!m) continue
@@ -570,7 +628,7 @@ export function mcpHandler(dir: () => string, now: () => Date = () => new Date()
         const ctx: Ctx = { data: loadAppData(dir()), dir: dir(), q: new URLSearchParams(query), today: toLocalISODate(now()) }
         return send(res, 200, run(m, ctx))
       } catch (e) {
-        if (e instanceof ApiError) return send(res, e.status, { error: e.message })
+        if (e instanceof ApiError || e instanceof ProposalError) return send(res, e.status, { error: e.message })
         console.error('[mcp]', e)
         return send(res, 500, { error: 'Error inesperado al preparar los datos.' })
       }
