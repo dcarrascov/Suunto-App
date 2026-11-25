@@ -34,6 +34,7 @@ const LIST_END = 40
 const SUUNTO_END = 80
 const PLAN_END = 95
 const LIST_SECONDS = 20   // ritmo al que avanza mientras Suunto manda la lista (suele tardar ~30 s)
+const BUSY_CODE = 3       // código de salida de los scripts cuando ya hay otra actualización en marcha
 
 /** Programa y argumentos para lanzar la actualización en cada sistema. `fit` = sin cuenta de Suunto (solo .fit). */
 export function updateCommand(platform: NodeJS.Platform, root: string, mode: 'normal' | 'fit' = 'normal'): { cmd: string; args: string[] } {
@@ -86,6 +87,8 @@ export function withListProgress(s: SyncState, now: number): SyncState {
 export function finish(s: SyncState, code: number | null, now: number): SyncState {
   const seconds = s.startedAt != null ?Math.round((now - s.startedAt) / 1000) : null
   if (code === 0) return { ...s, running: false, step: 'fin', percent: 100, ok: true, error: null, seconds }
+  // 3 = el candado de actualizar.ps1 / actualizar.sh: ya había otra en marcha (p. ej. la programada en el servidor)
+  if (code === BUSY_CODE) return { ...s, running: false, ok: false, error: 'Ya hay otra actualización en marcha (quizá la programada). Espera a que termine y recarga.', seconds }
   const error = s.step === 'validacion'
     ? `La validación ha encontrado errores en los datos. ${SCRIPT_HINT}`
     : s.step === 'suunto'

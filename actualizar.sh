@@ -36,6 +36,22 @@ fi
 paso() { echo ""; echo "== $1 =="; }
 inicio=$(date +%s)
 
+# Una sola actualización a la vez (p. ej. la programada en el servidor y el botón de recargar).
+# Si el candado es de una actualización que se cortó, se quita.
+mkdir -p public/data
+CANDADO=public/data/.actualizando
+if ! mkdir "$CANDADO" 2>/dev/null; then
+  otro=$(cat "$CANDADO/pid" 2>/dev/null)
+  if [ -n "$otro" ] && kill -0 "$otro" 2>/dev/null; then
+    echo 'Ya hay otra actualización en marcha; no lanzo otra.'
+    exit 3
+  fi
+  rm -rf "$CANDADO"
+  mkdir "$CANDADO" || exit 3
+fi
+echo $$ > "$CANDADO/pid"
+trap 'rm -rf "$CANDADO"' EXIT
+
 sync_args=()
 if [ "$SOLO_FIT" = 1 ]; then paso 'Suunto (ficheros FIT)'; sync_args+=(--source fit); else paso 'Suunto'; fi
 if [ "$COMPLETO" = 1 ]; then sync_args+=(--force); fi

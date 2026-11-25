@@ -30,6 +30,8 @@ describe('progreso de actualizar.ps1', () => {
     expect(finish(s, 0, 42_000)).toMatchObject({ running: false, ok: true, percent: 100, step: 'fin', seconds: 42 })
     expect(finish(s, 1, 1000).error).toContain('validación')
     expect(finish(run(['== Suunto ==']), 1, 1000).error).toContain('Suunto')
+    // 3 = ya había otra actualización en marcha (el candado de los scripts)
+    expect(finish(run([]), 3, 1000)).toMatchObject({ running: false, ok: false, error: expect.stringMatching(/otra actualización en marcha/) })
   })
   it('en Windows lanza actualizar.ps1 con PowerShell; en Mac/Linux, actualizar.sh con bash', () => {
     expect(updateCommand('win32', 'C:/app')).toMatchObject({ cmd: 'powershell.exe' })
