@@ -1,8 +1,9 @@
-// Herramientas del MCP: cada una es una ruta GET de la API de la app (server/mcpApi.ts). Todas son de solo lectura.
+// Herramientas del MCP: cada una es una ruta de la API de la app (server/mcpApi.ts). Todas leen, salvo guardar y borrar
+// propuestas de semana (que la app recibe al sincronizar).
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { apiGet, type ApiConfig } from './api.js'
+import { apiGet, apiRequest, type ApiConfig } from './api.js'
 
 const day = (what: string) => z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').describe(what)
 
@@ -15,7 +16,12 @@ export interface ToolDef {
   input: z.ZodRawShape
   /** Ruta de la API y parámetros. */
   route: (a: Args) => [string, Args]
+  /** Solo las propuestas escriben: PUT (guardar) o DELETE (borrar), con su cuerpo. */
+  write?: { method: 'PUT' | 'DELETE'; body?: (a: Record<string, unknown>) => unknown; destructive?: boolean }
 }
+
+const SESSION_TYPES = ['rodaje', 'progresivo', 'rectas', 'series', 'cuestas', 'cambios', 'activacion', 'competicion', 'fuerza', 'natacion', 'descanso', 'otro'] as const
+const MODE = z.enum(['como_entrenador', 'sin_entrenador'])
 
 export const TOOLS: ToolDef[] = [
   {
@@ -115,18 +121,60 @@ export const TOOLS: ToolDef[] = [
     input: { semana: day('Cualquier día de la semana.') },
     route: a => [`semana/${a.semana}`, {}],
   },
+  {
+    name: 'propuestas_guardadas',
+    title: 'Propuestas guardadas',
+    description: 'Semanas propuestas que ya están guardadas en la app (de Claude o del Entrenador IA de la app), para seguir un plan empezado en otra conversación.',
+    input: { semana: day('Solo la semana de este día (por defecto, las 12 más recientes).').optional() },
+    route: a => ['propuestas', { semana: a.semana }],
+  },
+  {
+    name: 'guardar_propuesta_semana',
+    title: 'Guardar una semana en la app',
+    description: 'Guarda en la app una semana propuesta, solo cuando el usuario lo pida. Aparece en Entrenador IA y Plan como «PROPUESTA IA», desde donde puede pasarla al calendario. No se envía a TrainingPeaks. Planifica por tiempo (duracion_min en todas las sesiones salvo descanso).',
+    input: {
+      semana: day('Cualquier día de la semana (de lunes a domingo).'),
+      modo: MODE.describe('como_entrenador (al estilo del entrenador) o sin_entrenador (plan propio hacia un objetivo).'),
+      explicacion: z.string().max(3000).describe('Por qué esta semana: objetivo, carga y cómo encaja.'),
+      sesiones: z.array(z.object({
+        fecha: day('Día de la sesión, dentro de esa semana.'),
+        tipo: z.enum(SESSION_TYPES),
+        titulo: z.string().min(1).max(150),
+        descripcion: z.string().max(2000).describe('Estructura: calentamiento, bloques con ritmo o zona, vuelta a la calma.').optional(),
+        duracion_min: z.number().min(0).max(600).optional(),
+        distancia_km: z.number().min(0).max(300).optional(),
+        tss: z.number().min(0).max(1000).optional(),
+      })).min(1).max(21),
+      reemplazar: z.boolean().describe('Sustituir la que ya haya para esa semana y modo.').optional(),
+    },
+    route: a => [`propuestas/${a.semana}`, {}],
+    write: { method: 'PUT', body: a => ({ modo: a.modo, explicacion: a.explicacion, sesiones: a.sesiones, reemplazar: a.reemplazar === true }) },
+  },
+  {
+    name: 'borrar_propuesta',
+    title: 'Borrar una semana guardada',
+    description: 'Borra de la app una semana que guardó Claude (no las del Entrenador IA de la app ni el calendario). Solo si el usuario lo pide.',
+    input: { semana: day('Cualquier día de la semana.'), modo: MODE },
+    route: a => [`propuestas/${a.semana}`, { modo: a.modo }],
+    write: { method: 'DELETE', destructive: true },
+  },
 ]
 
 /** Registra las herramientas en el servidor MCP. Los errores se devuelven como texto para que Claude los explique. */
 export function registerTools(server: McpServer, cfg: ApiConfig): void {
   for (const t of TOOLS) {
+    const annotations = t.write
+      ? { readOnlyHint: false, destructiveHint: !!t.write.destructive, idempotentHint: true, openWorldHint: false }
+      : { readOnlyHint: true, openWorldHint: false }
     server.registerTool(
       t.name,
-      { title: t.title, description: t.description, inputSchema: t.input, annotations: { readOnlyHint: true, openWorldHint: false } },
+      { title: t.title, description: t.description, inputSchema: t.input, annotations },
       async (args: Record<string, unknown>) => {
         try {
           const [path, query] = t.route(args as Args)   // ya validados por el SDK con el esquema de zod
-          const data = await apiGet(cfg, path, query)
+          const data = t.write
+            ? await apiRequest(cfg, t.write.method, path, query, t.write.body?.(args))
+            : await apiGet(cfg, path, query)
           return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] }
         } catch (e) {
           return { content: [{ type: 'text' as const, text: e instanceof Error ? e.message : 'Error inesperado.' }], isError: true }

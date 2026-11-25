@@ -43,11 +43,24 @@ export function buildPath(path: string, query: Record<string, string | number | 
 }
 
 /** GET a la API; lanza ApiCallError con un mensaje en español que Claude puede enseñar tal cual. */
-export async function apiGet(cfg: ApiConfig, path: string, query: Record<string, string | number | boolean | undefined> = {}): Promise<unknown> {
+export function apiGet(cfg: ApiConfig, path: string, query: Record<string, string | number | boolean | undefined> = {}): Promise<unknown> {
+  return apiRequest(cfg, 'GET', path, query)
+}
+
+/** Petición a la API (GET, o PUT/DELETE para las propuestas). */
+export async function apiRequest(
+  cfg: ApiConfig, method: 'GET' | 'PUT' | 'DELETE', path: string,
+  query: Record<string, string | number | boolean | undefined> = {}, body?: unknown,
+): Promise<unknown> {
   let res: Response
   try {
     res = await (cfg.fetchImpl ?? fetch)(cfg.baseUrl + buildPath(path, query), {
-      headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/json' },
+      method,
+      headers: {
+        Authorization: `Bearer ${cfg.token}`, Accept: 'application/json',
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       redirect: 'manual',   // una redirección = Authelia pidiendo login: la ruta del MCP no está bien en Traefik
       signal: AbortSignal.timeout(cfg.timeoutMs ?? 30_000),
     })
@@ -58,13 +71,13 @@ export async function apiGet(cfg: ApiConfig, path: string, query: Record<string,
   if (res.status >= 300 && res.status < 400) {
     throw new ApiCallError('La app ha redirigido al login de Authelia: falta (o no funciona) la ruta suunto-mcp de Traefik para /api/mcp/.')
   }
-  let body: unknown = null
-  if ((res.headers.get('content-type') ?? '').includes('json')) body = await res.json().catch(() => null)
-  const message = (body as { error?: unknown } | null)?.error
+  let answer: unknown = null
+  if ((res.headers.get('content-type') ?? '').includes('json')) answer = await res.json().catch(() => null)
+  const message = (answer as { error?: unknown } | null)?.error
   if (!res.ok) {
     if (res.status === 401) throw new ApiCallError('La app rechaza el token: SUUNTO_MCP_TOKEN tiene que ser igual que MCP_TOKEN en el servidor.')
     throw new ApiCallError(typeof message === 'string' ? message : `La app ha respondido con el código ${res.status}.`)
   }
-  if (body == null) throw new ApiCallError('La respuesta no es de la API del MCP. ¿SUUNTO_APP_URL apunta a la app?')
-  return body
+  if (answer == null) throw new ApiCallError('La respuesta no es de la API del MCP. ¿SUUNTO_APP_URL apunta a la app?')
+  return answer
 }

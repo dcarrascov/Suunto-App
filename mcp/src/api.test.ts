@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiGet, buildPath, checkBaseUrl, configFromEnv } from './api.js'
+import { apiGet, apiRequest, buildPath, checkBaseUrl, configFromEnv } from './api.js'
 import { TOOLS } from './tools.js'
 
 const TOKEN = 'k'.repeat(40)
@@ -31,6 +31,15 @@ describe('llamadas a la app', () => {
     expect(await apiGet({ baseUrl: 'https://x.example', token: TOKEN, fetchImpl }, 'perfil')).toEqual({ ok: 1 })
     expect(seen).toEqual({ url: 'https://x.example/api/mcp/v1/perfil', auth: `Bearer ${TOKEN}` })
   })
+  it('PUT con el cuerpo en JSON', async () => {
+    let seen: { method?: string; type: string | null; body: unknown } | null = null
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      seen = { method: init.method, type: new Headers(init.headers).get('content-type'), body: JSON.parse(String(init.body)) }
+      return json(200, { guardada: true })
+    }) as unknown as typeof fetch
+    expect(await apiRequest({ baseUrl: 'https://x.example', token: TOKEN, fetchImpl }, 'PUT', 'propuestas/2026-11-30', {}, { modo: 'sin_entrenador' })).toEqual({ guardada: true })
+    expect(seen).toEqual({ method: 'PUT', type: 'application/json', body: { modo: 'sin_entrenador' } })
+  })
   it('errores explicados en español', async () => {
     const cfg = (res: Response | Error) => ({
       baseUrl: 'https://x.example', token: TOKEN,
@@ -51,7 +60,17 @@ describe('herramientas', () => {
     expect(TOOLS.map(t => t.name)).toEqual([
       'perfil_atleta', 'listar_actividades', 'ver_actividad', 'resumen_semanal', 'estado_de_forma',
       'records_y_predicciones', 'distribucion_intensidad', 'plan_entrenador', 'estilo_entrenador', 'competiciones', 'comparar_semana',
+      'propuestas_guardadas', 'guardar_propuesta_semana', 'borrar_propuesta',
     ])
+    // solo las propuestas escriben, y solo borrar_propuesta destruye algo
+    expect(TOOLS.filter(t => t.write).map(t => [t.name, t.write!.method, !!t.write!.destructive])).toEqual([
+      ['guardar_propuesta_semana', 'PUT', false], ['borrar_propuesta', 'DELETE', true],
+    ])
+    const save = TOOLS.find(t => t.name === 'guardar_propuesta_semana')!
+    expect(save.route({ semana: '2026-11-30' })).toEqual(['propuestas/2026-11-30', {}])
+    expect(save.write!.body!({ modo: 'como_entrenador', explicacion: 'x', sesiones: [], semana: '2026-11-30' }))
+      .toEqual({ modo: 'como_entrenador', explicacion: 'x', sesiones: [], reemplazar: false })
+    expect(route('borrar_propuesta', { semana: '2026-11-30', modo: 'sin_entrenador' })).toEqual(['propuestas/2026-11-30', { modo: 'sin_entrenador' }])
     expect(route('estilo_entrenador', { antes_de: '2026-11-23' })).toEqual(['estilo', { antes_de: '2026-11-23' }])
     expect(route('ver_actividad', { id: 42 })).toEqual(['actividades/42', {}])
     expect(route('listar_actividades', { solo_competiciones: true })[1]).toMatchObject({ competiciones: true })

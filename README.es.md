@@ -325,7 +325,7 @@ Por defecto la app solo se abre en el ordenador donde se ejecuta, sin login. Par
 
 ## Habla con Claude de tus entrenamientos (MCP)
 
-Además del entrenador IA de la app, puedes conectar **Claude Desktop** o **Claude Code** a la app con su MCP y preguntarle por tus actividades, tu forma, tus récords, el plan de tu entrenador y tus competiciones en una conversación normal, con tu suscripción de Claude y sin clave de API. Funciona con la app en tu ordenador o en tu servidor, es de solo lectura y nunca manda rutas GPS. Paso a paso: [GUIA_MCP.md](GUIA_MCP.md).
+Además del entrenador IA de la app, puedes conectar **Claude Desktop** o **Claude Code** a la app con su MCP y preguntarle por tus actividades, tu forma, tus récords, el plan de tu entrenador y tus competiciones en una conversación normal, con tu suscripción de Claude y sin clave de API. Funciona con la app en tu ordenador o en tu servidor, nunca manda rutas GPS y lo único que puede guardar son las semanas que te proponga Claude, cuando se lo pidas. Paso a paso: [GUIA_MCP.md](GUIA_MCP.md).
 
 ## Qué datos de Suunto verás
 

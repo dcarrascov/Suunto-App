@@ -205,12 +205,14 @@ export function authMiddleware(
 export function authPlugin(): Plugin {
   let env: Record<string, string> = {}
   let dataDir = ''
-  const mcp = () => mcpHandler(() => dataDir)
+  let demo = false
+  const mcp = () => mcpHandler(() => dataDir, undefined, () => demo)
   return {
     name: 'suunto-auth',
     configResolved(config) {
       env = loadEnv(config.mode, config.root, '')   // prefijo '' = todas las variables, solo en el servidor
       dataDir = join(config.publicDir, 'data')
+      demo = config.mode === 'demo'
     },
     configureServer(server) {
       server.middlewares.use(authMiddleware(env, mcp()))

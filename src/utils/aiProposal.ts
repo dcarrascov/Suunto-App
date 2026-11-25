@@ -1,11 +1,11 @@
 // Lee la propuesta de semana que devuelve Gemini (pegada a mano) y la compara con la del entrenador.
 
-import type { PlannedEvent, PlannedWorkout } from '../types/suunto'
-import type { AiProposal, AiWorkout } from '../stores/aiStore'
-import { FAMILY_OF, sessionType, weekdayIndex } from './coach'
-import type { SessionFamily, SessionType } from './coach'
-import { localWeekStart } from './calculations'
-import { parseLocalDate } from './date'
+import type { PlannedEvent, PlannedWorkout } from '../types/suunto.ts'
+import type { AiProposal, AiWorkout } from '../stores/aiStore.ts'
+import { FAMILY_OF, sessionType, weekdayIndex } from './coach.ts'
+import type { SessionFamily, SessionType } from './coach.ts'
+import { localWeekStart } from './calculations.ts'
+import { parseLocalDate } from './date.ts'
 
 const TYPES: SessionType[] = ['rodaje', 'progresivo', 'rectas', 'series', 'cuestas', 'cambios', 'activacion', 'competicion', 'fuerza', 'natacion', 'descanso', 'otro']
 

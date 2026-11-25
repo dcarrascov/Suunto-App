@@ -10,7 +10,9 @@ los datos que necesita: actividades, forma, récords, plan del entrenador y comp
 Claude Desktop ──► MCP (en tu ordenador) ──► tu app (en tu ordenador o en tu servidor)
 ```
 
-Por ahora **solo lee**: guardar en la app las semanas que proponga Claude llegará más adelante. El diseño completo está
+Casi todo es **de lectura**. Lo único que escribe es guardar o borrar en la app las semanas que te proponga Claude, y
+solo cuando se lo pidas: aparecen en Entrenador IA y Plan como «PROPUESTA IA», desde donde las pasas al calendario si
+te gustan. El diseño completo está
 en [docs/DISENO_MCP.md](docs/DISENO_MCP.md).
 
 ## Qué puedes preguntarle
@@ -98,7 +100,8 @@ claude mcp add suunto-stats --scope user --env SUUNTO_APP_URL=https://suunto.tud
 ## 5. Pruébalo
 
 Pregúntale a Claude «¿cómo voy de forma?». La primera vez te pedirá permiso para usar cada herramienta. Todas son de
-**solo lectura**, así que puedes permitirlas siempre.
+**solo lectura** salvo `guardar_propuesta_semana` y `borrar_propuesta`, así que puedes permitir siempre las de lectura
+y que te pregunte por esas dos.
 
 ## Herramientas
 
@@ -115,6 +118,12 @@ Pregúntale a Claude «¿cómo voy de forma?». La primera vez te pedirá permis
 | `estilo_entrenador` | Cómo planifica tu entrenador, en resumen, con sus 2 últimas semanas de ejemplo |
 | `competiciones` | Próximas (con predicción) y pasadas (con resultado) |
 | `comparar_semana` | Lo planificado frente a lo hecho en una semana, día a día |
+| `propuestas_guardadas` | Las semanas propuestas que ya están en la app (de Claude o del Entrenador IA) |
+| `guardar_propuesta_semana` | **Escribe:** guarda en la app una semana propuesta (como tu entrenador o sin entrenador) |
+| `borrar_propuesta` | **Escribe:** borra una semana que guardó Claude (no toca las demás ni el calendario) |
+
+Para guardar una, pídeselo con naturalidad: «propónme la semana que viene como mi entrenador y, si te parece bien,
+guárdala». La verás en Entrenador IA y Plan en cuanto abras la app o vuelvas a ella.
 
 ## Privacidad y seguridad
 
@@ -129,7 +138,9 @@ Pregúntale a Claude «¿cómo voy de forma?». La primera vez te pedirá permis
 - **En tu servidor,** esa ruta no pasa por Authelia, pero sí por Traefik, con límite de peticiones. Traefik borra
   cualquier cabecera de usuario que llegue de fuera, y la ruta sigue exigiendo el secreto del proxy, como el resto.
   A quien llega sin token, la app le responde como si la ruta no existiera.
-- **El MCP no puede cambiar nada:** ni en la app, ni en Suunto, ni en TrainingPeaks.
+- **Lo único que puede cambiar son sus propuestas de semana en la app.** Se validan como las de la app (fechas de esa
+  semana, números con sentido, entre 12 semanas atrás y 26 adelante), no pisa una que ya exista salvo que se le pida y
+  solo borra las que guardó él. Nunca toca Suunto, TrainingPeaks, tus actividades, tus ajustes ni el calendario.
 - **El token queda escrito en la configuración de Claude Desktop de tu ordenador:** protege tu cuenta de Windows y no
   compartas ese fichero.
 - **Si crees que el token se ha filtrado,** cambia `MCP_TOKEN` en el servidor (y en Claude) y el viejo deja de valer.

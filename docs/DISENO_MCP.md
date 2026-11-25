@@ -1,7 +1,9 @@
 # MCP de Suunto Stats: diseño
 
 > **Estado (24-11-2026):** la **fase 1 (lectura) está hecha**: `server/auth.ts`, `server/mcpApi.ts`,
-> `server/mcpData.ts`, `mcp/` y la ruta de Traefik. La fase 2 (guardar propuestas) está sin hacer; de la fase 3 ya está
+> `server/mcpData.ts`, `mcp/` y la ruta de Traefik. La **fase 2 también está hecha** (`server/mcpProposals.ts`):
+> `guardar_propuesta_semana`, `borrar_propuesta` y `propuestas_guardadas` escriben en la parte «entrenador IA» guardada en el
+> servidor, y la app las recibe al sincronizar (no hizo falta pantalla nueva). De la fase 3 ya está
 > la sincronización entre dispositivos (`server/userState.ts` y `src/utils/stateSync.ts`). Cómo usarlo:
 > [GUIA_MCP.md](../GUIA_MCP.md).
 >
