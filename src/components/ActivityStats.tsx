@@ -110,7 +110,7 @@ export default function ActivityStats({ detail }: { detail: ActivityDetail }) {
 
   return (
     <section className="mb-6">
-      <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Estadísticas</h2>
+      <h2 className="text-xs text-slate-500 mb-3">Estadísticas</h2>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {visible.map(section => (
           <div key={section.title}>

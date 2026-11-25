@@ -42,7 +42,7 @@ export default function BestEfforts({ act }: { act: ActivitySummary }) {
 
   return (
     <section className="mb-6">
-      <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+      <h2 className="text-xs text-slate-500 mb-3">
         Mejores tramos{approx && <span className="normal-case tracking-normal text-slate-600"> · aprox. con los parciales</span>}
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -50,8 +50,8 @@ export default function BestEfforts({ act }: { act: ActivitySummary }) {
           <div key={r.key} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500">{r.label}</span>
-              {r.badge === 'pr' && <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-accent text-black">RÉCORD</span>}
-              {r.badge === 'year' && <span className="text-[10px] px-1.5 py-0.5 border border-slate-600 text-slate-300">Mejor del año</span>}
+              {r.badge === 'pr' && <span className="text-[11px] font-medium px-1.5 py-0.5 bg-accent text-black">Récord</span>}
+              {r.badge === 'year' && <span className="text-[11px] px-1.5 py-0.5 border border-slate-600 text-slate-300">Mejor del año</span>}
             </div>
             <div className="text-lg font-mono font-semibold text-slate-100 mt-1">
               {approx && <span className="text-slate-500 text-sm">≈ </span>}{formatRaceTime(r.secs)}

@@ -34,6 +34,8 @@
   --radius-2xl: 6px;
 
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* cifras de cronómetro (Resumen): monoespaciada del sistema, sin descargar fuentes */
+  --font-mono: "Cascadia Mono", "SF Mono", ui-monospace, Consolas, "Liberation Mono", monospace;
 
   --color-suunto-blue: #0079c1;
   --color-suunto-dark: #003d6b;
@@ -80,17 +82,18 @@ body {
   background: var(--color-line);
   border: 1px solid var(--color-line);
 }
+/* Relleno en la cuadrícula de 4 px: 20/24 en pantallas grandes, 16 en el móvil */
 .g-cell {
   background: var(--color-cell);
-  padding: 18px 20px;
+  padding: 20px 24px;
   min-width: 0;
 }
-@media (max-width: 639px) { .g-cell { padding: 14px 16px; } }
+@media (max-width: 639px) { .g-cell { padding: 16px; } }
+/* Etiqueta de cada celda: en minúscula normal (no en mayúsculas espaciadas), gris secundario */
 .g-label {
-  color: #77777d;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  color: var(--color-slate-500);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 /* Leaflet overrides */

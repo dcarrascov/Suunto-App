@@ -22,7 +22,7 @@ export default function ActivityCard({ activity: a, compact }: Props) {
           <div className="text-sm font-medium text-slate-200 truncate">{a.title}</div>
           <div className="text-xs text-slate-500">
             {formatRelativeTime(a.startTime)} · {sportLabel(a.sport)}
-            {a.sourceFile && <span className="ml-1.5 text-[10px] font-semibold border border-slate-600 text-slate-400 px-1" title={`Del fichero ${a.sourceFile}`}>FIT</span>}
+            {a.sourceFile && <span className="ml-1.5 text-[11px] font-semibold border border-slate-600 text-slate-400 px-1" title={`Del fichero ${a.sourceFile}`}>FIT</span>}
           </div>
         </div>
         {a.aerobicTE != null && (

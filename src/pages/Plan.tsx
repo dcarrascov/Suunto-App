@@ -8,6 +8,8 @@ import { formatDuration, formatPace } from '../utils/formatters'
 import { planItems, planWeeks, shiftWeek, weekDays } from '../utils/plan'
 import type { PlanItem, PlanStatus, PlanWeek } from '../utils/plan'
 import { useAiStore } from '../stores/aiStore'
+import type { AiWorkout } from '../stores/aiStore'
+import { SESSION_LABEL } from '../utils/coach'
 import AiProposalView from '../components/AiProposalView'
 import RaceBanner from '../components/RaceBanner'
 import WeekReview from '../components/WeekReview'
@@ -124,6 +126,37 @@ function WorkoutCard({ item }: { item: PlanItem }) {
   )
 }
 
+/** Sesión de una propuesta de la IA dentro de su día (con borde de puntos y la etiqueta «IA»: no es del entrenador). */
+function AiDayCard({ workout: w }: { workout: AiWorkout }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border border-dashed border-slate-600 bg-[#121214] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="w-1 h-5 bg-accent" aria-hidden />
+            <span className="font-medium text-slate-100">{w.title}</span>
+          </div>
+          <div className="text-xs text-slate-500 mt-0.5 tabular-nums">
+            {[SESSION_LABEL[w.type], w.durationMin ? formatDuration(w.durationMin * 60) : null,
+              w.distanceKm ? `${w.distanceKm.toString().replace('.', ',')} km` : null,
+              w.tss ? `${Math.round(w.tss)} TSS` : null].filter(Boolean).join(' · ')}
+          </div>
+        </div>
+        <span className="text-[11px] font-medium border border-accent text-accent px-1.5 py-0.5">IA</span>
+      </div>
+      {w.description && (
+        <div className="mt-2">
+          <button onClick={() => setOpen(o => !o)} className="text-xs text-blue-400 hover:text-blue-300">
+            {open ? 'Ocultar detalles' : 'Ver detalles'}
+          </button>
+          {open && <p className="mt-2 text-sm text-slate-300 whitespace-pre-line leading-relaxed">{w.description}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function WeekSummary({ week }: { week: PlanWeek | undefined }) {
   if (!week || week.planned === 0) return null
   const pct = Math.round(week.done / week.planned * 100)
@@ -136,7 +169,7 @@ function WeekSummary({ week }: { week: PlanWeek | undefined }) {
         { label: 'No hechas', value: String(week.missed), sub: week.missed ? 'sesiones pasadas sin hacer' : 'ninguna' },
       ].map(c => (
         <div key={c.label} className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-3">
-          <div className="text-xs text-slate-500 uppercase tracking-wider">{c.label}</div>
+          <div className="text-xs text-slate-500">{c.label}</div>
           <div className="text-xl font-bold text-slate-100 mt-1">{c.value}</div>
           <div className="text-xs text-slate-500">{c.sub}</div>
         </div>
@@ -166,6 +199,8 @@ export default function Plan() {
   )
   const weeks = useMemo(() => planWeeks(items), [items])
   const current = weeks.find(w => w.weekStart === week)
+  // Las sesiones de la IA van en los días solo si el entrenador no ha planificado esa semana (si no, se mezclarían)
+  const inlineProposal = current?.items.some(it => it.workout.hasPlan) ? undefined : (aiProposal ?? freeProposal)
   const history = weeks.filter(w => w.weekStart < thisWeek)
 
   if (!plan) {
@@ -217,27 +252,39 @@ export default function Plan() {
 
       <WeekReview key={week} weekStart={week} />
 
-      {/* Propuesta de la IA para esta semana (si la hay): aparte del plan del entrenador */}
+      {/* Propuestas de la IA para esta semana: si el entrenador no ha planificado nada, sus sesiones van en cada día
+          (marcadas «IA»); la propuesta completa (pasar al calendario, borrar, comparar) se abre aquí */}
       {aiProposal && (
-        <details className="mb-6">
-          <summary className="text-xs text-slate-400 cursor-pointer hover:text-white mb-2">
-            Hay una propuesta de la IA para esta semana · <Link to="/ia" className="text-accent">Entrenador IA</Link>
+        <details className="mb-6 border border-dashed border-slate-600 px-3 py-2">
+          <summary className="text-xs text-slate-300 cursor-pointer hover:text-white flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium border border-accent text-accent px-1.5 py-0.5">Propuesta IA</span>
+            {inlineProposal === aiProposal ? 'Sus sesiones están en cada día' : 'Hay una propuesta de la IA para esta semana'}
+            {aiProposal.model ? ` · ${aiProposal.model}` : ''}
+            <span className="text-slate-500">· pasar al calendario, borrar o comparar</span>
+            <Link to="/ia" className="text-accent ml-auto">Entrenador IA →</Link>
           </summary>
-          <AiProposalView
-            proposal={aiProposal}
-            onDelete={() => { if (window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(week)}?`)) deleteProposal(week) }}
-          />
+          <div className="mt-3">
+            <AiProposalView
+              proposal={aiProposal}
+              onDelete={() => { if (window.confirm(`¿Borrar la propuesta de la IA de la semana del ${weekLabel(week)}?`)) deleteProposal(week) }}
+            />
+          </div>
         </details>
       )}
       {freeProposal && (
-        <details className="mb-6">
-          <summary className="text-xs text-slate-400 cursor-pointer hover:text-white mb-2">
-            Hay una semana de la IA sin entrenador · <Link to="/ia" className="text-accent">Entrenador IA</Link>
+        <details className="mb-6 border border-dashed border-slate-600 px-3 py-2">
+          <summary className="text-xs text-slate-300 cursor-pointer hover:text-white flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium border border-accent text-accent px-1.5 py-0.5">IA · sin entrenador</span>
+            {inlineProposal === freeProposal ? 'Sus sesiones están en cada día' : 'Hay una semana de la IA sin entrenador'}
+            <span className="text-slate-500">· pasar al calendario, borrar</span>
+            <Link to="/ia" className="text-accent ml-auto">Entrenador IA →</Link>
           </summary>
-          <AiProposalView
-            proposal={freeProposal}
-            onDelete={() => { if (window.confirm(`¿Borrar la semana sin entrenador del ${weekLabel(week)}?`)) deleteFreeProposal(week) }}
-          />
+          <div className="mt-3">
+            <AiProposalView
+              proposal={freeProposal}
+              onDelete={() => { if (window.confirm(`¿Borrar la semana sin entrenador del ${weekLabel(week)}?`)) deleteFreeProposal(week) }}
+            />
+          </div>
         </details>
       )}
 
@@ -245,9 +292,10 @@ export default function Plan() {
         {days.map(day => {
           const dayItems = (current?.items ?? []).filter(it => it.workout.date === day)
           const dayEvents = eventsOfDay.get(day) ?? []
+          const dayAi = (inlineProposal?.workouts ?? []).filter(w => w.date === day && w.type !== 'descanso')
           return (
             <div key={day}>
-              <div className={`text-xs uppercase tracking-wider mb-2 ${day === today ? 'text-blue-300 font-semibold' : 'text-slate-500'}`}>
+              <div className={`text-xs mb-2 first-letter:uppercase ${day === today ? 'text-blue-300 font-semibold' : 'text-slate-500'}`}>
                 {dayLabel(day)}{day === today && ' · hoy'}
               </div>
               {dayEvents.length > 0 && (
@@ -256,7 +304,11 @@ export default function Plan() {
                 </div>
               )}
               {dayItems.length === 0 ? (
-                dayEvents.length === 0 && <div className="text-xs text-slate-600 pl-1">Sin entreno planificado</div>
+                dayAi.length > 0 ? (
+                  <div className="space-y-2">
+                    {dayAi.map((w, i) => <AiDayCard key={`${day}-${i}`} workout={w} />)}
+                  </div>
+                ) : dayEvents.length === 0 && <div className="text-xs text-slate-600 pl-1">Sin entreno planificado</div>
               ) : (
                 <div className="space-y-2">
                   {dayItems.map(it => <WorkoutCard key={it.workout.id} item={it} />)}
