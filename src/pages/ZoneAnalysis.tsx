@@ -166,7 +166,7 @@ export default function ZoneAnalysis() {
 
       {weeklyZoneData.length > 0 && (
         <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wider mb-4">Distribución semanal (últimas 24 semanas)</div>
+          <div className="text-xs text-slate-500 mb-4">Distribución semanal (últimas 24 semanas)</div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={weeklyZoneData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#26262b" />

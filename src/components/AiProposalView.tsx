@@ -46,11 +46,11 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">PROPUESTA IA{free ? ' · SIN ENTRENADOR' : ''}</span>
+            <span className="text-[11px] font-medium border border-slate-500 text-slate-300 px-1.5 py-0.5">Propuesta IA{free ? ' · sin entrenador' : ''}</span>
             <span className="text-sm text-slate-200">Semana del {parseLocalDate(proposal.weekStart).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {formatDuration(totalMin * 60)} · {Math.round(totalTss)} TSS · generada el {proposal.createdAt}{proposal.model ? ` con ${proposal.model}` : ''}{free ? '' : ' · no es el plan de tu entrenador'}
+            {formatDuration(totalMin * 60)}{totalTss > 0 ? ` · ${Math.round(totalTss)} TSS` : ''} · generada el {proposal.createdAt}{proposal.model ? ` con ${proposal.model}` : ''}{free ? '' : ' · no es el plan de tu entrenador'}
           </div>
         </div>
         {cmp ? (
@@ -110,7 +110,7 @@ export default function AiProposalView({ proposal, onDelete }: { proposal: AiPro
           <div className="grid grid-cols-7 gap-px bg-line border border-line text-center">
             {cmp.days.map(d => (
               <div key={d.weekday} className="bg-cell p-1.5">
-                <div className="text-[10px] text-slate-500">{DAYS[d.weekday]}</div>
+                <div className="text-[11px] text-slate-500">{DAYS[d.weekday]}</div>
                 <div className="text-[11px] text-slate-200 mt-1">{d.coach.map(f => FAMILY_LABEL[f]).join('+')}</div>
                 <div className="text-[11px] text-slate-400">{d.ai.map(f => FAMILY_LABEL[f]).join('+')}</div>
                 <div className="mt-1 h-1" style={{ background: d.score === 1 ? '#c5f23c' : d.score > 0 ? '#fbbf24' : '#3a3a40' }} />

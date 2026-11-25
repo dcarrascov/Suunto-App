@@ -90,7 +90,7 @@ export default function ActivityDetailPage() {
           <h1 className="text-xl font-bold text-slate-100">{act.title}</h1>
           <div className="text-sm text-slate-500 mt-0.5">
             {formatDate(act.startTime)} · {sportLabel(act.sport)}
-            {act.sourceFile && <span className="ml-2 text-[10px] font-semibold border border-slate-600 text-slate-400 px-1.5 py-0.5">FIT · {act.sourceFile}</span>}
+            {act.sourceFile && <span className="ml-2 text-[11px] font-semibold border border-slate-600 text-slate-400 px-1.5 py-0.5">FIT · {act.sourceFile}</span>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -148,7 +148,7 @@ export default function ActivityDetailPage() {
       {/* HR Zones */}
       {detail?.hrZones && detail.hrZones.length > 0 && (
         <section className="mb-6">
-          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">Zonas de frecuencia cardíaca</h2>
+          <h2 className="text-xs text-slate-500 mb-3">Zonas de frecuencia cardíaca</h2>
           <div className="space-y-2">
             {detail.hrZones.map((zone) => {
               const total = detail.hrZones.reduce((s, z) => s + z.seconds, 0)
@@ -175,7 +175,7 @@ export default function ActivityDetailPage() {
       {/* Laps */}
       {detail?.laps && detail.laps.length > 1 && (
         <section className="mb-6">
-          <h2 className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+          <h2 className="text-xs text-slate-500 mb-3">
             Parciales ({detail.laps.length})
           </h2>
           <div className="overflow-x-auto">
@@ -204,7 +204,7 @@ export default function ActivityDetailPage() {
                         <td className="py-2 pr-4 font-mono text-slate-200 whitespace-nowrap">
                           {formatPace(lap.avgPace)}
                           {z && (
-                            <span className="ml-2 text-[10px] font-sans px-1.5 py-0.5 rounded-full"
+                            <span className="ml-2 text-[11px] font-sans px-1.5 py-0.5 rounded-full"
                               style={{ color: z.color, background: z.color + '1a' }} title={z.name}>
                               Z{z.zone}
                             </span>

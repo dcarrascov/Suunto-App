@@ -363,6 +363,22 @@ export function predictRaces(activities: ActivitySummary[], sinceDate: string, u
 }
 
 /**
+ * Predicción para una distancia exacta (la de una competición): la de distancia más parecida de `predictRaces`,
+ * llevada a `km` con Riegel. Sin `km`, la de `fallbackLabel`. Null si no hay tramos.
+ */
+export function predictForDistance(
+  activities: ActivitySummary[], sinceDate: string, km: number | null, fallbackLabel = '10 km',
+): RacePrediction | null {
+  const preds = predictRaces(activities, sinceDate)
+  if (!km) return preds.find(p => p.label === fallbackLabel) ?? null
+  const base = preds.reduce<RacePrediction | null>(
+    (best, p) => (!best || Math.abs(Math.log(p.km / km)) < Math.abs(Math.log(best.km / km)) ? p : best), null)
+  if (!base) return null
+  const seconds = Math.round(riegel(base.seconds, base.km, km))
+  return { ...base, seconds, pace: Math.round(seconds / km), label: `${km.toLocaleString('es-ES')} km` }
+}
+
+/**
  * Ritmo umbral estimado (s/km) = ritmo que se puede mantener ~60 min, por Riegel desde
  * el tramo reciente más largo (de 5 km o más). null si no hay datos.
  */

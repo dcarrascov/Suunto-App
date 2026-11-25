@@ -6,8 +6,8 @@ export default function RaceBanner({ event }: { event: PlannedEvent }) {
   return (
     <div className="border border-accent/60 bg-accent/5 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold bg-accent text-black px-1.5 py-0.5">COMPETICIÓN</span>
-        {event.priority && <span className="text-[10px] font-semibold border border-accent text-accent px-1.5 py-0.5">PRIORIDAD {event.priority}</span>}
+        <span className="text-[11px] font-medium bg-accent text-black px-1.5 py-0.5">Competición</span>
+        {event.priority && <span className="text-[11px] font-medium border border-accent text-accent px-1.5 py-0.5">Prioridad {event.priority}</span>}
         <Link to="/races" className="ml-auto text-xs text-slate-500 hover:text-white">Competiciones →</Link>
       </div>
       <div className="text-lg font-semibold text-slate-100 mt-2">{event.name}</div>

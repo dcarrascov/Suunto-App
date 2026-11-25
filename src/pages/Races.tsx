@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivityStore } from '../stores/activityStore'
 import { useFitnessProjection } from '../hooks/useFitnessProjection'
-import { formState, predictRaces, RACE_FORM_BAND, riegel } from '../utils/calculations'
+import { formState, predictForDistance, RACE_FORM_BAND } from '../utils/calculations'
 import { isoDateOffset } from '../utils/date'
 import { formatPace, formatRaceTime } from '../utils/formatters'
 import { eventLabel, findRaces } from '../utils/races'
@@ -35,16 +35,10 @@ export default function Races() {
   // Predicción para la distancia de la próxima competición (la de TrainingPeaks) o, si no se sabe, la habitual
   const usualLabel = past.find(r => r.standardLabel)?.standardLabel ?? '10 km'
   const targetKm = next?.event?.distanceKm ?? null
-  const nowPrediction = useMemo(() => {
-    const preds = predictRaces(activities, isoDateOffset(90))
-    if (!targetKm) return preds.find(p => p.label === usualLabel) ?? null
-    // la predicción de distancia más parecida, llevada a la distancia exacta de la carrera
-    const base = preds.reduce<(typeof preds)[number] | null>(
-      (best, p) => (!best || Math.abs(Math.log(p.km / targetKm)) < Math.abs(Math.log(best.km / targetKm)) ? p : best), null)
-    if (!base) return null
-    const seconds = Math.round(riegel(base.seconds, base.km, targetKm))
-    return { ...base, seconds, pace: Math.round(seconds / targetKm), label: `${targetKm.toLocaleString('es-ES')} km` }
-  }, [activities, usualLabel, targetKm])
+  const nowPrediction = useMemo(
+    () => predictForDistance(activities, isoDateOffset(90), targetKm, usualLabel),
+    [activities, usualLabel, targetKm],
+  )
   const later = upcoming.slice(1, 4)
 
   return (
@@ -60,7 +54,7 @@ export default function Races() {
           <div className="g-cell col-span-12 md:col-span-4">
             <div className="flex items-center gap-2">
               <span className="g-label">Próxima competición</span>
-              {next.event?.priority && <span className="text-[10px] font-semibold bg-accent text-black px-1.5">{next.event.priority}</span>}
+              {next.event?.priority && <span className="text-[11px] font-semibold bg-accent text-black px-1.5">{next.event.priority}</span>}
             </div>
             <div className="text-2xl font-semibold text-slate-100 mt-2">{next.event?.name ?? 'Competición'}</div>
             <div className="text-xs text-slate-500 mt-1 first-letter:uppercase">
@@ -127,8 +121,8 @@ export default function Races() {
                       <Link to={`/activity/${a.id}`} className="text-slate-100 hover:text-accent">
                         {r.event?.name ?? <span className="first-letter:uppercase">{dayLabel(r.date)}</span>}
                       </Link>
-                      {r.event?.priority && <span className="ml-2 text-[10px] font-semibold bg-accent text-black px-1">{r.event.priority}</span>}
-                      {r.source === 'manual' && <span className="ml-2 text-[10px] text-slate-500 border border-slate-700 px-1">manual</span>}
+                      {r.event?.priority && <span className="ml-2 text-[11px] font-semibold bg-accent text-black px-1">{r.event.priority}</span>}
+                      {r.source === 'manual' && <span className="ml-2 text-[11px] text-slate-500 border border-slate-700 px-1">manual</span>}
                       {r.event && <div className="text-xs text-slate-500 first-letter:uppercase">{dayLabel(r.date)}</div>}
                     </td>
                     <td className="py-2.5 pr-4 text-slate-300 whitespace-nowrap">

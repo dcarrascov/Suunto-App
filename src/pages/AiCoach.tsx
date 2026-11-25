@@ -24,7 +24,8 @@ function weekLabel(weekStart: string): string {
   return `${f(d)} – ${f(end)}`
 }
 
-const TEXTAREA = 'w-full bg-slate-900 border border-slate-700 text-sm text-slate-200 p-3 placeholder:text-slate-600'
+const PROPOSALS_SHOWN = 3   // las demás semanas guardadas, con «Ver las anteriores»
+const TEXTAREA ='w-full bg-slate-900 border border-slate-700 text-sm text-slate-200 p-3 placeholder:text-slate-600'
 const PRIMARY = 'bg-accent text-black text-sm font-medium px-3 py-1.5 hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100'
 const SECONDARY = 'border border-slate-600 text-sm text-slate-200 px-3 py-1.5 hover:border-slate-400 disabled:opacity-40'
 
@@ -84,6 +85,7 @@ export default function AiCoach() {
   const [answers, setAnswers] = useState<{ q: string; a: string; model: string; fellBack: boolean }[]>([])
   const [busy, setBusy] = useState<null | 'question' | 'profile' | 'week'>(null)
   const [error, setError] = useState<{ where: 'question' | 'profile' | 'week'; text: string } | null>(null)
+  const [allShown, setAllShown] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -202,6 +204,21 @@ export default function AiCoach() {
 
       <SetupNotice status={status} />
 
+      {/* Tus semanas guardadas, lo primero (las genera la app o Claude por el MCP); generar y preguntar van debajo */}
+      {savedProposals.length > 0 && (
+        <div className="mb-8 space-y-4">
+          <div className="g-label">Tus semanas · {mode === 'coach' ? 'como tu entrenador' : 'sin entrenador'} · {savedProposals.length}</div>
+          {savedProposals.slice(0, allShown ? undefined : PROPOSALS_SHOWN).map(p => (
+            <AiProposalView key={p.weekStart} proposal={p} onDelete={() => removeProposal(p.weekStart)} />
+          ))}
+          {savedProposals.length > PROPOSALS_SHOWN && (
+            <button onClick={() => setAllShown(v => !v)} className="w-full py-2 border border-slate-700 text-sm text-slate-400 hover:text-slate-200">
+              {allShown ? 'Ver solo las últimas' : `Ver las anteriores (${savedProposals.length - PROPOSALS_SHOWN})`}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="g-grid">
         {mode === 'free' && (
           <div className="g-cell col-span-12 space-y-3">
@@ -313,15 +330,6 @@ export default function AiCoach() {
           ))}
         </div>
       </div>
-      {savedProposals.length > 0 && (
-        <div className="mt-8 space-y-4">
-          <div className="g-label">Semanas generadas · {mode === 'coach' ? 'como tu entrenador' : 'sin entrenador'}</div>
-          {savedProposals.map(p => (
-            <AiProposalView key={p.weekStart} proposal={p} onDelete={() => removeProposal(p.weekStart)} />
-          ))}
-        </div>
-      )}
-
     </div>
   )
 }

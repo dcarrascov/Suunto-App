@@ -118,7 +118,7 @@ export default function CalendarPage() {
             title={[`${w.source === 'ia' ? 'Propuesta IA' : 'Propio'}: ${w.title}`, customSummary(w), w.description].filter(Boolean).join('\n')}
           >
             <span className="w-0.5 h-3 shrink-0" style={{ background: sportColor(w.sport) }} />
-            {w.source === 'ia' && <span className="text-[9px] font-semibold text-accent shrink-0">IA</span>}
+            {w.source === 'ia' && <span className="text-[11px] font-semibold text-accent shrink-0">IA</span>}
             <span className="truncate">{w.title}</span>
           </button>
         ))}
@@ -127,9 +127,9 @@ export default function CalendarPage() {
   }
   const dayBadges = (day: string) => (
     <>
-      {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[9px] font-semibold bg-accent text-black px-1">CARRERA</span>}
+      {raceDays.has(day) && !eventsOfDay.has(day) && <span className="text-[11px] font-medium bg-accent text-black px-1">Carrera</span>}
       {eventsOfDay.get(day)?.some(e => e.priority) && (
-        <span className="text-[9px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
+        <span className="text-[11px] font-semibold bg-accent text-black px-1">{eventsOfDay.get(day)!.find(e => e.priority)!.priority}</span>
       )}
       <button
         onClick={() => setDialog({ id: null, form: { ...EMPTY_FORM, date: day } })}
@@ -211,7 +211,7 @@ export default function CalendarPage() {
                 return (
                   <div key={day} className={`flex gap-3 px-3 py-2 bg-cell border-t border-line ${day === today ? 'outline outline-1 outline-accent -outline-offset-1' : ''}`}>
                     <div className={`w-11 shrink-0 text-xs ${day === today ? 'text-accent font-semibold' : 'text-slate-500'}`}>
-                      <div className="uppercase">{WEEKDAYS[(d.getDay() + 6) % 7]}</div>
+                      <div className="first-letter:uppercase">{WEEKDAYS[(d.getDay() + 6) % 7]}</div>
                       <div className="text-base text-slate-200">{d.getDate()}</div>
                     </div>
                     <div className="flex-1 min-w-0 space-y-1 pt-0.5">

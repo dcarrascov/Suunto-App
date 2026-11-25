@@ -93,10 +93,10 @@ export default function Shoes() {
             <div className="text-base font-semibold text-slate-100">{s.name}</div>
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               {s.tagIds.map(id => (
-                <span key={id} className="text-[10px] font-semibold border border-slate-500 text-slate-300 px-1.5 py-0.5">{tagName(id).toUpperCase()}</span>
+                <span key={id} className="text-[11px] font-medium border border-slate-500 text-slate-300 px-1.5 py-0.5">{tagName(id).toUpperCase()}</span>
               ))}
-              {isDefault && <span className="text-[10px] font-semibold bg-accent text-black px-1.5 py-0.5">POR DEFECTO</span>}
-              {s.retiredDate && <span className="text-[10px] text-slate-500">retiradas el {fmtDate(s.retiredDate)}</span>}
+              {isDefault && <span className="text-[11px] font-medium bg-accent text-black px-1.5 py-0.5">Por defecto</span>}
+              {s.retiredDate && <span className="text-[11px] text-slate-500">retiradas el {fmtDate(s.retiredDate)}</span>}
             </div>
           </div>
           <div className="text-right">
