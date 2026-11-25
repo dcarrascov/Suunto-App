@@ -1,8 +1,12 @@
 # MCP de Suunto Stats: diseño
 
 > **Estado (24-11-2026):** la **fase 1 (lectura) está hecha**: `server/auth.ts`, `server/mcpApi.ts`,
-> `server/mcpData.ts`, `server/settingsSync.ts`, `mcp/` y la ruta de Traefik. La fase 2 (guardar propuestas) y la 3 están
-> sin hacer. Cómo usarlo: [GUIA_MCP.md](../GUIA_MCP.md).
+> `server/mcpData.ts`, `mcp/` y la ruta de Traefik. La fase 2 (guardar propuestas) está sin hacer; de la fase 3 ya está
+> la sincronización entre dispositivos (`server/userState.ts` y `src/utils/stateSync.ts`). Cómo usarlo:
+> [GUIA_MCP.md](../GUIA_MCP.md).
+>
+> **Cambio posterior:** `ajustes.json` y `PUT /api/ajustes` (apartados 3.4, 4.2 y 7) se sustituyeron por esa
+> sincronización: los ajustes, como las demás partes, se guardan en `public/data/estado/` y el MCP los lee de ahí.
 >
 > Cambios frente a lo previsto: el MCP tiene 11 herramientas de lectura (`propuestas_guardadas` pasa a la fase 2) y la
 > app limita a 60 peticiones por minuto, además de las 30 por minuto de Traefik.

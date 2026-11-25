@@ -37,8 +37,9 @@ export default function BackupSection() {
     <div className="space-y-3">
       <div className="g-label">Copia de seguridad</div>
       <p className="text-xs text-slate-500">
-        Lo que guardas en la app vive solo en este navegador: {Object.values(BACKUP_KEYS).join('; ').toLowerCase()}.
-        Si borras los datos del navegador o cambias de ordenador, se pierde. Descarga una copia de vez en cuando.
+        Lo que guardas en la app: {Object.values(BACKUP_KEYS).join('; ').toLowerCase()}. Se guarda en este navegador y
+        también en el servidor de la app, para verlo igual en todos tus dispositivos. Descarga una copia de vez en cuando
+        por si se pierde el servidor.
       </p>
       <div className="flex flex-wrap gap-2">
         <button onClick={exportBackup} className="px-3 py-1.5 text-sm font-medium bg-accent text-black hover:brightness-110">

@@ -129,7 +129,7 @@ Para que se actualice sola, crea en Dokploy una **Schedule Job** de tipo Compose
 
 ## Lo que debes saber
 
-- **Lo guardado en el navegador no se comparte entre dispositivos:** zapatillas, ajustes, entrenos propios y propuestas de la IA. Pásalos con **Ajustes → Copia de seguridad**.
+- **Zapatillas, ajustes, entrenos propios y propuestas de la IA se ven igual en todos tus dispositivos:** se guardan también en el servidor y cada dispositivo se pone al día al abrir la app. La primera vez, abre la app desde el dispositivo que ya tiene esos datos.
 - **Si caduca la sesión** con la app abierta, recarga la página para volver a identificarte.
 
 ## Problemas
