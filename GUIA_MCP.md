@@ -11,9 +11,8 @@ Claude Desktop ──► MCP (en tu ordenador) ──► tu app (en tu ordenador
 ```
 
 Casi todo es **de lectura**. Lo único que escribe es guardar o borrar en la app las semanas que te proponga Claude, y
-solo cuando se lo pidas: aparecen en Entrenador IA y Plan como «PROPUESTA IA», desde donde las pasas al calendario si
-te gustan. El diseño completo está
-en [docs/DISENO_MCP.md](docs/DISENO_MCP.md).
+solo cuando se lo pidas: aparecen en Entrenador IA y Plan como «Propuesta IA», desde donde las pasas al calendario si
+te gustan.
 
 ## Qué puedes preguntarle
 

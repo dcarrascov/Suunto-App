@@ -22,7 +22,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 // Si llega alguna de estas, hay un proxy delante aunque la conexión parezca local
 const PROXY_HEADERS = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip']
 
-// API del MCP (server/mcpApi.ts): sin Authelia, con su propio token. Ver docs/DISENO_MCP.md
+// API del MCP (server/mcpApi.ts): sin Authelia, con su propio token. Ver GUIA_MCP.md
 export const MCP_PREFIX = '/api/mcp/'
 
 export type Access =

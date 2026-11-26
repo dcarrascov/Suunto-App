@@ -1,6 +1,6 @@
-// Propuestas de semana que guarda Claude por el MCP (fase 2, docs/DISENO_MCP.md). Se escriben en la parte «entrenador IA»
+// Propuestas de semana que guarda Claude por el MCP (fase 2 del MCP, GUIA_MCP.md). Se escriben en la parte «entrenador IA»
 // que la app guarda en el servidor (public/data/estado/suunto-ai.json, server/userState.ts), así que tu app las recibe
-// sola al sincronizar y las enseña como cualquier propuesta: «PROPUESTA IA», con «Pasar al calendario» y «Borrar».
+// sola al sincronizar y las enseña como cualquier propuesta: «Propuesta IA», con «Pasar al calendario» y «Borrar».
 // Se validan con las mismas reglas que las de Gemini (parseProposal). Nunca se envían a TrainingPeaks.
 
 import type { AiProposal } from '../src/stores/aiStore.ts'
