@@ -11,9 +11,8 @@ Claude Desktop ──► MCP (on your computer) ──► your app (on your comp
 ```
 
 Almost everything is **read-only**. The only writes are saving or deleting in the app the weeks Claude proposes, and only
-when you ask: they show up in Entrenador IA and Plan as «PROPUESTA IA», where you can move them to the calendar if you
-like them. The full design (in Spanish)
-is in [docs/DISENO_MCP.md](docs/DISENO_MCP.md). The tools and their data use Spanish names, like the app.
+when you ask: they show up in Entrenador IA and Plan as «Propuesta IA», where you can move them to the calendar if you
+like them. The tools and their data use Spanish names, like the app.
 
 ## What you can ask
 

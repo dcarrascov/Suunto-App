@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MCP de Suunto Stats (docs/DISENO_MCP.md). Claude Desktop o Claude Code lo arrancan y hablan con él por stdio;
+// MCP de Suunto Stats (cómo usarlo: GUIA_MCP.md). Claude Desktop o Claude Code lo arrancan y hablan con él por stdio;
 // cada herramienta pide los datos a la app (local o en tu servidor) con el token del MCP.
 // stdout es del protocolo: los mensajes para ti van por stderr.
 

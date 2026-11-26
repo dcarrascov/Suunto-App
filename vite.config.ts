@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
   const allowedHosts = true
   return {
     // authPlugin: primero de todos, decide quién entra (AUTH_MODE, ver server/auth.ts) y atiende la API del MCP
-    // (/api/mcp/, con MCP_TOKEN; ver server/mcpApi.ts y docs/DISENO_MCP.md)
+    // (/api/mcp/, con MCP_TOKEN; ver server/mcpApi.ts y GUIA_MCP.md)
     // statePlugin: ruta /api/estado, lo que la app guarda en el navegador también en el servidor (ver server/userState.ts)
     // dataPlugin: en npm run preview, los datos se leen de public/data/ y no de la copia de dist/ (ver server/data.ts)
     // geminiPlugin: ruta /api/gemini (la clave GEMINI_API_KEY se queda en el servidor, ver server/gemini.ts)

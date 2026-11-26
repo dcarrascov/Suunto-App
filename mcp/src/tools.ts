@@ -131,7 +131,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'guardar_propuesta_semana',
     title: 'Guardar una semana en la app',
-    description: 'Guarda en la app una semana propuesta, solo cuando el usuario lo pida. Aparece en Entrenador IA y Plan como «PROPUESTA IA», desde donde puede pasarla al calendario. No se envía a TrainingPeaks. Planifica por tiempo (duracion_min en todas las sesiones salvo descanso).',
+    description: 'Guarda en la app una semana propuesta, solo cuando el usuario lo pida. Aparece en Entrenador IA y Plan como «Propuesta IA», desde donde puede pasarla al calendario. No se envía a TrainingPeaks. Planifica por tiempo (duracion_min en todas las sesiones salvo descanso).',
     input: {
       semana: day('Cualquier día de la semana (de lunes a domingo).'),
       modo: MODE.describe('como_entrenador (al estilo del entrenador) o sin_entrenador (plan propio hacia un objetivo).'),

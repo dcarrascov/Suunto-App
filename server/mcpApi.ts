@@ -1,4 +1,4 @@
-// API del MCP (docs/DISENO_MCP.md): rutas GET /api/mcp/v1/… con tus datos ya resumidos para Claude.
+// API del MCP (GUIA_MCP.md): rutas GET /api/mcp/v1/… con tus datos ya resumidos para Claude.
 // Solo llega aquí lo que entra con MCP_TOKEN (server/auth.ts), y nunca sigue al resto del servidor.
 // Nunca devuelve rutas GPS: cada respuesta se construye campo a campo, sin copiar objetos enteros del disco.
 // Los cálculos son los mismos de la app (src/utils), para que Claude vea los números de la pantalla.
@@ -594,7 +594,7 @@ function proposalWrite(req: IncomingMessage, res: ServerResponse, dir: string, d
       console.log(`[mcp] propuesta guardada: semana del ${p.weekStart} (${b.modo}), ${p.workouts.length} sesiones`)
       send(res, 200, {
         guardada: true, semana: p.weekStart, modo: b.modo, sesiones: p.workouts.length,
-        aviso: 'Aparece en la app (Entrenador IA y Plan) al abrirla o al volver a ella, marcada como PROPUESTA IA. No se envía a TrainingPeaks.',
+        aviso: 'Aparece en la app (Entrenador IA y Plan) al abrirla o al volver a ella, marcada como «Propuesta IA». No se envía a TrainingPeaks.',
       })
     })
     .catch(fail)
